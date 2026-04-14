@@ -1,0 +1,75 @@
+{
+  "description": "PreToolUse skill guards for odsp-web tools. Inject skill context before high-risk operations.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "description": "ow-build / ow-rush: always load ow-dev-build — never npm directly; rush update if package.json changed",
+        "matcher": "ow-build|ow-rush",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-skill-required.sh ow-dev-build",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "description": "ow-start: load ow-dev-debuglink — debug link workflow, port conventions",
+        "matcher": "ow-start",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-skill-required.sh ow-dev-debuglink",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "description": "ow-test: load ow-dev-test — tests run on .js not .ts, coverage thresholds",
+        "matcher": "ow-test",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-skill-required.sh ow-dev-test",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "description": "ow-git: content-based skill injection for git and rush patterns",
+        "matcher": "ow-git",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-skill-rush.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "description": "Bash: inject ow-dev-pr when az repos/pipelines ADO commands are used",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-skill-azcli.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "description": "Reset all skill-guard counters after context compaction",
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/reset-skill-guards.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
