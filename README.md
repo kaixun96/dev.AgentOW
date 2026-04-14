@@ -9,11 +9,30 @@ A Claude Code plugin that provides MCP tools, agents, skills, and hooks for deve
 - Node.js 22+
 - Claude Code CLI
 - GitHub Codespace with odsp-web cloned at `/workspaces/odsp-web`
-- tmux (pre-installed in Codespaces)
+- An Azure DevOps PAT (Personal Access Token) with **Code (Read)** permission
 
 ## Installation
 
-### 1. Build the MCP server
+### 1. Clone the repo into your Codespace
+
+The plugin must live at `/workspaces/dev.AgentOW` inside the Codespace. Since Codespace git credentials only cover the odsp-web repo, you need a PAT to clone from the Developer project.
+
+**Generate a PAT:**
+1. Go to https://dev.azure.com/onedrive/_usersSettings/tokens
+2. Create a token with **Code (Read)** scope
+
+**Clone:**
+```bash
+git clone https://<your-alias>:<PAT>@dev.azure.com/onedrive/Developer/_git/dev.AgentOW /workspaces/dev.AgentOW
+```
+
+After cloning, remove the PAT from the remote URL:
+```bash
+cd /workspaces/dev.AgentOW
+git remote set-url origin https://onedrive@dev.azure.com/onedrive/Developer/_git/dev.AgentOW
+```
+
+### 2. Build the MCP server
 
 ```bash
 cd /workspaces/dev.AgentOW/ts
@@ -21,7 +40,13 @@ npm install
 npm run build
 ```
 
-### 2. Register the plugin
+### 3. Install tmux (if not already installed)
+
+```bash
+sudo apt-get install -y tmux
+```
+
+### 4. Register the plugin
 
 ```bash
 cd /workspaces/odsp-web
@@ -29,7 +54,7 @@ claude plugin marketplace add /workspaces/dev.AgentOW
 claude plugin install agentOW@agentOW --scope project
 ```
 
-### 3. Enable Agent Teams
+### 5. Enable Agent Teams (optional, for orchestrator)
 
 Add to your Claude Code settings (`~/.claude/settings.json`):
 
@@ -41,7 +66,7 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
 }
 ```
 
-### 4. Verify
+### 6. Restart Claude Code and verify
 
 ```bash
 claude plugin list        # agentOW should be enabled
