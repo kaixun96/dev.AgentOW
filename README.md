@@ -93,7 +93,7 @@ git pull
 cd ts
 npm install
 npm run build
-claude plugin upgrade agentOW@agentOW
+claude plugin update agentOW@agentOW
 ```
 
 Then restart Claude Code for MCP server changes to take effect.

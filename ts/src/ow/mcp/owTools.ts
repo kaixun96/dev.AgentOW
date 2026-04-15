@@ -331,7 +331,7 @@ export function registerOwTools(
       isUpToDate,
       behindCount,
       ...(isUpToDate ? {} : {
-        updateCommand: `cd ${pluginRoot} && git pull && cd ts && npm install && npm run build && claude plugin upgrade agentOW@agentOW`,
+        updateCommand: `cd ${pluginRoot} && git pull && cd ts && npm install && npm run build && claude plugin update agentOW@agentOW`,
       }),
     });
   });
