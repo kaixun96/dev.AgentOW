@@ -81,3 +81,37 @@ https://<tenant>.sharepoint.com/sites/<site>/<page>?debugManifestsFile=https://l
 - Dashboard is available at `https://localhost:<port>/dashboard/index.html`.
 - `rush start` must remain running in tmux while debugging — don't kill the session.
 - Only one `rush start` can run at a time — stop existing one before starting another.
+
+## Constructing Full Test URLs
+
+### sp-client (SPFx webparts)
+Combine SharePoint page URL + debug query string from rush start:
+
+```
+Full URL = <page URL> + <debug query string>
+Example: https://microsoft.sharepoint-df.com/sites/JimuCommTest2/SitePages/A-ElevationTest.aspx?debugManifestsFile=https://localhost:4321/temp/manifests.js&loadSPFX=true
+```
+
+Use `ow-debuglink` with `sharePointPageUrl` parameter to construct automatically:
+
+```
+ow-debuglink(sharePointPageUrl="https://microsoft.sharepoint-df.com/sites/JimuCommTest2/SitePages/A-ElevationTest.aspx")
+→ returns fullTestUrl ready for browser_navigate
+```
+
+### odsp-next
+Requires devhost link + cookie injection in browser console.
+Details TBD — see Codespace CLAUDE.md for cookie injection steps.
+Currently falls back to code inspection if odsp-next is detected.
+
+### Default Test Page
+```
+https://microsoft.sharepoint-df.com/sites/JimuCommTest2/SitePages/A-ElevationTest.aspx
+```
+
+The planner can specify a different page in the plan's acceptance criteria.
+The evaluator uses the plan's page if specified, otherwise the default.
+
+### Testing Flights Locally
+sp-client: append `&expOverrides=[[<flightId>,1]]` to the full test URL to enable a flight.
+Disable: append `&expOverrides=[[<flightId>,0]]` instead.

@@ -11,7 +11,7 @@ You are connected to the ow MCP server — a dev toolkit for odsp-web developmen
 - ow-build           — rush build -t <project>. Auto-scopes from git diff if project not specified.
 - ow-test            — rush test with Jest output parsing (passed/failed/skipped).
 - ow-start           — Start rush start --to <project> in a tmux window. Returns tmux target.
-- ow-debuglink       — Extract debug link URL from rush start tmux output.
+- ow-debuglink       — Extract debug link from rush start output. Pass sharePointPageUrl to get a ready-to-use fullTestUrl.
 
 ### Tmux Sessions (for long-running processes like rush start)
 - ow-session-open     — Open/attach a named tmux window.
@@ -24,6 +24,9 @@ You are connected to the ow MCP server — a dev toolkit for odsp-web developmen
 ### Git
 - ow-git             — Run git commands with structured output.
 
+### PR Creation
+- ow-pr-create       — Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
+
 ## Development Loop
 
 Since Claude Code runs directly inside the Codespace, all commands execute locally:
@@ -35,6 +38,7 @@ Since Claude Code runs directly inside the Codespace, all commands execute local
 5. ow-start — rush start in tmux for dev server.
 6. ow-session-capture on 'agentow:rush' — poll until [WATCHING] or FAILURE:.
 7. ow-debuglink — extract debug URL from rush output.
+8. ow-pr-create — push and create draft PR when ready.
 
 ## Rules
 

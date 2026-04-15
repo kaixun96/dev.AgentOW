@@ -28,3 +28,13 @@ export function extractDebugLinks(rushOutput: string): {
 
   return { landingPage, debugQueryString, devhostLink };
 }
+
+/**
+ * Combines a SharePoint page URL with a debug query string into a full test URL.
+ * Handles both cases: page URL with existing query params and without.
+ */
+export function buildFullTestUrl(pageUrl: string, debugQueryString: string): string {
+  const cleanDebug = debugQueryString.replace(/^\?/, "");
+  const separator = pageUrl.includes("?") ? "&" : "?";
+  return pageUrl + separator + cleanDebug;
+}

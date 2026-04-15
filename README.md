@@ -10,6 +10,7 @@ A Claude Code plugin that provides MCP tools, agents, skills, and hooks for deve
 - Claude Code CLI
 - GitHub Codespace with odsp-web cloned at `/workspaces/odsp-web`
 - An Azure DevOps PAT (Personal Access Token) with **Code (Read)** permission
+- Playwright MCP server (for evaluator browser verification)
 
 ## Installation
 
@@ -66,7 +67,15 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
 }
 ```
 
-### 6. Restart Claude Code and verify
+### 6. Register Playwright MCP (for evaluator)
+
+```bash
+claude mcp add --scope user playwright -- npx @playwright/mcp@latest --user-data-dir=/workspaces/.playwright-profile
+```
+
+On first use, the evaluator will open a browser. Log in to SharePoint manually once — the session persists for future runs.
+
+### 7. Restart Claude Code and verify
 
 ```bash
 claude plugin list        # agentOW should be enabled
@@ -86,8 +95,10 @@ claude agent ow-orchestrator
 The orchestrator will coordinate:
 1. **ow-planner** — research codebase, draft plan, ask for approval
 2. **ow-generator** — implement, build, test, start dev server
-3. **ow-evaluator** — verify via code inspection + Playwright
+3. **ow-evaluator** — verify via Playwright MCP on SharePoint pages with debug links
 4. Loop if needed (max 5 cycles)
+5. **ow-review-agent** — code review
+6. **ow-pr-create** — push + draft PR on Azure DevOps
 
 ### Individual agents
 
@@ -115,7 +126,7 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | **Agents** | Workflow separation | orchestrator, initiator, planner, generator, evaluator, reviewer |
 | **Skills** | Knowledge injection | build rules, test rules, git conventions, PR workflow, monorepo reference |
 
-### MCP Tools (13 total)
+### MCP Tools (14 total)
 
 | Tool | Description |
 |------|-------------|
@@ -132,6 +143,7 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | `ow-session-list` | List tmux windows |
 | `ow-session-kill` | Kill tmux window/session |
 | `ow-session-interrupt` | Send Ctrl+C to tmux pane |
+| `ow-pr-create` | Push branch and create draft PR on Azure DevOps |
 
 ### Agents
 
@@ -140,7 +152,7 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | `ow-orchestrator` | opus | Coordinate full pipeline (read-only) |
 | `ow-planner` | opus | Research + plan + user approval (read-only) |
 | `ow-generator` | opus | Implement + build + test + dev server |
-| `ow-evaluator` | opus | Verify acceptance criteria |
+| `ow-evaluator` | opus | Verify via Playwright MCP on SharePoint + code inspection |
 | `ow-review-agent` | inherit | Pre-PR code review (read-only) |
 
 ### Skills
@@ -154,3 +166,4 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | `ow-ref-monorepo` | monorepo structure, Rush/Heft |
 | `ow-dev-pr` | PR, az repos |
 | `search-odspweb-wiki` | wiki, documentation |
+| `ow-dev-playwright` | Playwright MCP, browser verification |

@@ -6,6 +6,7 @@ description: "Coordinate the full agent workflow: planner → generator → eval
 allowedTools:
   - ow-status
   - ow-session-list
+  - ow-pr-create
   - Read
   - Glob
   - Grep
@@ -104,38 +105,67 @@ After completion, read `reportFile` and parse the evaluator's NDJSON line.
 
 ### Step 4: Loop or Complete
 
-**If evaluator result is PASS:**
-1. Inform user: "Feature implementation verified successfully!"
-2. Show summary: tasks completed, tests passed, debug link
-3. Ask: "Would you like me to run a code review (ow-review-agent), push and create a PR, or are we done?"
-
 **If evaluator result is FAIL:**
 1. Check cycle count. If `cycle >= 5`:
    - Inform user: "Max retry cycles reached. Here are the remaining blockers: ..."
+   - Show blockers from evaluator
    - Ask user for guidance
 2. If `cycle < 5`:
    - Inform user: "Evaluation found issues. Starting fix cycle <N+1>..."
    - Show blockers from evaluator
    - Go back to **Step 2** with `cycle = N + 1` and `blockers` from evaluator
 
-### Optional: Code Review
+**If evaluator result is PASS:**
+Proceed to Step 5.
 
-If user requests, invoke `ow-review-agent`:
+### Step 5: Review and PR
+
+#### Step 5a: Code Review
+
+Invoke `ow-review-agent`:
 
 ```
 reportFile: <reportFile>
 branch: <branch>
 ```
 
-Present review findings to user.
+Wait for completion, read review NDJSON from `reportFile`.
 
-### Optional: Push & PR
+#### Step 5b: Check Review Verdict
 
-If user requests, guide them through:
-1. `git push -u origin <branch>`
-2. Create draft PR via `az repos pr create`
+- If `verdict` is `REQUEST_CHANGES` and `criticalCount > 0`:
+  - Show critical findings to user
+  - Ask: "Review found {N} critical issues. Create PR anyway? (yes/no)"
+  - If no → stop and report
+- Otherwise → proceed to PR creation
 
-(The orchestrator does NOT do this directly — it instructs the user or delegates to an appropriate agent.)
+#### Step 5c: Create PR
+
+Invoke `ow-pr-create`:
+
+```
+title: <plan spec title>
+description: |
+  ## Summary
+  <from plan spec>
+
+  ## Changes
+  <list from generator tasksCompleted>
+
+  ## Testing
+  - Build: {buildStatus}
+  - Unit tests: {passed} passed, {failed} failed
+  - Playwright verification: {criteriaResults count} criteria passed
+```
+
+#### Step 5d: Report to User
+
+```
+Feature complete!
+PR: <prUrl>
+Review: <verdict> (<criticalCount> critical, <warningCount> warnings)
+Evaluation report: <evalReportPath>
+```
 
 ## Rules
 

@@ -56,6 +56,17 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "description": "browser_* Playwright MCP tools: load ow-dev-playwright — authentication, page loading, DOM inspection patterns",
+        "matcher": "browser_",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-skill-required.sh ow-dev-playwright",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "PreCompact": [

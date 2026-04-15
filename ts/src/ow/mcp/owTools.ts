@@ -6,7 +6,8 @@ import { OW } from "../../shared/constants.js";
 import { RushCli } from "../tools/rushCli.js";
 import { TmuxManager } from "../tools/tmuxManager.js";
 import { GitClient } from "../tools/gitClient.js";
-import { extractDebugLinks } from "../tools/debugLink.js";
+import { PrClient } from "../tools/prClient.js";
+import { extractDebugLinks, buildFullTestUrl } from "../tools/debugLink.js";
 import { FileLogger, RawOutputLog } from "../../shared/logger.js";
 import {
   registerMcpTool,
@@ -35,6 +36,7 @@ export function registerOwTools(
   const rush = new RushCli(OW.odspWebRoot, logger);
   const tmux = new TmuxManager();
   const git = new GitClient(OW.odspWebRoot);
+  const pr = new PrClient(OW.odspWebRoot, logger);
 
   // ── 1. ow-status ──────────────────────────────────────────────────────────
   registerMcpTool(server, "ow-status", {
@@ -163,16 +165,22 @@ export function registerOwTools(
 
   // ── 6. ow-debuglink ───────────────────────────────────────────────────────
   registerMcpTool(server, "ow-debuglink", {
-    description: "Extract debug link URL from rush start tmux output.",
+    description: "Extract debug link URL from rush start tmux output. Pass sharePointPageUrl to get a ready-to-use fullTestUrl for browser testing.",
     inputSchema: {
       target: z.string().optional().describe("Tmux target (default: agentow:rush)"),
+      sharePointPageUrl: z.string().optional().describe("SharePoint page URL. When provided, returns fullTestUrl = page URL + debug query string combined."),
     },
   }, async (input, extras) => {
     const target = input.target ?? `${OW.tmuxSession}:${OW.rushWindow}`;
     const captured = await tmux.capture(target, 200, extras.signal);
     const links = extractDebugLinks(captured);
+    let fullTestUrl: string | undefined;
+    if (input.sharePointPageUrl && links.debugQueryString) {
+      fullTestUrl = buildFullTestUrl(input.sharePointPageUrl, links.debugQueryString);
+    }
     return successResultWithDebug(logger, "ow-debuglink", {
       ...links,
+      fullTestUrl,
       tmuxTarget: target,
     });
   });
@@ -286,5 +294,26 @@ export function registerOwTools(
       target: input.target,
       message: "Ctrl+C sent.",
     });
+  });
+
+  // ── 14. ow-pr-create ─────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-pr-create", {
+    description: "Push current branch to origin and create a draft PR on Azure DevOps. Branch must match 'user/<alias>/<feature>' pattern. Returns PR URL.",
+    inputSchema: {
+      title: z.string().describe("PR title (keep under 70 chars)"),
+      description: z.string().describe("PR body in markdown"),
+      targetBranch: z.string().optional().describe("Target branch (default: main)"),
+      draft: z.boolean().optional().describe("Create as draft (default: true)"),
+      workItems: z.string().optional().describe("Space-separated work item IDs to link"),
+    },
+  }, async (input, extras) => {
+    const result = await pr.createPr({
+      title: input.title,
+      description: input.description,
+      targetBranch: input.targetBranch,
+      draft: input.draft,
+      workItems: input.workItems,
+    }, extras.signal);
+    return successResultWithDebug(logger, "ow-pr-create", result);
   });
 }
