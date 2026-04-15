@@ -137,8 +137,11 @@ echo "[$(date +%H:%M:%S)] 🔨 Generator completed" >> {progressLog}
 ```
 
 Read `reportFile` and parse the generator's NDJSON line.
+- If the report file is **empty** (0 bytes / no generator line), the generator failed to write its report. Inform the user of this gap, but **still proceed to the evaluator** — the evaluator can verify the implementation state independently via code inspection and Playwright.
 - If `status: "failure"` → inform user, ask whether to retry or stop.
 - If `status: "success"` or `"partial"` → proceed to evaluation.
+
+**Always invoke the evaluator** after the generator completes (unless the user explicitly asks to stop). The evaluator provides independent verification — skipping it leaves the implementation unvalidated.
 
 ### Step 3: Invoke ow-evaluator
 

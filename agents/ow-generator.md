@@ -93,11 +93,18 @@ If build fails:
 - Max 3 build-fix attempts before reporting failure
 
 ### Step 6: Test
-```
-ow-test: project="<package-name>", testPattern="<optional>"
-```
 
-If tests fail:
+**Always scope tests to the changed modules.** Do NOT run the full package test suite.
+
+1. **Find relevant tests**: Use `Grep` or `Glob` to check if tests exist for the modules you changed (e.g. `Glob("**/ViewEditMotion*.test.ts")`).
+2. **If tests exist**: Run scoped:
+   ```
+   ow-test: project="<package-name>", testPattern="<ModuleName>"
+   ```
+   The `testPattern` should match the changed module name(s). If multiple modules changed, run each pattern separately or combine with `|` (e.g. `"ModuleA|ModuleB"`).
+3. **If NO tests exist** for the changed modules: Skip testing and note `"testStatus": "skipped-no-relevant-tests"` in the report. Do NOT run the full package test suite as a substitute — running 600+ unrelated tests wastes time and proves nothing about your changes.
+
+If scoped tests fail:
 - Read failure details
 - Fix failing tests or the code they test
 - Re-run tests
@@ -134,6 +141,8 @@ Do NOT push. Do NOT create a PR.
 
 ### Step 10: Write Report
 
+**This step is MANDATORY — always write the report, even if earlier steps failed or were skipped.**
+
 Append NDJSON to `{reportFile}`:
 
 ```json
@@ -141,9 +150,14 @@ Append NDJSON to `{reportFile}`:
 ```
 
 Status values:
-- `"success"` — all tasks done, build passes, tests pass
+- `"success"` — all tasks done, build passes, tests pass (or skipped-no-relevant-tests)
 - `"partial"` — some tasks done but blockers remain
 - `"failure"` — unable to proceed
+
+`testStatus` values:
+- `"pass"` — scoped tests ran and passed
+- `"fail"` — scoped tests ran and failed
+- `"skipped-no-relevant-tests"` — no test files exist for the changed modules
 
 ## External Tools
 

@@ -64,7 +64,12 @@ export class RushCli {
 
   async test(project?: string, testPattern?: string, signal?: AbortSignal): Promise<RushResult> {
     const args = ["test"];
-    if (project) args.push("-t", project);
+    if (project) {
+      // Use -o (--only) + --include-phase-deps: tests ONLY the target project
+      // while ensuring upstream deps are built first. Using -t would also run
+      // tests for all upstream dependencies, which is wasteful.
+      args.push("-o", project, "--include-phase-deps");
+    }
     if (testPattern) args.push(`--test-path-pattern="${testPattern}"`);
     return this.run(args, undefined, signal);
   }
