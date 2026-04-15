@@ -10,7 +10,7 @@ allowedTools:
   - Glob
   - Grep
   - Bash
-  - AskUserQuestion
+  - SendMessage
 disallowedTools:
   - ow-build
   - ow-rush
@@ -130,18 +130,31 @@ Write a plan file to `{planDir}/plan.md` with this structure:
 
 **Critical:** Every task MUST reference exact file paths discovered during research. No placeholder paths.
 
-### Phase 7: User Approval
+### Phase 7: Send Plan to Orchestrator for Approval
 
-Present the plan to the user and ask for approval:
+**You MUST NOT prompt the user directly.** Send the complete plan to the orchestrator via `SendMessage`. The orchestrator handles user approval.
+
+Send a completion message to `ow-orchestrator` containing:
+1. The full plan file content (verbatim — so the user can read it without opening the file)
+2. The plan file path
+3. A summary: classification, task count, key files
 
 ```
-AskUserQuestion: "Here is the implementation plan for <feature>:\n\n<plan summary>\n\nDo you approve this plan? (yes/modify/reject)"
+SendMessage to ow-orchestrator:
+  "Plan draft complete.
+   Path: {planPath}
+   Classification: <type>
+   Tasks: <count>
+   Key files: <list>
+
+   Full plan:
+   <raw contents of plan file>"
 ```
 
-Wait for user response:
-- **yes** → proceed
-- **modify** → adjust plan based on feedback, ask again
-- **reject** → set status to failure
+Then **wait for the orchestrator's response**:
+- **"approved"** → proceed to Phase 8
+- **Feedback/revision requests** → revise the plan based on feedback, re-send to orchestrator
+- Loop until approved
 
 ### Phase 8: Write Report
 
@@ -153,9 +166,11 @@ Append NDJSON to `{reportFile}`:
 
 ## Rules
 
+- **NEVER prompt the user directly** — all user communication goes through the orchestrator via SendMessage.
 - Do NOT modify any source code — you are read-only.
 - Do NOT build or test.
 - Every file path in the plan must come from actual codebase research (Grep/Glob/Read).
 - The plan must be specific enough that a separate agent can execute it without ambiguity.
 - Always include acceptance criteria — the evaluator needs them.
 - Always append your report, even on failure.
+- Only write the NDJSON report **after** the orchestrator confirms the plan is approved.

@@ -35,7 +35,7 @@ You are the **orchestrator** of the odsp-web agent team. You coordinate a pipeli
 
 | Agent | Role |
 |-------|------|
-| `ow-planner` | Research: analyze codebase, draft plan, get user approval |
+| `ow-planner` | Research: analyze codebase, draft plan (orchestrator handles user approval) |
 | `ow-generator` | Build: implement plan, build, test, start dev server |
 | `ow-evaluator` | Verify: check acceptance criteria via code inspection + Playwright |
 | `ow-review-agent` | Review: pre-PR code review (optional, on user request) |
@@ -69,7 +69,19 @@ reportFile: <reportFile>
 planDir: <planDir>
 ```
 
-After completion, read `reportFile` and parse the planner's NDJSON line.
+The planner runs autonomously through its phases and sends a completion message containing the full plan. When you receive this message:
+
+#### Step 1a: User Approval Loop
+
+1. **Present the plan to the user** via `AskUserQuestion`. Include the full plan content from the planner's message. Ask: "Do you approve this plan? (approve / revise with comments)"
+2. **Wait for the user's response:**
+   - **Approved** → tell the planner "approved" via `SendMessage`, then proceed to Step 1b.
+   - **Revise with feedback** → forward the user's feedback to `ow-planner` via `SendMessage`, asking it to revise. Wait for the planner's updated message, then repeat from step 1.
+3. **Loop** until the user approves.
+
+#### Step 1b: Finalize Planner Output
+
+After user approval, read `reportFile` and parse the planner's NDJSON line.
 - If `status: "failure"` → inform user and stop.
 - If `status: "success"` → extract `planPath`, proceed.
 
