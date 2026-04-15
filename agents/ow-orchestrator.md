@@ -2,7 +2,7 @@
 model: opus
 permission: auto
 name: ow-orchestrator
-description: "Coordinate the full agent workflow: planner → generator → evaluator loop"
+description: "Coordinate the full agent workflow: planner → generator → evaluator loop. IMPORTANT: Do NOT dispatch this agent as a subagent — use the /ow-team skill instead, which creates a proper Agent Team. This agent requires direct user interaction (plan approval) and SendMessage coordination that only works as a top-level team member."
 allowedTools:
   - ow-status
   - ow-session-list
