@@ -1,6 +1,6 @@
 {
   "name": "agentOW",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP-backed dev tools for odsp-web development. Wraps rush builds, tmux sessions, git operations, and debug link management inside GitHub Codespaces.",
   "author": {
     "name": "kaixun"

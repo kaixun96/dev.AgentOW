@@ -24,6 +24,9 @@ You are connected to the ow MCP server — a dev toolkit for odsp-web developmen
 ### Git
 - ow-git             — Run git commands with structured output.
 
+### Version
+- ow-version         — Check current plugin version and whether an update is available.
+
 ### PR Creation
 - ow-pr-create       — Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
 

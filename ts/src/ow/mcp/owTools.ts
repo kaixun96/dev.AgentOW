@@ -296,7 +296,47 @@ export function registerOwTools(
     });
   });
 
-  // ── 14. ow-pr-create ─────────────────────────────────────────────────────
+  // ── 14. ow-version ─────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-version", {
+    description: "Check current plugin version and whether an update is available from the remote repo.",
+  }, async (extras) => {
+    // Read version from plugin.json
+    const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? `${OW.odspWebRoot}/../dev.AgentOW`;
+    let version = "unknown";
+    try {
+      const pkg = JSON.parse(await fs.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
+      version = pkg.version ?? "unknown";
+    } catch { /* ignore */ }
+
+    // Get local and remote HEAD
+    let localCommit = "unknown";
+    let remoteCommit = "unknown";
+    let isUpToDate = false;
+    let behindCount = 0;
+    try {
+      localCommit = (await execSimple(`git -C ${pluginRoot} rev-parse --short HEAD`)).trim();
+      await execSimple(`git -C ${pluginRoot} fetch origin main --quiet`);
+      remoteCommit = (await execSimple(`git -C ${pluginRoot} rev-parse --short origin/main`)).trim();
+      isUpToDate = localCommit === remoteCommit;
+      if (!isUpToDate) {
+        const count = (await execSimple(`git -C ${pluginRoot} rev-list HEAD..origin/main --count`)).trim();
+        behindCount = parseInt(count, 10) || 0;
+      }
+    } catch { /* ignore - git may not be available */ }
+
+    return successResultWithDebug(logger, "ow-version", {
+      version,
+      localCommit,
+      remoteCommit,
+      isUpToDate,
+      behindCount,
+      ...(isUpToDate ? {} : {
+        updateCommand: `cd ${pluginRoot} && git pull && cd ts && npm install && npm run build && claude plugin upgrade agentOW@agentOW`,
+      }),
+    });
+  });
+
+  // ── 15. ow-pr-create ─────────────────────────────────────────────────────
   registerMcpTool(server, "ow-pr-create", {
     description: "Push current branch to origin and create a draft PR on Azure DevOps. Branch must match 'user/<alias>/<feature>' pattern. Returns PR URL.",
     inputSchema: {

@@ -141,7 +141,7 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | **Agents** | Workflow separation | orchestrator, initiator, planner, generator, evaluator, reviewer |
 | **Skills** | Knowledge injection | build rules, test rules, git conventions, PR workflow, monorepo reference |
 
-### MCP Tools (14 total)
+### MCP Tools (15 total)
 
 | Tool | Description |
 |------|-------------|
@@ -158,6 +158,7 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | `ow-session-list` | List tmux windows |
 | `ow-session-kill` | Kill tmux window/session |
 | `ow-session-interrupt` | Send Ctrl+C to tmux pane |
+| `ow-version` | Check plugin version and update availability |
 | `ow-pr-create` | Push branch and create draft PR on Azure DevOps |
 
 ### Agents
