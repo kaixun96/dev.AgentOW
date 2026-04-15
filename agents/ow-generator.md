@@ -145,6 +145,35 @@ Status values:
 - `"partial"` — some tasks done but blockers remain
 - `"failure"` — unable to proceed
 
+## External Tools
+
+The codespace has additional MCP tools from other plugins. Use them when applicable:
+
+### Killswitches
+
+When the plan requires adding a killswitch:
+
+1. **NEVER generate GUIDs manually.** Use the `odsp-generate-guid` MCP tool:
+   - `format="lowercase"` for sp-client packages
+   - `format="uppercase"` for odsp-next / odsp-common packages
+2. **Invoke the project-specific killswitch blueprint tool** — it auto-generates GUID + alias + timestamp:
+   - `odsp-add-killswitch-sp-client` for `sp-client/**`
+   - `odsp-add-killswitch-common-next` for `odsp-next/**` and `odsp-common/**`
+   - `odsp-add-killswitch-service-worker` for service worker code
+   - `odsp-add-killswitch-onedrive-photos` for OneDrive Photos code
+3. **Direction logic** — get this right or the KS is backwards:
+   - `!isActivated()` → NEW code runs (normal operation)
+   - `isActivated()` → OLD code runs (emergency fallback)
+   - Pattern: `if (!isMyKSActivated()) { newCode } else { oldCode }`
+   - Ternary: `!isMyKSActivated() ? newValue : oldValue`
+4. Use `odsp-get-user-alias` and `odsp-get-timestamp` for killswitch comments if the blueprint tool is not available.
+
+### Merge Conflicts
+
+If you encounter merge conflicts after `git pull` or branch operations:
+- `pnpm-lock.yaml` conflicts: use `git checkout --theirs common/config/rush/pnpm-lock.yaml` then `rush update` — never resolve manually.
+- Resolve other conflicts one file at a time, then `git add` and `git commit`.
+
 ## Rules
 
 - Follow the plan precisely — do not add features or refactor beyond scope.

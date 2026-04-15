@@ -65,6 +65,18 @@ Agents communicate via a shared NDJSON report file (`report.json`). Each agent a
 3. Point `command` to a script in `hooks/`
 4. Hook scripts receive tool input on stdin as JSON, emit `{"systemMessage": "..."}` on stdout
 
+## External Tool Integration
+
+agentOW agents reference MCP tools and skills from other codespace plugins rather than reimplementing them:
+
+- **Killswitch tools** (`odsp-generate-guid`, `odsp-add-killswitch-*`) — from `odsp-web-mcp-servers-opt-out`
+- **Bluebird** (`search_code`, `code_history`) — from `odsp-web-mcp-servers-opt-in`
+- **ADO** (`wit_get_work_item`, etc.) — from `odsp-web-mcp-servers-opt-in`
+- **Code review** (`/cr` skill) — from `code-review-tools` plugin
+- **Killswitch conventions** — referenced from `odsp-web-mcp-servers-opt-out/skills/killswitches/SKILL.md`
+
+The `ow-ref-external-tools` skill provides a cheatsheet of all available external tools. Agents reference these tools in their prompts but don't require them — they degrade gracefully if a plugin is not installed.
+
 ## Naming Conventions
 
 - Tools: `ow-<category>` (e.g. `ow-build`, `ow-session-open`)

@@ -75,10 +75,18 @@ Evaluate the changes against these criteria:
 - [ ] Tests cover both happy path and edge cases
 
 #### Killswitches (if applicable)
-- [ ] KillSwitch GUIDs are proper (not placeholder, not manually generated)
+- [ ] KillSwitch GUIDs are proper (not placeholder, not manually generated — must use `odsp-generate-guid` MCP tool)
+- [ ] GUID case is correct: **lowercase** for sp-client, **UPPERCASE** for odsp-next/odsp-common
 - [ ] sp-client packages use `_SPKillSwitch` from `@microsoft/sp-core-library`
 - [ ] odsp-common/odsp-next packages use `KillSwitch` from `@msinternal/utilities-killswitch`
 - [ ] No module-evaluated killswitches in sp-client or odsp-common
+- [ ] **Direction is correct**: `!isActivated()` → new code, `isActivated()` → old/fallback code
+- [ ] if/else pattern: new code in `if (!isKSActivated())` branch, old code in `else` branch
+- [ ] Ternary pattern: `!isKSActivated() ? newValue : oldValue` (new first, old after colon)
+- [ ] No inverted logic (common mistake: `if (isKSActivated()) { newCode }` — this is BACKWARDS)
+- [ ] Newly added functions/classes are NOT wrapped in KS checks (only call sites need protection)
+- [ ] Deleted functions/classes are brought back for the old code path but not wrapped themselves
+- [ ] Multi-file KS uses shared module pattern (one file per KS, not a catch-all KillSwitches.ts)
 
 #### Security
 - [ ] No XSS vulnerabilities (unsanitized user input in DOM)
@@ -123,6 +131,15 @@ Append NDJSON to `{reportFile}`:
 ```json
 {"sender":"ow-review-agent","timestamp":"<ISO>","status":"success","verdict":"APPROVE|REQUEST_CHANGES|COMMENT","criticalCount":0,"warningCount":1,"suggestionCount":2,"details":"<review summary>"}
 ```
+
+## Enhanced Review (Optional)
+
+If the codespace has the `code-review-tools` plugin installed, the `/cr` skill provides a more sophisticated 3-agent parallel review:
+- Agent 1: Correctness & Security
+- Agent 2: Patterns, Modularity & React
+- Agent 3: Docs, Style, Conventions + CLAUDE.md gap analysis
+
+Consider delegating to `/cr` for large diffs. Use the ADO PR diff approach: always compute the merge-base with `git merge-base <targetCommitId> <sourceCommitId>` — do NOT use `lastMergeTargetCommit` directly as the diff baseline.
 
 ## Rules
 

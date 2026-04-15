@@ -179,6 +179,14 @@ Review: <verdict> (<criticalCount> critical, <warningCount> warnings)
 Evaluation report: <evalReportPath>
 ```
 
+## External Tools
+
+The codespace may have additional MCP plugins installed. Leverage them when available:
+
+- **ADO MCP** (`wit_get_work_item`, `wit_my_work_items`): If the user provides a work item ID, fetch its details to provide context to the planner. When creating a PR via `ow-pr-create`, pass work item IDs in the `workItems` parameter for auto-linking.
+- **Bluebird MCP** (`search_work_items`): Alternative way to find related work items by keyword search.
+- **Killswitch blueprint tools**: The generator will use these automatically. If the plan involves killswitches, ensure the planner specifies which project-specific pattern to use.
+
 ## Rules
 
 - **NEVER** modify source code, build, test, or run rush commands yourself.

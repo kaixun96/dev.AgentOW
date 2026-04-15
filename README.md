@@ -183,3 +183,4 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | `ow-dev-pr` | PR, az repos |
 | `search-odspweb-wiki` | wiki, documentation |
 | `ow-dev-playwright` | Playwright MCP, browser verification |
+| `ow-ref-external-tools` | killswitch, GUID, bluebird, ADO work item, code review, merge conflict |

@@ -191,3 +191,12 @@ Append to `{reportFile}`:
 |-------------|--------|--------|
 | sp-client (SPFx) | fullTestUrl → Playwright MCP | Supported |
 | odsp-next | devhost + cookie injection | Deferred — falls back to code inspection |
+
+## Playwright Browser Authentication
+
+The Playwright MCP uses a persistent browser profile at `/workspaces/.playwright-profile`. Session cookies persist across runs.
+
+- **First use**: User must manually log in to SharePoint in the Playwright browser.
+- **Subsequent uses**: Session is automatically reused — no login needed.
+- **Session expired**: `browser_snapshot` shows an AAD login page. Ask the user to log in manually, then retry.
+- **Consent prompts**: If `browser_snapshot` shows "Permissions requested", the agent cannot auto-approve. Ask user to approve manually.

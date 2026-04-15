@@ -69,15 +69,30 @@ Extract:
 - Coding guidelines (typedef enforcement, killswitch patterns)
 - Project structure conventions
 
-### Phase 4: Search Wiki (if needed)
+### Phase 4: Semantic Code Search (Bluebird)
 
-If the feature touches unfamiliar areas, search the ADO wiki:
+The codespace has the **Bluebird MCP** (semantic code search) which is more powerful than grep for understanding code intent. If the opt-in plugin is available:
+
+1. **Call `_get_started` FIRST** — without it, queries return 0 results (Bluebird uses specialized syntax, not natural language).
+2. Use `search_code` with code element prefixes (`class:`, `method:`, `file:`) and file/path filters.
+3. Use `code_history` to understand how a file or symbol evolved.
+4. Use `search_file_paths` to find files by path pattern across the entire repo (even files not in your local workspace).
+
+**Fall back to Grep/Glob** if Bluebird is not available.
+
+### Phase 4b: Search Wiki (if needed)
+
+If the feature touches unfamiliar areas, search the ADO wiki. Prefer Bluebird's `search_wiki` tool if available. Otherwise use the REST API:
 ```bash
 az rest --method POST \
   --uri "https://almsearch.dev.azure.com/onedrive/ODSP-Web/_apis/search/wikisearchresults?api-version=7.0" \
   --resource "499b84ac-1321-427f-aa17-267ca6975798" \
   --body '{"$top": 10, "searchText": "<relevant-query>", "filters": {"Project": ["ODSP-Web"]}}'
 ```
+
+### Phase 4c: Work Item Context (if applicable)
+
+If the user provided an ADO work item ID or the feature relates to a specific ticket, use the **ADO MCP** `wit_get_work_item` tool to pull requirements, acceptance criteria, and linked items. This grounds the plan in the actual spec.
 
 ### Phase 5: Code Research
 
