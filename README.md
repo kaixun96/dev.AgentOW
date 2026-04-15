@@ -83,6 +83,21 @@ claude mcp list           # ow server should be connected
 claude agent              # agents should be listed
 ```
 
+## Upgrading
+
+After the repo is updated with new features or fixes:
+
+```bash
+cd /workspaces/dev.AgentOW
+git pull
+cd ts
+npm install
+npm run build
+claude plugin upgrade agentOW@agentOW
+```
+
+Then restart Claude Code for MCP server changes to take effect.
+
 ## Quick Start
 
 ### Full workflow (orchestrated)
