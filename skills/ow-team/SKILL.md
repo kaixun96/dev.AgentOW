@@ -30,12 +30,14 @@ Run:
 ```bash
 mkdir -p /workspaces/odsp-web/.aero/<session-name>/plans
 touch /workspaces/odsp-web/.aero/<session-name>/report.json
+touch /workspaces/odsp-web/.aero/<session-name>/progress.log
 ```
 
 Record:
 - `sessionName`: the kebab-case name
 - `sessionDir`: `/workspaces/odsp-web/.aero/<session-name>/`
 - `reportFile`: `{sessionDir}/report.json`
+- `progressLog`: `{sessionDir}/progress.log`
 - `planDir`: `{sessionDir}/plans/`
 - `teamName`: `ow-<session-name>` (e.g. `ow-add-loading-spinner`)
 
@@ -94,6 +96,7 @@ prompt:
     Team:         {teamName}
     sessionDir:   {sessionDir}
     reportFile:   {reportFile}
+    progressLog:  {progressLog}
     planDir:      {planDir}
     User task:    {userPrompt}
 
@@ -149,12 +152,21 @@ Team "{teamName}" is live.
 
 Session workspace: {sessionDir}
 Report file:       {reportFile}
+Progress log:      {progressLog}
 
 The orchestrator is running the full development cycle autonomously.
 It will ask for your approval on the implementation plan.
 ```
 
-**Stop here.** Do NOT invoke any tools, agents, or commands after this point unless the user explicitly asks.
+Then start monitoring the progress log so the user sees real-time updates:
+
+```bash
+Monitor: tail -f {progressLog}
+```
+
+This streams orchestrator status updates to the user's terminal as they happen.
+
+**After starting Monitor, stop.** Do NOT invoke any other tools, agents, or commands unless the user explicitly asks.
 
 ---
 

@@ -56,9 +56,26 @@ Set variables:
 - `reportFile` = `/workspaces/odsp-web/.aero/<session-name>/report.json`
 - `planDir` = `/workspaces/odsp-web/.aero/<session-name>/plans/`
 
+Also create the progress log:
+```bash
+touch /workspaces/odsp-web/.aero/<session-name>/progress.log
+```
+
+Set: `progressLog` = `{sessionDir}/progress.log`
+
+Write first progress entry:
+```bash
+echo "[$(date +%H:%M:%S)] 🚀 Session started: <session-name>" >> {progressLog}
+```
+
 Tell the user: "Starting session `<session-name>`"
 
 ### Step 1: Invoke ow-planner
+
+Write progress before invoking:
+```bash
+echo "[$(date +%H:%M:%S)] 📋 Planner started" >> {progressLog}
+```
 
 Send message to `ow-planner`:
 
@@ -73,6 +90,12 @@ The planner runs autonomously through its phases and sends a completion message 
 
 #### Step 1a: User Approval Loop
 
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 📋 Planner completed — plan ready for approval" >> {progressLog}
+echo "[$(date +%H:%M:%S)] ⏸️  Waiting for user to approve plan..." >> {progressLog}
+```
+
 1. **Present the plan to the user** via `AskUserQuestion`. Include the full plan content from the planner's message. Ask: "Do you approve this plan? (approve / revise with comments)"
 2. **Wait for the user's response:**
    - **Approved** → tell the planner "approved" via `SendMessage`, then proceed to Step 1b.
@@ -81,11 +104,21 @@ The planner runs autonomously through its phases and sends a completion message 
 
 #### Step 1b: Finalize Planner Output
 
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] ✅ Plan approved" >> {progressLog}
+```
+
 After user approval, read `reportFile` and parse the planner's NDJSON line.
 - If `status: "failure"` → inform user and stop.
 - If `status: "success"` → extract `planPath`, proceed.
 
 ### Step 2: Invoke ow-generator
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 🔨 Generator started (cycle {N})" >> {progressLog}
+```
 
 Send message to `ow-generator`:
 
@@ -98,11 +131,21 @@ blockers: <blockers from evaluator, or empty array>
 
 The generator will create a feature branch from main if needed.
 
-After completion, read `reportFile` and parse the generator's NDJSON line.
+After completion, write progress and read report:
+```bash
+echo "[$(date +%H:%M:%S)] 🔨 Generator completed" >> {progressLog}
+```
+
+Read `reportFile` and parse the generator's NDJSON line.
 - If `status: "failure"` → inform user, ask whether to retry or stop.
 - If `status: "success"` or `"partial"` → proceed to evaluation.
 
 ### Step 3: Invoke ow-evaluator
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 🔍 Evaluator started (cycle {N})" >> {progressLog}
+```
 
 Send message to `ow-evaluator`:
 
@@ -113,7 +156,12 @@ cycle: <N>
 generatorReport: <generator's NDJSON record as JSON>
 ```
 
-After completion, read `reportFile` and parse the evaluator's NDJSON line.
+After completion, write progress and read report:
+```bash
+echo "[$(date +%H:%M:%S)] 🔍 Evaluator completed" >> {progressLog}
+```
+
+Read `reportFile` and parse the evaluator's NDJSON line.
 
 ### Step 4: Loop or Complete
 
@@ -123,6 +171,10 @@ After completion, read `reportFile` and parse the evaluator's NDJSON line.
    - Show blockers from evaluator
    - Ask user for guidance
 2. If `cycle < 5`:
+   - Write progress:
+     ```bash
+     echo "[$(date +%H:%M:%S)] ⚠️  Evaluation FAIL — starting fix cycle <N+1>" >> {progressLog}
+     ```
    - Inform user: "Evaluation found issues. Starting fix cycle <N+1>..."
    - Show blockers from evaluator
    - Go back to **Step 2** with `cycle = N + 1` and `blockers` from evaluator
@@ -132,7 +184,17 @@ Proceed to Step 5.
 
 ### Step 5: Review and PR
 
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] ✅ Evaluator: ALL PASS" >> {progressLog}
+```
+
 #### Step 5a: Code Review
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 📝 Review started" >> {progressLog}
+```
 
 Invoke `ow-review-agent`:
 
@@ -141,7 +203,12 @@ reportFile: <reportFile>
 branch: <branch>
 ```
 
-Wait for completion, read review NDJSON from `reportFile`.
+Wait for completion. Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 📝 Review completed" >> {progressLog}
+```
+
+Read review NDJSON from `reportFile`.
 
 #### Step 5b: Check Review Verdict
 
@@ -152,6 +219,11 @@ Wait for completion, read review NDJSON from `reportFile`.
 - Otherwise → proceed to PR creation
 
 #### Step 5c: Create PR
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 🚀 Creating PR..." >> {progressLog}
+```
 
 Invoke `ow-pr-create`:
 
@@ -171,6 +243,11 @@ description: |
 ```
 
 #### Step 5d: Report to User
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] ✅ PR created — workflow complete" >> {progressLog}
+```
 
 ```
 Feature complete!
