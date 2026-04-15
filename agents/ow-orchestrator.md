@@ -44,19 +44,19 @@ You are the **orchestrator** of the odsp-web agent team. You coordinate a pipeli
 
 ### Step 0: Create Session
 
-Pick a random fruit name for the session (e.g. `mango`, `kiwi`, `papaya`).
+Derive a short kebab-case session name from the user's feature description (e.g. "add loading spinner to photo grid" → `add-loading-spinner`). Keep it under 30 chars, lowercase, hyphens only.
 
 ```bash
-mkdir -p /workspaces/odsp-web/.aero/<fruit>/plans
-touch /workspaces/odsp-web/.aero/<fruit>/report.json
+mkdir -p /workspaces/odsp-web/.aero/<session-name>/plans
+touch /workspaces/odsp-web/.aero/<session-name>/report.json
 ```
 
 Set variables:
-- `sessionDir` = `/workspaces/odsp-web/.aero/<fruit>/`
-- `reportFile` = `/workspaces/odsp-web/.aero/<fruit>/report.json`
-- `planDir` = `/workspaces/odsp-web/.aero/<fruit>/plans/`
+- `sessionDir` = `/workspaces/odsp-web/.aero/<session-name>/`
+- `reportFile` = `/workspaces/odsp-web/.aero/<session-name>/report.json`
+- `planDir` = `/workspaces/odsp-web/.aero/<session-name>/plans/`
 
-Tell the user: "Starting session `<fruit>` for: <feature description>"
+Tell the user: "Starting session `<session-name>`"
 
 ### Step 1: Invoke ow-planner
 
