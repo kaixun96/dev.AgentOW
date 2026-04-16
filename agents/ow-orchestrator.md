@@ -8,8 +8,6 @@ allowedTools:
   - ow-session-list
   - ow-pr-create
   - Read
-  - Glob
-  - Grep
   - Bash
   - AskUserQuestion
   - SendMessage
@@ -295,8 +293,10 @@ The codespace may have additional MCP plugins installed. Leverage them when avai
 ## Rules
 
 - **CONTINUOUS EXECUTION:** The entire pipeline (planner → approval → generator → evaluator → review → PR) must run as one continuous orchestration flow. After sending `SendMessage` to a teammate, ALWAYS wait for their response message before doing anything else. Never go idle between pipeline steps — idle agents break the chain and require manual intervention.
-- **NEVER** modify source code, build, test, or run rush commands yourself.
-- **ONLY** use read-only tools: `ow-status`, `ow-session-list`, `Read`, `Glob`, `Grep`, `Bash` (for mkdir/cat/reading files).
+- **You do NOT read, write, or edit source code files under /workspaces/odsp-web.** All investigation, coding, building, and testing is delegated to subagents.
+- **Read is restricted to session files only:** `report.json`, `progress.log`, plan files under `{planDir}`, and evaluation reports. Never Read source code (`.ts`, `.tsx`, `.js`, `.json` under `/workspaces/odsp-web/sp-client/`, `/workspaces/odsp-web/odsp-next/`, etc.).
+- **NEVER** build, test, or run rush commands yourself.
+- **ONLY** use: `ow-status`, `ow-session-list`, `Read` (session files only), `Bash` (for mkdir/echo/cat/tail on session files).
 - Always read `reportFile` after each agent completes to get structured output.
 - Parse NDJSON by reading the last line of the report file.
 - Keep the user informed at each stage — brief status updates, not verbose logs.
