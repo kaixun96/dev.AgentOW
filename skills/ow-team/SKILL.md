@@ -1,145 +1,190 @@
 ---
 name: ow-team
-description: "Use when the user asks to run the full odsp-web agent workflow, kick off the agent team, run end-to-end development, orchestrate the full cycle, or wants autonomous feature implementation. Runs a synchronous pipeline: planner → user approval → generator → evaluator → review → PR."
+description: "Use when the user asks to run the full odsp-web agent workflow, kick off the agent team, run end-to-end development, orchestrate the full cycle, or wants autonomous feature implementation. Creates a persistent team of 5 agents — orchestrator runs the full pipeline while you step back."
 ---
 
-# odsp-web Agent Pipeline
+# odsp-web Agent Team
 
-Run the full development pipeline synchronously. **You are a dispatcher** — set up the session, fill in variables, fire each agent, show results to user. Do NOT read intermediate files, interpret agent output, or compose custom prompts. Just plug variables into the templates below and execute.
+Create a persistent agent team for the full development pipeline. **You are a launcher** — set up the session, read agent definitions, create the team, spawn agents, start monitoring, then step back.
 
-## Pipeline
+> **Why Team mode over Subagent serial:** Team agents are persistent — the generator in cycle 2 is the same instance as cycle 1, retaining full context of what it tried, what failed, and what code it wrote. Subagent serial mode destroys this context between cycles.
 
-```
-Setup → Planner → User Approval → Generator → Evaluator → [loop if FAIL] → Review → PR
-```
-
-All agents run **foreground** (synchronous). Data flows via files — each agent reads what the previous one wrote. You only pass file paths.
+> **Why inline agent definitions:** After context compaction, agents that were told to "read a file" lose the content. Embedding the full MD content in the spawn prompt ensures the agent definition survives compaction.
 
 ---
 
-## Step 1: Setup
+## Step 1: Capture User Request and Setup Session
 
-Derive a kebab-case `sessionName` from the user's request (under 30 chars). Run:
+Record the user's exact request as `userPrompt`. Derive a kebab-case session name (under 30 chars).
 
 ```bash
-mkdir -p /workspaces/odsp-web/.aero/{sessionName}/plans
-touch /workspaces/odsp-web/.aero/{sessionName}/report.json
+mkdir -p /workspaces/odsp-web/.aero/<session-name>/plans
+touch /workspaces/odsp-web/.aero/<session-name>/report.json
+touch /workspaces/odsp-web/.aero/<session-name>/progress.log
 ```
 
-Set these variables once — they're reused in every prompt below:
+Record variables:
 
 | Variable | Value |
 |----------|-------|
+| `{sessionName}` | kebab-case name |
 | `{sessionDir}` | `/workspaces/odsp-web/.aero/{sessionName}/` |
 | `{reportFile}` | `{sessionDir}/report.json` |
+| `{progressLog}` | `{sessionDir}/progress.log` |
 | `{planDir}` | `{sessionDir}/plans/` |
-| `{planPath}` | `{planDir}/plan.md` |
-| `{userPrompt}` | The user's exact request |
-| `{featureName}` | Short kebab-case feature name |
+| `{teamName}` | `ow-{sessionName}` |
+| `{userPrompt}` | user's exact request |
 
-Tell the user: `Session: {sessionDir} — starting pipeline.`
-
----
-
-## Step 2: Planner
-
-Fire and forget — the agent reads the codebase, writes `{planPath}`, returns the plan content.
-
-```
-Agent({
-  subagent_type: "agentOW:ow-planner",
-  description: "Plan: {featureName}",
-  prompt: "
-    featureName: {featureName}
-    userRequest: {userPrompt}
-    reportFile: {reportFile}
-    planDir: {planDir}
-    Return the full plan content when done. Do NOT use SendMessage.
-  "
-})
-```
-
-Show the returned plan to the user. Ask: **approve or revise?**
-- Revise → re-invoke planner with feedback appended to `userRequest`.
-- Approve → proceed.
+Tell the user: `Session workspace initialized at {sessionDir}. Reading agent definitions...`
 
 ---
 
-## Step 3: Generator
+## Step 2: Read All Agent MD Files
 
-```
-Agent({
-  subagent_type: "agentOW:ow-generator",
-  description: "Build: {featureName}",
-  mode: "bypassPermissions",
-  prompt: "
-    planPath: {planPath}
-    reportFile: {reportFile}
-    cycle: {N}
-    blockers: {blockers or []}
-    Return: tasks completed, build status, test status. Do NOT use SendMessage.
-  "
-})
-```
+Read all 5 agent MD files using the `Read` tool. Store the full content of each.
 
-Show the summary to the user. If status is `failure` → ask user to retry or stop.
+| Variable | File path |
+|----------|-----------|
+| `{orchestratorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-orchestrator.md` |
+| `{plannerMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-planner.md` |
+| `{generatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-generator.md` |
+| `{evaluatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator.md` |
+| `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
+
+Read all 5 in parallel. Do not proceed until all reads are complete.
 
 ---
 
-## Step 4: Evaluator
+## Step 3: Create the Team
 
-```
-Agent({
-  subagent_type: "agentOW:ow-evaluator",
-  description: "Verify: {featureName}",
-  mode: "bypassPermissions",
-  prompt: "
-    planPath: {planPath}
-    reportFile: {reportFile}
-    cycle: {N}
-    Return: PASS/FAIL, criteria results, blockers. Do NOT use SendMessage.
-  "
-})
-```
+Call `TeamCreate`:
 
-**If FAIL and cycle < 5:** show blockers to user, go back to Step 3 with `cycle = N+1` and `blockers` from evaluator.
-**If FAIL and cycle >= 5:** show blockers, ask user for guidance.
-**If PASS:** proceed.
+```json
+{
+  "team_name": "{teamName}",
+  "description": "odsp-web full development cycle — planner → generator → evaluator loop",
+  "agent_type": "coordinator"
+}
+```
 
 ---
 
-## Step 5: Review
+## Step 4: Spawn the Agents
+
+Spawn all 5 agents using the `Agent` tool. Use `subagent_type: general-purpose` for all.
+
+> **Why general-purpose:** Custom `subagent_type` values like `agentOW:*` are not supported for team member spawning. Agent behavior comes entirely from the `prompt` parameter — each agent receives its full definition inlined.
+
+### Agent 1 — ow-orchestrator (active, spawn FIRST)
 
 ```
-Agent({
-  subagent_type: "agentOW:ow-review-agent",
-  description: "Review: {featureName}",
-  prompt: "
-    reportFile: {reportFile}
-    branch: <current git branch>
-    Return: verdict, findings, checklist. Do NOT use SendMessage.
-  "
-})
+subagent_type: general-purpose
+team_name: {teamName}
+name: ow-orchestrator
+prompt:
+  You are ow-orchestrator. Follow this agent definition exactly:
+
+  ======= AGENT DEFINITION START =======
+  {orchestratorMd}
+  ======= AGENT DEFINITION END =======
+
+  Session context (already initialized — skip Step 0):
+    Team:         {teamName}
+    sessionDir:   {sessionDir}
+    reportFile:   {reportFile}
+    progressLog:  {progressLog}
+    planDir:      {planDir}
+    User task:    {userPrompt}
+
+  Team members waiting for your instructions (use SendMessage by name):
+    - ow-planner
+    - ow-generator
+    - ow-evaluator
+    - ow-review-agent
+
+  CRITICAL: After sending SendMessage to a teammate, you MUST wait for
+  their response message before doing anything else. The full pipeline
+  (planner → approval → generator → evaluator → review → PR) must run
+  as one continuous flow. Never go idle between steps.
+
+  Start immediately with Step 1 (invoke ow-planner).
 ```
 
-If critical issues → show to user, ask whether to proceed.
+### Agents 2–5 — idle members (spawn AFTER orchestrator)
+
+For each idle agent, use this template:
+
+| `name` | MD variable |
+|--------|-------------|
+| `ow-planner` | `{plannerMd}` |
+| `ow-generator` | `{generatorMd}` |
+| `ow-evaluator` | `{evaluatorMd}` |
+| `ow-review-agent` | `{reviewMd}` |
+
+```
+subagent_type: general-purpose
+team_name: {teamName}
+name: {agentName}
+prompt:
+  You are {agentName}. Follow this agent definition exactly:
+
+  ======= AGENT DEFINITION START =======
+  {agentMd}
+  ======= AGENT DEFINITION END =======
+
+  Team: {teamName}
+  Session workspace: {sessionDir}
+  Shared report file: {reportFile}
+
+  ACTIVATION: Do NOT start working until ow-orchestrator contacts you
+  via SendMessage. Wait silently until then.
+
+  ## Shutdown protocol
+  If you receive a message with {"type":"shutdown_request"}, immediately
+  call SendMessage back to the sender with:
+    {"type":"shutdown_response","request_id":"<echo the request_id>","approve":true}
+  Then stop all work.
+```
 
 ---
 
-## Step 6: Create PR
+## Step 5: Start Monitoring and Step Back
 
-Use `ow-pr-create` with info from `{reportFile}` (the review agent and generator both wrote there).
+After all 5 agents are spawned, tell the user:
 
-Report the PR URL to the user.
+```
+Team "{teamName}" is live.
+
+  ow-orchestrator   — running (driving the pipeline)
+  ow-planner        — idle (waiting for orchestrator)
+  ow-generator      — idle (waiting for orchestrator)
+  ow-evaluator      — idle (waiting for orchestrator)
+  ow-review-agent   — idle (waiting for orchestrator)
+
+Session workspace: {sessionDir}
+Progress log:      {progressLog}
+
+The orchestrator will ask for your approval on the implementation plan.
+```
+
+Start monitoring the progress log:
+
+```bash
+Monitor: tail -f {progressLog}
+```
+
+This streams orchestrator status updates to the user's terminal as they happen.
+
+**After starting Monitor, stop.** Do NOT invoke any other tools, agents, or commands unless the user explicitly asks.
 
 ---
 
 ## Rules
 
-- **You are a dispatcher, not an interpreter.** Copy-paste the prompt templates above, fill in variables, fire. Do NOT read `{reportFile}` yourself, do NOT rewrite agent prompts, do NOT add context from previous steps.
-- **All agents foreground.** Never use `run_in_background: true`.
-- **Data flows via files.** `{planPath}` and `{reportFile}` are the shared state. Each agent reads what it needs from these files.
-- **No TeamCreate, no SendMessage, no orchestrator agent.**
-- **`subagent_type` loads the agent definition.** Do NOT inline agent MD content in prompts — the subagent_type already provides it.
-- User approval between planner and generator — never skip.
-- Max 5 generator-evaluator cycles.
+- **You are a launcher, not the orchestrator.** Never plan, build, coordinate, or read the report file yourself.
+- **Do not use the `Agent` tool after Step 4.**
+- Read all agent MD files (Step 2) before calling TeamCreate or spawning any agent.
+- Spawn the orchestrator **first** so it is running before the idle agents join.
+- If the user asks for a status update, use `SendMessage` to query `ow-orchestrator` by name — the orchestrator is the single source of truth.
+- If the user asks to shut down, send `{"type": "shutdown_request"}` via `SendMessage` to `ow-orchestrator` first; it will relay the shutdown to its team members.
+- Team members must NEVER message each other directly — all communication is brokered through `ow-orchestrator`.
