@@ -111,13 +111,15 @@ In any Claude Code session, use the `/ow-team` skill:
 
 Or just describe what you want — the skill triggers on keywords like "run the agent workflow", "implement a feature", etc.
 
-This creates a team of 5 specialized agents:
-1. **ow-planner** — research codebase, draft plan, ask for approval
-2. **ow-generator** — implement, build, test, start dev server
-3. **ow-evaluator** — verify via Playwright MCP on SharePoint pages with debug links
-4. Loop if needed (max 5 cycles)
-5. **ow-review-agent** — code review
-6. **ow-pr-create** — push + draft PR on Azure DevOps
+This creates a persistent team of 5 agents. The orchestrator drives the full pipeline:
+
+1. **ow-planner** researches the codebase and drafts an implementation plan
+2. **ow-orchestrator** presents the plan to you for approval
+3. **ow-generator** implements the plan — code, build, test, start dev server
+4. **ow-evaluator** verifies acceptance criteria via Playwright MCP on SharePoint pages
+5. If evaluator finds issues, generator fixes them (max 5 cycles)
+6. **ow-review-agent** performs code review (+ superpowers deep review if available)
+7. Orchestrator pushes the branch and creates a draft PR on Azure DevOps
 
 > **Note:** Do NOT use `claude agent ow-orchestrator` directly — use `/ow-team` which properly sets up the Agent Team with all members.
 
