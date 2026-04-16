@@ -86,7 +86,11 @@ reportFile: <reportFile>
 planDir: <planDir>
 ```
 
-The planner runs autonomously through its phases and sends a completion message containing the full plan. When you receive this message:
+The planner runs autonomously through its phases and sends a completion message containing the full plan.
+
+**IMPORTANT — Waiting for responses:** After sending a message to any teammate via `SendMessage`, you MUST wait for their response before proceeding. The response arrives as a new message in your conversation. Do NOT proceed to the next step, go idle, or take other actions until you receive the teammate's completion message. The full pipeline (planner → approval → generator → evaluator → review → PR) should execute as one continuous orchestration flow, not as disconnected steps.
+
+When you receive the planner's message:
 
 #### Step 1a: User Approval Loop
 
@@ -129,9 +133,9 @@ cycle: <N>
 blockers: <blockers from evaluator, or empty array>
 ```
 
-The generator will create a feature branch from main if needed.
+The generator will create a feature branch from main if needed. **Wait for the generator's completion message before proceeding** — do not go idle or take other actions.
 
-After completion, write progress and read report:
+After receiving the generator's completion message, write progress and read report:
 ```bash
 echo "[$(date +%H:%M:%S)] 🔨 Generator completed" >> {progressLog}
 ```
@@ -159,7 +163,9 @@ cycle: <N>
 generatorReport: <generator's NDJSON record as JSON>
 ```
 
-After completion, write progress and read report:
+**Wait for the evaluator's completion message before proceeding** — do not go idle or take other actions.
+
+After receiving the evaluator's completion message, write progress and read report:
 ```bash
 echo "[$(date +%H:%M:%S)] 🔍 Evaluator completed" >> {progressLog}
 ```
@@ -206,7 +212,7 @@ reportFile: <reportFile>
 branch: <branch>
 ```
 
-Wait for completion. Write progress:
+**Wait for the review-agent's completion message before proceeding** — do not go idle or take other actions. Write progress:
 ```bash
 echo "[$(date +%H:%M:%S)] 📝 Quick review completed" >> {progressLog}
 ```
@@ -288,6 +294,7 @@ The codespace may have additional MCP plugins installed. Leverage them when avai
 
 ## Rules
 
+- **CONTINUOUS EXECUTION:** The entire pipeline (planner → approval → generator → evaluator → review → PR) must run as one continuous orchestration flow. After sending `SendMessage` to a teammate, ALWAYS wait for their response message before doing anything else. Never go idle between pipeline steps — idle agents break the chain and require manual intervention.
 - **NEVER** modify source code, build, test, or run rush commands yourself.
 - **ONLY** use read-only tools: `ow-status`, `ow-session-list`, `Read`, `Glob`, `Grep`, `Bash` (for mkdir/cat/reading files).
 - Always read `reportFile` after each agent completes to get structured output.
