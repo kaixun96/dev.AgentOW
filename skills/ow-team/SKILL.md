@@ -5,201 +5,130 @@ description: "Use when the user asks to run the full odsp-web agent workflow, ki
 
 # odsp-web Agent Pipeline
 
-Run the full development pipeline synchronously. **You (the main agent) ARE the orchestrator.** No Team, no orchestrator agent — you directly spawn each agent as a foreground sub-agent and chain the results.
+Run the full development pipeline synchronously. **You are a dispatcher** — set up the session, fill in variables, fire each agent, show results to user. Do NOT read intermediate files, interpret agent output, or compose custom prompts. Just plug variables into the templates below and execute.
 
 ## Pipeline
 
 ```
-Planner (sync) → User Approval → Generator (sync) → Evaluator (sync) → Review (sync) → PR
+Setup → Planner → User Approval → Generator → Evaluator → [loop if FAIL] → Review → PR
 ```
 
-Each agent is spawned via the `Agent` tool in **foreground mode** (not background). It runs to completion and returns its results directly. You then use those results to invoke the next step.
+All agents run **foreground** (synchronous). Data flows via files — each agent reads what the previous one wrote. You only pass file paths.
 
 ---
 
-## Step 1: Setup Session
+## Step 1: Setup
 
-Record the user's exact request as `userPrompt`. Derive a kebab-case session name (under 30 chars).
+Derive a kebab-case `sessionName` from the user's request (under 30 chars). Run:
 
 ```bash
-mkdir -p /workspaces/odsp-web/.aero/<session-name>/plans
-touch /workspaces/odsp-web/.aero/<session-name>/report.json
+mkdir -p /workspaces/odsp-web/.aero/{sessionName}/plans
+touch /workspaces/odsp-web/.aero/{sessionName}/report.json
 ```
 
-Record: `sessionDir`, `reportFile`, `planDir`.
+Set these variables once — they're reused in every prompt below:
 
-Tell the user: `Session initialized at {sessionDir}. Starting planner...`
+| Variable | Value |
+|----------|-------|
+| `{sessionDir}` | `/workspaces/odsp-web/.aero/{sessionName}/` |
+| `{reportFile}` | `{sessionDir}/report.json` |
+| `{planDir}` | `{sessionDir}/plans/` |
+| `{planPath}` | `{planDir}/plan.md` |
+| `{userPrompt}` | The user's exact request |
+| `{featureName}` | Short kebab-case feature name |
 
----
-
-## Step 2: Read Agent Definitions
-
-Read **4** agent MD files (no orchestrator needed):
-
-| Variable | File path |
-|----------|-----------|
-| `{plannerMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-planner.md` |
-| `{generatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-generator.md` |
-| `{evaluatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator.md` |
-| `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
-
-Read all 4 in parallel. Do not proceed until all reads are complete.
+Tell the user: `Session: {sessionDir} — starting pipeline.`
 
 ---
 
-## Step 3: Invoke Planner (foreground)
+## Step 2: Planner
 
-Spawn a **foreground** Agent (NOT background):
+Fire and forget — the agent reads the codebase, writes `{planPath}`, returns the plan content.
 
 ```
 Agent({
-  name: "ow-planner",
   subagent_type: "agentOW:ow-planner",
-  description: "Plan: <short task description>",
+  description: "Plan: {featureName}",
   prompt: "
-    You are ow-planner. Follow this agent definition exactly:
-
-    ======= AGENT DEFINITION START =======
-    {plannerMd}
-    ======= AGENT DEFINITION END =======
-
-    featureName: <feature-name>
-    userRequest: <userPrompt>
+    featureName: {featureName}
+    userRequest: {userPrompt}
     reportFile: {reportFile}
     planDir: {planDir}
-
-    When done, return the full plan content in your response.
-    Do NOT use SendMessage — just return your results directly.
+    Return the full plan content when done. Do NOT use SendMessage.
   "
 })
 ```
 
-The planner runs synchronously and returns the plan in the tool result.
+Show the returned plan to the user. Ask: **approve or revise?**
+- Revise → re-invoke planner with feedback appended to `userRequest`.
+- Approve → proceed.
 
 ---
 
-## Step 4: User Approval
-
-Present the plan to the user. Ask: "Do you approve this plan? (approve / revise)"
-
-- **Approved** → proceed to Step 5.
-- **Revise** → re-invoke the planner with feedback, then re-present. Loop until approved.
-
----
-
-## Step 5: Invoke Generator (foreground)
+## Step 3: Generator
 
 ```
 Agent({
-  name: "ow-generator",
   subagent_type: "agentOW:ow-generator",
-  description: "Implement: <short task description>",
+  description: "Build: {featureName}",
   mode: "bypassPermissions",
   prompt: "
-    You are ow-generator. Follow this agent definition exactly:
-
-    ======= AGENT DEFINITION START =======
-    {generatorMd}
-    ======= AGENT DEFINITION END =======
-
-    planPath: {planDir}/plan.md
+    planPath: {planPath}
     reportFile: {reportFile}
-    cycle: 1
-    blockers: []
-
-    When done, return a summary: tasks completed, build status, test status, debug URL.
-    Do NOT use SendMessage — just return your results directly.
+    cycle: {N}
+    blockers: {blockers or []}
+    Return: tasks completed, build status, test status. Do NOT use SendMessage.
   "
 })
 ```
 
-Parse the generator's result. If failure → ask user whether to retry or stop.
+Show the summary to the user. If status is `failure` → ask user to retry or stop.
 
 ---
 
-## Step 6: Invoke Evaluator (foreground)
+## Step 4: Evaluator
 
 ```
 Agent({
-  name: "ow-evaluator",
   subagent_type: "agentOW:ow-evaluator",
-  description: "Evaluate: <short task description>",
+  description: "Verify: {featureName}",
   mode: "bypassPermissions",
   prompt: "
-    You are ow-evaluator. Follow this agent definition exactly:
-
-    ======= AGENT DEFINITION START =======
-    {evaluatorMd}
-    ======= AGENT DEFINITION END =======
-
-    planPath: {planDir}/plan.md
+    planPath: {planPath}
     reportFile: {reportFile}
-    cycle: 1
-
-    When done, return: overall PASS/FAIL, criteria results, and any blockers.
-    Do NOT use SendMessage — just return your results directly.
+    cycle: {N}
+    Return: PASS/FAIL, criteria results, blockers. Do NOT use SendMessage.
   "
 })
 ```
 
-### Loop on Failure
-
-If evaluator returns FAIL and cycle < 5:
-1. Show blockers to user.
-2. Re-invoke generator (Step 5) with `cycle = N+1` and `blockers` from evaluator.
-3. Re-invoke evaluator (Step 6).
-4. Repeat until PASS or cycle >= 5.
-
-If cycle >= 5: show remaining blockers, ask user for guidance.
+**If FAIL and cycle < 5:** show blockers to user, go back to Step 3 with `cycle = N+1` and `blockers` from evaluator.
+**If FAIL and cycle >= 5:** show blockers, ask user for guidance.
+**If PASS:** proceed.
 
 ---
 
-## Step 7: Invoke Review Agent (foreground)
+## Step 5: Review
 
 ```
 Agent({
-  name: "ow-review-agent",
   subagent_type: "agentOW:ow-review-agent",
-  description: "Review: <short task description>",
+  description: "Review: {featureName}",
   prompt: "
-    You are ow-review-agent. Follow this agent definition exactly:
-
-    ======= AGENT DEFINITION START =======
-    {reviewMd}
-    ======= AGENT DEFINITION END =======
-
     reportFile: {reportFile}
-    branch: <current branch>
-
-    When done, return: verdict (APPROVE/REQUEST_CHANGES), findings, checklist.
-    Do NOT use SendMessage — just return your results directly.
+    branch: <current git branch>
+    Return: verdict, findings, checklist. Do NOT use SendMessage.
   "
 })
 ```
 
-If critical issues found → show to user, ask whether to proceed.
+If critical issues → show to user, ask whether to proceed.
 
 ---
 
-## Step 8: Create PR
+## Step 6: Create PR
 
-Use `ow-pr-create` to push and create a draft PR:
-
-```
-title: <from plan spec>
-description: |
-  ## Summary
-  <from plan>
-
-  ## Changes
-  <from generator>
-
-  ## Testing
-  - Build: {buildStatus}
-  - Tests: {testStatus}
-  - Evaluation: {evalResult}
-  - Review: {reviewVerdict}
-```
+Use `ow-pr-create` with info from `{reportFile}` (the review agent and generator both wrote there).
 
 Report the PR URL to the user.
 
@@ -207,11 +136,10 @@ Report the PR URL to the user.
 
 ## Rules
 
-- **You ARE the orchestrator.** Drive the pipeline yourself — do not spawn a separate orchestrator agent.
-- **All agents run in foreground (synchronous).** Do NOT use `run_in_background: true` for pipeline agents.
-- **Agents return results directly.** Tell agents "Do NOT use SendMessage — just return your results directly."
-- **No TeamCreate.** No team infrastructure needed — this is a sequential pipeline.
-- Each agent's full MD definition must be inlined in the prompt (survives context compaction).
-- User approval happens between planner and generator — never skip it.
-- Maximum 5 generator-evaluator cycles before escalating to user.
-- If any agent fails, present the error and ask user how to proceed.
+- **You are a dispatcher, not an interpreter.** Copy-paste the prompt templates above, fill in variables, fire. Do NOT read `{reportFile}` yourself, do NOT rewrite agent prompts, do NOT add context from previous steps.
+- **All agents foreground.** Never use `run_in_background: true`.
+- **Data flows via files.** `{planPath}` and `{reportFile}` are the shared state. Each agent reads what it needs from these files.
+- **No TeamCreate, no SendMessage, no orchestrator agent.**
+- **`subagent_type` loads the agent definition.** Do NOT inline agent MD content in prompts — the subagent_type already provides it.
+- User approval between planner and generator — never skip.
+- Max 5 generator-evaluator cycles.
