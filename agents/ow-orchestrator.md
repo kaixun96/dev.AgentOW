@@ -192,11 +192,11 @@ Write progress:
 echo "[$(date +%H:%M:%S)] ✅ Evaluator: ALL PASS" >> {progressLog}
 ```
 
-#### Step 5a: Code Review
+#### Step 5a: Quick Review (ow-review-agent)
 
 Write progress:
 ```bash
-echo "[$(date +%H:%M:%S)] 📝 Review started" >> {progressLog}
+echo "[$(date +%H:%M:%S)] 📝 Quick review started (ow-review-agent)" >> {progressLog}
 ```
 
 Invoke `ow-review-agent`:
@@ -208,16 +208,35 @@ branch: <branch>
 
 Wait for completion. Write progress:
 ```bash
-echo "[$(date +%H:%M:%S)] 📝 Review completed" >> {progressLog}
+echo "[$(date +%H:%M:%S)] 📝 Quick review completed" >> {progressLog}
 ```
 
 Read review NDJSON from `reportFile`.
 
-#### Step 5b: Check Review Verdict
+#### Step 5b: Deep Review (superpowers)
 
-- If `verdict` is `REQUEST_CHANGES` and `criticalCount > 0`:
-  - Show critical findings to user
-  - Ask: "Review found {N} critical issues. Create PR anyway? (yes/no)"
+If the `superpowers:requesting-code-review` skill is available, run a second deep review:
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 📝 Deep review started (superpowers)" >> {progressLog}
+```
+
+Invoke the `superpowers:requesting-code-review` skill via `Skill` tool. This dispatches an independent code-reviewer subagent that examines the full diff against the plan and coding standards.
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 📝 Deep review completed" >> {progressLog}
+```
+
+If superpowers is not available, skip this step and proceed with only the quick review results.
+
+#### Step 5c: Check Review Verdict
+
+Combine findings from both reviews. Use the **stricter** verdict:
+- If either review has `REQUEST_CHANGES` with critical issues:
+  - Show all critical findings to user (from both reviews)
+  - Ask: "Reviews found {N} critical issues. Create PR anyway? (yes/no)"
   - If no → stop and report
 - Otherwise → proceed to PR creation
 
