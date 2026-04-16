@@ -23,6 +23,7 @@ allowedTools:
   - Glob
   - Grep
   - Bash
+  - SendMessage
 ---
 
 # ow-generator
@@ -41,6 +42,15 @@ You receive a message from the orchestrator containing:
 - `branch` — current feature branch
 - `cycle` — iteration number (1 = first attempt, 2+ = fix cycle after evaluator feedback)
 - `blockers` — (cycle 2+) array of blocker objects from evaluator with `description` and `suggestedFix`
+
+## Two-Phase Reporting
+
+The generator uses a **two-phase reporting** protocol to enable parallelism:
+
+1. **`code_done`** — sent immediately after code is implemented and committed (Step 6). The orchestrator uses this signal to dispatch the evaluator (code inspection) and review-agent **in parallel with the build**.
+2. **`build_done`** — sent after build, test, and dev server are ready (Step 11).
+
+This means Steps 7–11 run concurrently with the evaluator and review-agent.
 
 ## Steps
 
@@ -85,7 +95,34 @@ If any `package.json` was modified:
 ow-rush: command="update"
 ```
 
-### Step 5: Build
+### Step 5: Commit Changes
+
+**Commit BEFORE building** so that the evaluator (code inspection) and review-agent can start working in parallel with the build.
+
+```bash
+git add <specific-files>
+git commit -m "<descriptive commit message>"
+```
+
+Do NOT push. Do NOT create a PR.
+
+### Step 6: Send `code_done` Interim Report
+
+Immediately after committing, send an interim message to `ow-orchestrator` via `SendMessage`. This allows the orchestrator to dispatch the evaluator and review-agent in parallel while you continue building.
+
+```
+SendMessage to ow-orchestrator:
+  "phase: code_done
+   cycle: <N>
+   planPath: <path>
+   tasksCompleted: [<task1>, <task2>]
+   tasksPending: []
+   details: <brief narrative of what was implemented>"
+```
+
+**Do NOT wait for a response.** Continue immediately to Step 7.
+
+### Step 7: Build
 ```
 ow-build: project="<package-name>"
 ```
@@ -96,7 +133,9 @@ If build fails:
 - Rebuild
 - Max 3 build-fix attempts before reporting failure
 
-### Step 6: Test
+**Important:** If you had to change code to fix build errors, make an additional commit before proceeding.
+
+### Step 8: Test
 
 **Always scope tests to the changed modules.** Do NOT run the full package test suite.
 
@@ -114,7 +153,7 @@ If scoped tests fail:
 - Re-run tests
 - Max 3 test-fix attempts before reporting failure
 
-### Step 7: Start Dev Server
+### Step 9: Start Dev Server
 ```
 ow-start: project="<package-name>"
 ```
@@ -128,26 +167,29 @@ Repeat capture every few seconds until you see:
 - `[WATCHING]` → dev server is ready
 - `FAILURE:` → build failed in watch mode, investigate
 
-### Step 8: Extract Debug Link
+### Step 10: Extract Debug Link
 ```
 ow-debuglink
 ```
 
 Record the `landingPage` and `debugQueryString` for the evaluator.
 
-### Step 9: Commit Changes
-```bash
-git add <specific-files>
-git commit -m "<descriptive commit message>"
+### Step 11: Send `build_done` + Write Final Report
+
+Send the build result to `ow-orchestrator` via `SendMessage`:
+
+```
+SendMessage to ow-orchestrator:
+  "phase: build_done
+   cycle: <N>
+   buildStatus: <success|failure>
+   testStatus: <pass|fail|skipped-no-relevant-tests>
+   rushStartTarget: agentow:rush
+   debugUrl: <url or empty>
+   blockers: [<if any>]"
 ```
 
-Do NOT push. Do NOT create a PR.
-
-### Step 10: Write Report
-
-**This step is MANDATORY — always write the report, even if earlier steps failed or were skipped.**
-
-Append NDJSON to `{reportFile}`:
+Then append the full NDJSON report to `{reportFile}`:
 
 ```json
 {"sender":"ow-generator","timestamp":"<ISO>","status":"success","cycle":1,"planPath":"<path>","tasksCompleted":["task1","task2"],"tasksPending":[],"buildStatus":"success","testStatus":"pass","rushStartTarget":"agentow:rush","debugUrl":"<url>","details":"<narrative>","blockers":[]}
@@ -198,6 +240,7 @@ If you encounter merge conflicts after `git pull` or branch operations:
 - Read files before editing them — understand context first.
 - Do NOT push to remote or create PRs.
 - Do NOT drop existing TypeScript types when editing code.
-- Always append your report, even on failure.
+- Always send both `code_done` and `build_done` messages to the orchestrator.
+- Always append your NDJSON report, even on failure.
 - Keep the rush start tmux session alive — the evaluator needs it.
 - If stuck after 3 attempts at build or test, report `"partial"` with clear blockers.
