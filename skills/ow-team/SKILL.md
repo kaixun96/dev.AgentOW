@@ -5,7 +5,12 @@ description: "Use when the user asks to run the full odsp-web agent workflow, ki
 
 # odsp-web Agent Team
 
-Create a persistent agent team for the full development pipeline. **You are a launcher** — set up the session, read agent definitions, create the team, spawn agents, start monitoring, then step back.
+Create a persistent agent team for the full development pipeline. **You play two roles:**
+
+1. **Launcher** — set up the session, read agent definitions, create the team, spawn agents, start monitoring.
+2. **User-relay (after launch)** — relay user Q&A between `ow-orchestrator` and the user. Team members cannot call `AskUserQuestion` directly (they are idle workers, not interactive threads), so the orchestrator sends user-facing questions to you via `SendMessage`, and you forward the user's reply back to the orchestrator.
+
+Never make implementation, planning, or coordination decisions yourself — you are strictly a transport layer for the orchestrator ↔ user channel.
 
 > **Why Team mode over Subagent serial:** Team agents are persistent — the generator in cycle 2 is the same instance as cycle 1, retaining full context of what it tried, what failed, and what code it wrote. Subagent serial mode destroys this context between cycles.
 
@@ -148,7 +153,7 @@ prompt:
 
 ---
 
-## Step 5: Start Monitoring and Step Back
+## Step 5: Start Monitoring and Serve as User-Relay
 
 After all 5 agents are spawned, tell the user:
 
@@ -175,16 +180,40 @@ Monitor: tail -f {progressLog}
 
 This streams orchestrator status updates to the user's terminal as they happen.
 
-**After starting Monitor, stop.** Do NOT invoke any other tools, agents, or commands unless the user explicitly asks.
+**After starting Monitor, your job becomes user-relay.** Do NOT invoke any other tools (no Agent, no Bash on source, no Read/Edit/Write on code). Your ONLY active behavior from this point onward:
+
+### When ow-orchestrator sends you a message
+
+If the message contains a question/plan/status that needs user input:
+1. Present the orchestrator's message content to the user **verbatim** (so the user sees the raw content, not your paraphrase).
+2. Wait for the user's reply.
+3. Forward the user's reply back to `ow-orchestrator` via `SendMessage`, prefixing it so the orchestrator knows it's a user response (e.g. `"USER RESPONSE: <raw text>"`).
+
+If the message is a status/progress update (not a question): optionally summarize to the user, but do nothing else.
+
+### When the user sends you a message mid-pipeline
+
+- **Status question** ("what's going on?") → forward to `ow-orchestrator` via `SendMessage`, then relay the reply.
+- **Course correction** ("change the plan", "stop the cycle", "skip tests") → forward verbatim to `ow-orchestrator`.
+- **Shutdown request** ("stop", "cancel") → send `{"type": "shutdown_request"}` to `ow-orchestrator`.
+
+### Do NOT
+
+- Reply to the orchestrator's user-relay questions yourself. Always route through the user.
+- Intervene with sub-agents directly (e.g. DM'ing `ow-planner`) — it violates the orchestrator's authority. If the orchestrator appears stuck, **wait at least 5 minutes** before probing — planner research and generator builds legitimately take 2-5 min. Only if still stuck, `SendMessage` to `ow-orchestrator` (not the sub-agent) asking for a status check.
+- Read or write source code under `/workspaces/odsp-web/`.
+- Make scope, plan, or approval decisions.
 
 ---
 
 ## Rules
 
-- **You are a launcher, not the orchestrator.** Never plan, build, coordinate, or read the report file yourself.
+- **You are a launcher + user-relay, never the orchestrator.** Never plan, build, coordinate, or read the report file yourself.
 - **Do not use the `Agent` tool after Step 4.**
 - Read all agent MD files (Step 2) before calling TeamCreate or spawning any agent.
 - Spawn the orchestrator **first** so it is running before the idle agents join.
 - If the user asks for a status update, use `SendMessage` to query `ow-orchestrator` by name — the orchestrator is the single source of truth.
 - If the user asks to shut down, send `{"type": "shutdown_request"}` via `SendMessage` to `ow-orchestrator` first; it will relay the shutdown to its team members.
 - Team members must NEVER message each other directly — all communication is brokered through `ow-orchestrator`.
+- **Relay, don't decide.** When the orchestrator asks for user input via SendMessage, forward the raw content to the user; do not answer on their behalf.
+- **Don't probe too early.** Agents going idle after a SendMessage is normal. Wait at least 5 minutes before checking whether an agent is actually stuck.
