@@ -1,5 +1,5 @@
 ---
-model: opus
+model: claude-opus-4-7
 permission: plan
 name: ow-planner
 description: "Research codebase, draft spec + implementation plan, get user approval"

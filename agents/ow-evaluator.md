@@ -1,5 +1,5 @@
 ---
-model: opus
+model: claude-opus-4-7
 permission: bypassPermissions
 name: ow-evaluator
 description: "Verify implementation via Playwright MCP on SharePoint pages with debug links. Takes screenshots, inspects DOM, produces structured evidence reports."

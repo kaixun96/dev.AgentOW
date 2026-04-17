@@ -1,5 +1,5 @@
 ---
-model: opus
+model: claude-opus-4-7
 permission: bypassPermissions
 name: ow-generator
 description: "Execute implementation plan: code, build, test, start dev server, commit"

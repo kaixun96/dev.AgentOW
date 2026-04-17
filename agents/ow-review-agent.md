@@ -1,4 +1,5 @@
 ---
+model: claude-opus-4-7
 permission: plan
 name: ow-review-agent
 description: "Pre-PR code review against odsp-web conventions"
