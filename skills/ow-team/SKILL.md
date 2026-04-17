@@ -80,44 +80,9 @@ Spawn all 5 agents using the `Agent` tool. Use `subagent_type: general-purpose` 
 
 > **Why general-purpose:** Custom `subagent_type` values like `agentOW:*` are not supported for team member spawning. Agent behavior comes entirely from the `prompt` parameter — each agent receives its full definition inlined.
 
-### Agent 1 — ow-orchestrator (active, spawn FIRST)
+### Agents 1–4 — idle members (spawn FIRST, before orchestrator)
 
-```
-subagent_type: general-purpose
-team_name: {teamName}
-name: ow-orchestrator
-prompt:
-  You are ow-orchestrator. Follow this agent definition exactly:
-
-  ======= AGENT DEFINITION START =======
-  {orchestratorMd}
-  ======= AGENT DEFINITION END =======
-
-  Session context (already initialized — skip Step 0):
-    Team:         {teamName}
-    sessionDir:   {sessionDir}
-    reportFile:   {reportFile}
-    progressLog:  {progressLog}
-    planDir:      {planDir}
-    User task:    {userPrompt}
-
-  Team members waiting for your instructions (use SendMessage by name):
-    - ow-planner
-    - ow-generator
-    - ow-evaluator
-    - ow-review-agent
-
-  CRITICAL: After sending SendMessage to a teammate, you MUST wait for
-  their response message before doing anything else. The full pipeline
-  (planner → approval → generator → evaluator → review → PR) must run
-  as one continuous flow. Never go idle between steps.
-
-  Start immediately with Step 1 (invoke ow-planner).
-```
-
-### Agents 2–5 — idle members (spawn AFTER orchestrator)
-
-For each idle agent, use this template:
+Spawn all 4 idle agents FIRST so they are ready to receive messages when the orchestrator starts.
 
 | `name` | MD variable |
 |--------|-------------|
@@ -149,6 +114,43 @@ prompt:
   call SendMessage back to the sender with:
     {"type":"shutdown_response","request_id":"<echo the request_id>","approve":true}
   Then stop all work.
+```
+
+### Agent 5 — ow-orchestrator (active, spawn LAST)
+
+> **Why last:** The orchestrator immediately sends SendMessage to ow-planner on startup. If planner hasn't been spawned yet, the message is lost and the pipeline deadlocks. Spawning idle agents first ensures all teammates are ready.
+
+```
+subagent_type: general-purpose
+team_name: {teamName}
+name: ow-orchestrator
+prompt:
+  You are ow-orchestrator. Follow this agent definition exactly:
+
+  ======= AGENT DEFINITION START =======
+  {orchestratorMd}
+  ======= AGENT DEFINITION END =======
+
+  Session context (already initialized — skip Step 0):
+    Team:         {teamName}
+    sessionDir:   {sessionDir}
+    reportFile:   {reportFile}
+    progressLog:  {progressLog}
+    planDir:      {planDir}
+    User task:    {userPrompt}
+
+  Team members (already spawned and waiting for your instructions):
+    - ow-planner
+    - ow-generator
+    - ow-evaluator
+    - ow-review-agent
+
+  CRITICAL: After sending SendMessage to a teammate, you MUST wait for
+  their response message before doing anything else. The full pipeline
+  (planner → approval → generator → evaluator → review → PR) must run
+  as one continuous flow. Never go idle between steps.
+
+  Start immediately with Step 1 (invoke ow-planner).
 ```
 
 ---
