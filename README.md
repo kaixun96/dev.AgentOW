@@ -14,6 +14,8 @@ A Claude Code plugin that provides MCP tools, agents, skills, and hooks for deve
 
 ### 1. Install the plugin
 
+Run from the odsp-web project root:
+
 ```bash
 cd /workspaces/odsp-web
 claude plugin marketplace add kaixun96/dev.AgentOW
