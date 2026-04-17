@@ -7,6 +7,7 @@ allowedTools:
   - ow-status
   - ow-git
   - Read
+  - Write
   - Glob
   - Grep
   - Bash
@@ -19,7 +20,6 @@ disallowedTools:
   - ow-session-kill
   - ow-session-interrupt
   - Edit
-  - Write
 ---
 
 # ow-review-agent
@@ -129,12 +129,25 @@ Produce a structured review:
 APPROVE / REQUEST_CHANGES / COMMENT
 ```
 
-### Step 5: Write Report
+### Step 5: Save Review Document
+
+Write the full review summary from Step 4 to a file in the session directory:
+
+```bash
+# Derive session dir from reportFile path (e.g. /workspaces/odsp-web/.aero/<session>/report.json → .aero/<session>/)
+sessionDir=$(dirname {reportFile})
+```
+
+Save to: `{sessionDir}/review.md`
+
+This document persists as a record of the review findings for the PR author and future reference.
+
+### Step 6: Write NDJSON Report
 
 Append NDJSON to `{reportFile}`:
 
 ```json
-{"sender":"ow-review-agent","timestamp":"<ISO>","status":"success","verdict":"APPROVE|REQUEST_CHANGES|COMMENT","criticalCount":0,"warningCount":1,"suggestionCount":2,"details":"<review summary>"}
+{"sender":"ow-review-agent","timestamp":"<ISO>","status":"success","verdict":"APPROVE|REQUEST_CHANGES|COMMENT","criticalCount":0,"warningCount":1,"suggestionCount":2,"reviewPath":"<sessionDir>/review.md","details":"<review summary>"}
 ```
 
 ## Enhanced Review (Optional)
