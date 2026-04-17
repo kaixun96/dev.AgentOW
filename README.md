@@ -6,56 +6,29 @@ A Claude Code plugin that provides MCP tools, agents, skills, and hooks for deve
 
 ## Prerequisites
 
-- Node.js 22+
 - Claude Code CLI
 - GitHub Codespace with odsp-web cloned at `/workspaces/odsp-web`
-- An Azure DevOps PAT (Personal Access Token) with **Code (Read)** permission
 - Playwright MCP server (for evaluator browser verification)
 
 ## Installation
 
-### 1. Clone the repo into your Codespace
-
-The plugin must live at `/workspaces/dev.AgentOW` inside the Codespace. Since Codespace git credentials only cover the odsp-web repo, you need a PAT to clone from the Developer project.
-
-**Generate a PAT:**
-1. Go to https://dev.azure.com/onedrive/_usersSettings/tokens
-2. Create a token with **Code (Read)** scope
-
-**Clone:**
-```bash
-git clone https://<your-alias>:<PAT>@dev.azure.com/onedrive/Developer/_git/dev.AgentOW /workspaces/dev.AgentOW
-```
-
-After cloning, remove the PAT from the remote URL:
-```bash
-cd /workspaces/dev.AgentOW
-git remote set-url origin https://onedrive@dev.azure.com/onedrive/Developer/_git/dev.AgentOW
-```
-
-### 2. Build the MCP server
+### 1. Install the plugin
 
 ```bash
-cd /workspaces/dev.AgentOW/ts
-npm install
-npm run build
+cd /workspaces/odsp-web
+claude plugin marketplace add kaixun96/dev.AgentOW
+claude plugin install agentOW@agentOW --scope project
 ```
 
-### 3. Install tmux (if not already installed)
+No cloning, no building — the plugin is ready to use.
+
+### 2. Install tmux (if not already installed)
 
 ```bash
 sudo apt-get install -y tmux
 ```
 
-### 4. Register the plugin
-
-```bash
-cd /workspaces/odsp-web
-claude plugin marketplace add /workspaces/dev.AgentOW
-claude plugin install agentOW@agentOW --scope project
-```
-
-### 5. Enable Agent Teams (optional, for orchestrator)
+### 3. Enable Agent Teams
 
 Add to your Claude Code settings (`~/.claude/settings.json`):
 
@@ -67,7 +40,7 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
 }
 ```
 
-### 6. Register Playwright MCP (for evaluator)
+### 4. Register Playwright MCP (for evaluator)
 
 ```bash
 claude mcp add --scope user playwright -- npx @playwright/mcp@latest --user-data-dir=/workspaces/.playwright-profile
@@ -75,7 +48,7 @@ claude mcp add --scope user playwright -- npx @playwright/mcp@latest --user-data
 
 On first use, the evaluator will open a browser. Log in to SharePoint manually once — the session persists for future runs.
 
-### 7. Restart Claude Code and verify
+### 5. Restart Claude Code and verify
 
 ```bash
 claude plugin list        # agentOW should be enabled
@@ -85,18 +58,11 @@ claude agent              # agents should be listed
 
 ## Upgrading
 
-After the repo is updated with new features or fixes:
-
 ```bash
-cd /workspaces/dev.AgentOW
-git pull
-cd ts
-npm install
-npm run build
 claude plugin update agentOW@agentOW
 ```
 
-Then restart Claude Code for MCP server changes to take effect.
+Then restart Claude Code for changes to take effect.
 
 ## Quick Start
 
@@ -146,7 +112,7 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | Layer | Purpose | Components |
 |-------|---------|------------|
 | **Tools (MCP)** | Deterministic operations | rush, tmux, git, debug link |
-| **Agents** | Workflow separation | orchestrator, initiator, planner, generator, evaluator, reviewer |
+| **Agents** | Workflow separation | orchestrator, planner, generator, evaluator, reviewer |
 | **Skills** | Knowledge injection | build rules, test rules, git conventions, PR workflow, monorepo reference |
 
 ### MCP Tools (15 total)
@@ -174,7 +140,7 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | Agent | Model | Role |
 |-------|-------|------|
 | `ow-orchestrator` | opus | Coordinate full pipeline (read-only) |
-| `ow-planner` | opus | Research + plan + user approval (read-only) |
+| `ow-planner` | opus | Research + plan (read-only) |
 | `ow-generator` | opus | Implement + build + test + dev server |
 | `ow-evaluator` | opus | Verify via Playwright MCP on SharePoint + code inspection |
 | `ow-review-agent` | inherit | Pre-PR code review (read-only) |
@@ -191,5 +157,9 @@ Use ow-start to launch the dev server for @ms/sp-pages
 | `ow-dev-pr` | PR, az repos |
 | `search-odspweb-wiki` | wiki, documentation |
 | `ow-dev-playwright` | Playwright MCP, browser verification |
-| `ow-ref-external-tools` | killswitch, GUID, bluebird, ADO work item, code review, merge conflict |
+| `ow-ref-external-tools` | killswitch, GUID, bluebird, ADO work item |
 | `ow-team` | Launch full agent team workflow |
+
+## Repository
+
+- **GitHub**: https://github.com/kaixun96/dev.AgentOW
