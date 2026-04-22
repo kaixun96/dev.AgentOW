@@ -96,6 +96,67 @@ echo "[$(date +%H:%M:%S)] 🚀 Session started: <session-name>" >> {progressLog}
 
 Tell the user: "Starting session `<session-name>`"
 
+### Step 0.5: Brainstorm — Understand User Intent
+
+**Purpose:** Before invoking the planner, fully understand what the user wants. Complex requests often have ambiguity — wrong assumptions here cascade into wasted generator/evaluator cycles.
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 💡 Brainstorm started — clarifying user intent" >> {progressLog}
+```
+
+Follow this process (adapted from superpowers:brainstorming methodology):
+
+#### 1. Assess complexity
+
+Read the user's request. If it is **simple and unambiguous** (e.g. "fix the typo in PhotoGrid.tsx", "add a loading spinner to the photo grid"), skip brainstorming and proceed directly to Step 1. Not every request needs interrogation.
+
+If the request is **complex, vague, or could be interpreted multiple ways**, proceed with brainstorming.
+
+#### 2. Ask clarifying questions — ONE at a time
+
+Ask the user questions via the team-lead relay (SendMessage to team-lead, who uses AskUserQuestion). Rules:
+
+- **One question per message.** Do not overwhelm with multiple questions.
+- **Prefer multiple choice** when possible — easier for the user to answer.
+- **Focus on:** purpose, scope, constraints, success criteria, out-of-scope.
+- **Stop asking** when you can confidently describe what to build, why, and how to verify it.
+
+Example questions (pick what's relevant, don't ask all):
+- "Which package does this affect? (a) sp-client, (b) odsp-next, (c) odsp-common, (d) not sure"
+- "Is this a bug fix, new feature, or enhancement?"
+- "What should happen when X? (a) show error, (b) fallback to default, (c) other"
+- "Should this be behind a killswitch?"
+- "What's the test page URL for verification, or should I use the default?"
+
+#### 3. Summarize understanding
+
+After sufficient Q&A, summarize your understanding back to the user:
+
+```
+Here's what I'll build:
+
+**What:** <one-line description>
+**Why:** <problem being solved>
+**Scope:** <what's included>
+**Out of scope:** <what's NOT included>
+**Verify on:** <test page URL or "default">
+**Killswitch:** <yes/no>
+
+Shall I proceed with planning?
+```
+
+Wait for user confirmation. If they correct anything, update and re-confirm.
+
+#### 4. Compose refined request
+
+Once confirmed, compose a **refined userRequest** that incorporates all Q&A context. This becomes the input to the planner — much richer than the user's original one-liner.
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 💡 Brainstorm completed — user intent confirmed" >> {progressLog}
+```
+
 ### Step 1: Invoke ow-planner
 
 Write progress before invoking:
@@ -107,7 +168,7 @@ Send message to `ow-planner`:
 
 ```
 featureName: <feature-name>
-userRequest: <original user request>
+userRequest: <refined userRequest from brainstorm — includes all clarified context>
 reportFile: <reportFile>
 planDir: <planDir>
 ```
