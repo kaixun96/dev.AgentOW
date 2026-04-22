@@ -42,7 +42,16 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
 }
 ```
 
-### 4. Register Playwright MCP (for evaluator)
+### 4. Install superpowers plugin (recommended)
+
+superpowers provides brainstorming, code review, and other development skills that agentOW integrates with.
+
+```bash
+claude plugin marketplace add anthropics/claude-code-superpowers
+claude plugin install superpowers --scope user
+```
+
+### 5. Register Playwright MCP (for evaluator)
 
 ```bash
 claude mcp add --scope user playwright -- npx @playwright/mcp@latest --user-data-dir=/workspaces/.playwright-profile
@@ -50,7 +59,7 @@ claude mcp add --scope user playwright -- npx @playwright/mcp@latest --user-data
 
 On first use, the evaluator will open a browser. Log in to SharePoint manually once — the session persists for future runs.
 
-### 5. Restart Claude Code and verify
+### 6. Restart Claude Code and verify
 
 ```bash
 claude plugin list        # agentOW should be enabled
@@ -79,15 +88,16 @@ In any Claude Code session, use the `/ow-team` skill:
 
 Or just describe what you want — the skill triggers on keywords like "run the agent workflow", "implement a feature", etc.
 
-This creates a persistent team of 5 agents. The orchestrator drives the full pipeline:
+This runs a brainstorming session first (if superpowers is installed) to clarify your intent, then creates a persistent team of 5 agents:
 
-1. **ow-planner** researches the codebase and drafts an implementation plan
-2. **ow-orchestrator** presents the plan to you for approval
-3. **ow-generator** implements the plan — code, build, test, start dev server
-4. **ow-evaluator** verifies acceptance criteria via Playwright MCP on SharePoint pages
-5. If evaluator finds issues, generator fixes them (max 5 cycles)
-6. **ow-review-agent** performs code review (+ superpowers deep review if available)
-7. Orchestrator pushes the branch and creates a draft PR on Azure DevOps
+1. **Brainstorm** — clarify requirements, explore approaches, confirm scope (via superpowers)
+2. **ow-planner** researches the codebase and drafts an implementation plan
+3. **ow-orchestrator** presents the plan to you for approval
+4. **ow-generator** implements the plan — code, build, test, start dev server
+5. **ow-evaluator** verifies acceptance criteria via Playwright MCP on SharePoint pages
+6. If evaluator finds issues, generator fixes them (max 5 cycles)
+7. **ow-review-agent** performs code review (+ superpowers deep review if available)
+8. Orchestrator pushes the branch and creates a draft PR on Azure DevOps
 
 > **Note:** Do NOT use `claude agent ow-orchestrator` directly — use `/ow-team` which properly sets up the Agent Team with all members.
 

@@ -5,12 +5,13 @@ description: "Use when the user asks to run the full odsp-web agent workflow, ki
 
 # odsp-web Agent Team
 
-Create a persistent agent team for the full development pipeline. **You play two roles:**
+Create a persistent agent team for the full development pipeline. **You play three roles:**
 
-1. **Launcher** — set up the session, read agent definitions, create the team, spawn agents, start monitoring.
-2. **User-relay (after launch)** — relay user Q&A between `ow-orchestrator` and the user. Team members cannot call `AskUserQuestion` directly (they are idle workers, not interactive threads), so the orchestrator sends user-facing questions to you via `SendMessage`, and you forward the user's reply back to the orchestrator.
+1. **Brainstormer** — before launching the team, run `superpowers:brainstorming` to fully understand what the user wants. This produces a refined, unambiguous request.
+2. **Launcher** — set up the session, read agent definitions, create the team, spawn agents, start monitoring.
+3. **User-relay (after launch)** — relay user Q&A between `ow-orchestrator` and the user. Team members cannot call `AskUserQuestion` directly (they are idle workers, not interactive threads), so the orchestrator sends user-facing questions to you via `SendMessage`, and you forward the user's reply back to the orchestrator.
 
-Never make implementation, planning, or coordination decisions yourself — you are strictly a transport layer for the orchestrator ↔ user channel.
+Never make implementation or coordination decisions yourself — you are a brainstormer, launcher, and transport layer.
 
 > **Why Team mode over Subagent serial:** Team agents are persistent — the generator in cycle 2 is the same instance as cycle 1, retaining full context of what it tried, what failed, and what code it wrote. Subagent serial mode destroys this context between cycles.
 
@@ -40,7 +41,32 @@ Record variables:
 | `{teamName}` | `ow-{sessionName}` |
 | `{userPrompt}` | user's exact request |
 
-Tell the user: `Session workspace initialized at {sessionDir}. Reading agent definitions...`
+Tell the user: `Session workspace initialized at {sessionDir}.`
+
+---
+
+## Step 1.5: Brainstorm (superpowers)
+
+**Before launching the team, clarify user intent.** Invoke the `superpowers:brainstorming` skill via the `Skill` tool:
+
+```
+Skill(skill="superpowers:brainstorming")
+```
+
+Follow the brainstorming skill's process:
+1. Explore project context (check relevant files in `/workspaces/odsp-web`)
+2. Ask clarifying questions — one at a time, multiple choice preferred
+3. Propose 2-3 approaches with trade-offs and your recommendation
+4. Present design and get user approval
+
+**When brainstorming completes**, you will have a clear, refined understanding of what to build. Compose a `{refinedRequest}` that captures all clarified context — this replaces the raw `{userPrompt}` as input to the orchestrator and planner.
+
+**Skip brainstorming if** the request is trivially simple and unambiguous (e.g. "fix the typo in PhotoGrid.tsx line 42"). In that case, set `{refinedRequest} = {userPrompt}` and proceed.
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 💡 Brainstorm completed — user intent confirmed" >> {progressLog}
+```
 
 ---
 
@@ -137,7 +163,12 @@ prompt:
     reportFile:   {reportFile}
     progressLog:  {progressLog}
     planDir:      {planDir}
-    User task:    {userPrompt}
+    User task:    {refinedRequest}
+
+  NOTE: The user request above has been refined through a brainstorming
+  session. It contains full context — do NOT re-ask the user for
+  clarification on topics already covered. Skip Step 0.5 (Brainstorm)
+  and proceed directly to Step 1 (invoke ow-planner).
 
   Team members (already spawned and waiting for your instructions):
     - ow-planner
