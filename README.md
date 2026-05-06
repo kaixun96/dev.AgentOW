@@ -132,7 +132,19 @@ You provide one input. You get back one draft PR URL. Nothing in between.
 - Plan approval: auto
 - Review critical issues: auto-fix within the cycle limit; if still failing, PR is created as draft anyway
 
-> **Don't** invoke `claude agent ow-orchestrator` directly — always use `/ow-team`. The orchestrator requires a properly set up Agent Team to function.
+### Batch mode — drop a list, get a list of PRs
+
+```
+/ow-batch
+1. Add loading spinner to PhotoGrid
+2. Fix elevation background on mobile
+3. Remove unused imports from sp-pages
+... (10+ tasks)
+```
+
+Designed for "leave it overnight, come back to PRs". Each task gets a fresh agent team, runs in `--auto` mode, and produces its own PR. Failures in one task do not affect the rest. A summary file lists every result and PR URL.
+
+> **Don't** invoke `claude agent ow-orchestrator` directly — always use `/ow-team` or `/ow-batch`. The orchestrator requires a properly set up Agent Team to function.
 
 ### Individual agents
 
@@ -208,6 +220,7 @@ All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cy
 | Skill | Trigger keywords |
 |-------|------------------|
 | `ow-team` | Run the full pipeline (entry point) |
+| `ow-batch` | Run multiple tasks overnight, one PR per task |
 | `ow-dev-build` | rush build/install/update |
 | `ow-dev-test` | rush test, Jest |
 | `ow-dev-git` | git, branch, checkout |
