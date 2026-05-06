@@ -19,7 +19,7 @@ Never make implementation or coordination decisions yourself — you are a brain
 
 ---
 
-## Step 0: Detect Mode
+## Step 0: Detect Mode and Announce
 
 Check the skill arguments and user prompt for the `--auto` flag:
 
@@ -31,9 +31,25 @@ Set `{autoMode}` = `true` or `false`.
 | Mode | Brainstorm | Plan approval | Review critical confirmation |
 |------|-----------|---------------|------------------------------|
 | **Interactive** (default) | ✅ runs | ✅ asks user | ✅ asks user |
-| **Auto** (`--auto`) | ❌ skipped | ❌ auto-approve | ❌ auto-proceed |
+| **Auto** (`--auto`) | ❌ skipped | ❌ auto-approve | ❌ auto-proceed (still fixes within cycle limit) |
 
-In AUTO MODE, the user provides one input and gets back a PR URL with zero further interaction.
+**Announce the mode to the user immediately, before any other work.** This is mandatory — the user must know upfront which mode is active.
+
+If AUTO MODE:
+```
+🤖 AUTO MODE ENABLED — no further interaction required.
+   Pipeline will run end-to-end and return a draft PR URL.
+   Brainstorm: skipped. Plan approval: auto. Review critical: auto-fix (max 5 cycles).
+```
+
+If INTERACTIVE MODE:
+```
+💬 INTERACTIVE MODE — you will be asked to:
+   1. Confirm intent during brainstorming (a few questions)
+   2. Approve the implementation plan
+   3. Decide whether to proceed if review finds critical issues
+   To skip all prompts next time, use: /ow-team --auto
+```
 
 ---
 
@@ -60,6 +76,13 @@ Record variables:
 | `{userPrompt}` | user's exact request |
 
 Tell the user: `Session workspace initialized at {sessionDir}.`
+
+Write the mode to progress.log so it's visible in the Monitor stream:
+```bash
+echo "[$(date +%H:%M:%S)] 🤖 Mode: AUTO (no user interaction)" >> {progressLog}
+# OR for interactive:
+echo "[$(date +%H:%M:%S)] 💬 Mode: INTERACTIVE (will ask for plan approval)" >> {progressLog}
+```
 
 ---
 
