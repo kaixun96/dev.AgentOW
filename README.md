@@ -79,12 +79,30 @@ Then restart Claude Code for changes to take effect.
 
 ### Full workflow (orchestrated)
 
-In any Claude Code session, use the `/ow-team` skill:
+In any Claude Code session, use the `/ow-team` skill. There are two modes:
+
+#### Interactive mode (default)
 
 ```
 /ow-team
 > Implement a feature that adds a loading spinner to the photo grid component
 ```
+
+The team will brainstorm with you, ask for plan approval, and confirm before pushing if review finds critical issues. Typical interaction count: 3-5 questions.
+
+#### Auto mode — zero interaction
+
+```
+/ow-team --auto
+> Implement a feature that adds a loading spinner to the photo grid component
+```
+
+The team runs the full pipeline without any user interaction:
+- Skips brainstorming
+- Auto-approves the plan
+- Auto-proceeds even if review finds critical issues (PR is draft, so you can review before publishing)
+
+You provide one input. You get back one PR URL. Nothing in between.
 
 Or just describe what you want — the skill triggers on keywords like "run the agent workflow", "implement a feature", etc.
 

@@ -19,6 +19,24 @@ Never make implementation or coordination decisions yourself — you are a brain
 
 ---
 
+## Step 0: Detect Mode
+
+Check the skill arguments and user prompt for the `--auto` flag:
+
+- If args contain `--auto` (or user says "fully autonomous", "no questions", "just do it") → **AUTO MODE**
+- Otherwise → **INTERACTIVE MODE** (default)
+
+Set `{autoMode}` = `true` or `false`.
+
+| Mode | Brainstorm | Plan approval | Review critical confirmation |
+|------|-----------|---------------|------------------------------|
+| **Interactive** (default) | ✅ runs | ✅ asks user | ✅ asks user |
+| **Auto** (`--auto`) | ❌ skipped | ❌ auto-approve | ❌ auto-proceed |
+
+In AUTO MODE, the user provides one input and gets back a PR URL with zero further interaction.
+
+---
+
 ## Step 1: Capture User Request and Setup Session
 
 Record the user's exact request as `userPrompt`. Derive a kebab-case session name (under 30 chars).
@@ -45,9 +63,13 @@ Tell the user: `Session workspace initialized at {sessionDir}.`
 
 ---
 
-## Step 1.5: Brainstorm (superpowers)
+## Step 1.5: Brainstorm (superpowers) — INTERACTIVE MODE ONLY
 
-**Before launching the team, clarify user intent.** Invoke the `superpowers:brainstorming` skill via the `Skill` tool:
+**If `{autoMode}` is true, SKIP this step entirely.** Set `{refinedRequest} = {userPrompt}` and proceed to Step 2.
+
+In AUTO MODE, the orchestrator will use the raw user request. The planner is responsible for handling ambiguity by making reasonable assumptions and noting them in the plan.
+
+Otherwise (interactive mode), invoke the `superpowers:brainstorming` skill via the `Skill` tool:
 
 ```
 Skill(skill="superpowers:brainstorming")
@@ -164,11 +186,19 @@ prompt:
     progressLog:  {progressLog}
     planDir:      {planDir}
     User task:    {refinedRequest}
+    autoMode:     {autoMode}
 
   NOTE: The user request above has been refined through a brainstorming
-  session. It contains full context — do NOT re-ask the user for
-  clarification on topics already covered. Skip Step 0.5 (Brainstorm)
-  and proceed directly to Step 1 (invoke ow-planner).
+  session (interactive mode) or used directly (auto mode). Do NOT
+  re-brainstorm. Proceed directly to Step 1 (invoke ow-planner).
+
+  If autoMode is true:
+  - SKIP plan approval (Step 1a). Auto-approve immediately and tell
+    the planner "approved" via SendMessage.
+  - SKIP review critical confirmation (Step 5b). Proceed to PR creation
+    even if review found critical issues. The PR is draft, so a human
+    can review before publishing.
+  - Do NOT call AskUserQuestion at all in auto mode.
 
   Team members (already spawned and waiting for your instructions):
     - ow-planner

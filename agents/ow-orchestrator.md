@@ -120,7 +120,18 @@ The planner runs autonomously through its phases and sends a completion message 
 
 When you receive the planner's message:
 
-#### Step 1a: User Approval Loop
+#### Step 1a: Plan Approval
+
+**If `autoMode` is true:**
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 📋 Planner completed — auto-approving (auto mode)" >> {progressLog}
+```
+
+Send `"approved"` to `ow-planner` via `SendMessage` immediately. Skip user interaction entirely.
+
+**If `autoMode` is false (interactive):**
 
 Write progress:
 ```bash
@@ -296,6 +307,13 @@ If superpowers is not available, skip this step.
 #### Step 7b: Check Review Verdicts
 
 Combine findings from ow-review-agent (already received in Step 3) and deep review (if run). Use the **stricter** verdict:
+
+**If `autoMode` is true:**
+- Critical issues are logged to progress.log but do NOT block the PR.
+- The PR is created as draft, so a human reviewer can decide whether to publish.
+- Skip user confirmation entirely.
+
+**If `autoMode` is false (interactive):**
 - If either review has `REQUEST_CHANGES` with critical issues:
   - SendMessage to `team-lead`: "[USER QUESTION] Reviews found {N} critical issues: <list findings>. Create PR anyway? (yes/no)"
   - Wait for team-lead to relay the user's reply
