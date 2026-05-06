@@ -280,7 +280,19 @@ Read `reportFile` for structured NDJSON data.
    - Show blockers from evaluator
    - Go back to **Step 2** with `cycle = N + 1` and `blockers` from evaluator
 
-**If evaluator result is PASS:**
+**If evaluator result is PASS but review-agent verdict is REQUEST_CHANGES with critical issues:**
+
+Treat review critical issues as fix-worthy — they often catch real problems (killswitch direction, type weakening, missing tests, security issues) that evaluator's UI verification would not detect.
+
+1. If `cycle >= 5`: proceed to Step 7 anyway (max retries reached, let user decide via Step 7b).
+2. If `cycle < 5`:
+   ```bash
+   echo "[$(date +%H:%M:%S)] ⚠️  Review REQUEST_CHANGES (critical: {N}) — starting fix cycle <N+1>" >> {progressLog}
+   ```
+   - Compose blockers from review's critical findings (each finding becomes a blocker with `description` and `suggestedFix`).
+   - Go back to **Step 2** with `cycle = N + 1` and the review blockers.
+
+**If evaluator result is PASS and review verdict is APPROVE / COMMENT / REQUEST_CHANGES with only warnings:**
 ```bash
 echo "[$(date +%H:%M:%S)] ✅ ALL PASS — evaluation + review complete" >> {progressLog}
 ```
