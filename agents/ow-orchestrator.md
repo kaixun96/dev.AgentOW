@@ -284,13 +284,16 @@ Read `reportFile` for structured NDJSON data.
 
 Treat review critical issues as fix-worthy — they often catch real problems (killswitch direction, type weakening, missing tests, security issues) that evaluator's UI verification would not detect.
 
-1. If `cycle >= 5`: proceed to Step 7 anyway (max retries reached, let user decide via Step 7b).
-2. If `cycle < 5`:
-   ```bash
-   echo "[$(date +%H:%M:%S)] ⚠️  Review REQUEST_CHANGES (critical: {N}) — starting fix cycle <N+1>" >> {progressLog}
-   ```
-   - Compose blockers from review's critical findings (each finding becomes a blocker with `description` and `suggestedFix`).
-   - Go back to **Step 2** with `cycle = N + 1` and the review blockers.
+**Within cycle limit (`cycle < 5`):** always go back to fix, regardless of mode.
+```bash
+echo "[$(date +%H:%M:%S)] ⚠️  Review REQUEST_CHANGES (critical: {N}) — starting fix cycle <N+1>" >> {progressLog}
+```
+- Compose blockers from review's critical findings (each finding becomes a blocker with `description` and `suggestedFix`).
+- Go back to **Step 2** with `cycle = N + 1` and the review blockers.
+
+**At cycle limit (`cycle >= 5`):**
+- **Interactive mode:** proceed to Step 7 anyway, let user decide via Step 7b.
+- **Auto mode:** proceed to Step 7 anyway. The PR will still be created as draft, with critical findings logged in progress.log and review.md so a human reviewer can address them post-PR. We do not loop forever to avoid runaway costs.
 
 **If evaluator result is PASS and review verdict is APPROVE / COMMENT / REQUEST_CHANGES with only warnings:**
 ```bash
