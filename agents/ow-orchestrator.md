@@ -360,14 +360,37 @@ description: |
   - Playwright verification: {criteriaResults count} criteria passed
 ```
 
-#### Step 7d: Report to User
+#### Step 7d: Report Completion
 
 Write progress:
 ```bash
 echo "[$(date +%H:%M:%S)] ✅ Workflow complete" >> {progressLog}
 ```
 
-Report final status:
+**If `batchMode` is true (CRITICAL — required for batch dispatcher to detect completion):**
+
+Send a final SendMessage to `team-lead` with the result. This is mandatory — without it, the batch dispatcher cannot tell whether you finished or are still running, and the entire batch will deadlock.
+
+```
+SendMessage(
+  to='team-lead',
+  message='BATCH_RESULT: success | PR: <prUrl>'
+)
+```
+
+Or on failure:
+```
+SendMessage(
+  to='team-lead',
+  message='BATCH_RESULT: failure | ERROR: <one-line reason>'
+)
+```
+
+The `BATCH_RESULT:` prefix MUST be present and the format must be exactly as shown — the dispatcher parses it. After sending, your work is done.
+
+**If `batchMode` is false (normal interactive/auto run):**
+
+Report final status to the user (plain text in your final assistant turn is fine here, since team-lead in non-batch mode is actively watching):
 ```
 Feature complete!
 Build: {buildStatus}

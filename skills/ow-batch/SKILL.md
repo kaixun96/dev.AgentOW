@@ -170,7 +170,7 @@ Agent({
       planDir:      {sessionDir}/plans/
       User task:    {taskDescription}
       autoMode:     true
-      batchMode:    true (no team-lead relay — report directly via your final message)
+      batchMode:    true
 
     Team members (already spawned):
       - ow-planner
@@ -179,12 +179,22 @@ Agent({
       - ow-review-agent
 
     AUTO MODE: skip plan approval, skip review-critical confirmation.
-    BATCH MODE: when complete, send a final message containing:
-      RESULT: success
-      PR: <url>
-      OR
-      RESULT: failure
-      ERROR: <reason>
+
+    BATCH MODE — CRITICAL FINAL STEP:
+    When the entire pipeline completes (PR created OR failure), you MUST
+    send a SendMessage to 'team-lead' as your VERY LAST action. Do NOT
+    just write the result in plain text — plain text does not propagate
+    to the dispatcher.
+
+    The SendMessage payload MUST be a single line, prefixed with
+    'BATCH_RESULT:' so the dispatcher can parse it reliably:
+
+      Success:   SendMessage(to='team-lead', message='BATCH_RESULT: success | PR: <url>')
+      Failure:   SendMessage(to='team-lead', message='BATCH_RESULT: failure | ERROR: <reason>')
+
+    Send this exactly ONCE, after everything else is done. The dispatcher
+    is blocked waiting for this message — without it, the entire batch
+    deadlocks.
 
     Do NOT call AskUserQuestion. Do NOT prompt the user.
     Start immediately with Step 1 (invoke ow-planner).
@@ -192,20 +202,29 @@ Agent({
 })
 ```
 
-### 2f. Wait for orchestrator completion
+### 2f. Wait for orchestrator's BATCH_RESULT SendMessage
 
-Wait for the orchestrator's final message (the one with `RESULT: success` or `RESULT: failure`).
+You are now blocked, waiting for the orchestrator to send a SendMessage to `team-lead` containing `BATCH_RESULT:`.
 
-If `RESULT: success`:
-- Extract PR URL
-- Append to batch log: `[$(date +%H:%M:%S)] ✅ Task ${i} complete: PR <url>`
+**Important — do NOT rely on idle notifications.** Team agents go idle frequently between SendMessages while waiting for replies; an idle notification does NOT mean the pipeline is done. The ONLY reliable signal of completion is a SendMessage to you containing the `BATCH_RESULT:` prefix.
 
-If `RESULT: failure`:
-- Extract error reason
-- Append to batch log: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
+Watch for the SendMessage. When you receive it:
 
-If orchestrator does not respond within a reasonable timeout (e.g. 30 minutes), mark as timeout:
-- Append: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 30min`
+Parse the message:
+- `BATCH_RESULT: success | PR: <url>` → extract `<url>`
+  - Append to batch log: `[$(date +%H:%M:%S)] ✅ Task ${i} complete: PR <url>`
+- `BATCH_RESULT: failure | ERROR: <reason>` → extract `<reason>`
+  - Append to batch log: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
+
+**Timeout fallback (30 minutes):** If no `BATCH_RESULT:` message arrives within 30 minutes from task start, mark as timeout. Before giving up, do ONE check: tail the session's progress.log to see if the workflow actually finished but the orchestrator forgot the final SendMessage:
+```bash
+tail -1 ${sessionDir}/progress.log
+```
+If the last line says `✅ Workflow complete` or contains a PR URL, mark as success and parse the URL from progress.log instead. Otherwise mark as timeout.
+
+Append:
+- Success-recovered-from-log: `[$(date +%H:%M:%S)] ⚠️  Task ${i} complete (recovered from log, orchestrator missed final SendMessage): PR <url>`
+- Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 30min`
 
 ### 2g. Kill the team
 
