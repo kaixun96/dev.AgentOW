@@ -127,13 +127,59 @@ SendMessage to ow-orchestrator:
 ow-build: project="<package-name>"
 ```
 
-If build fails:
+If build fails, **classify the error before retrying**:
+
+#### 7a. Rush infrastructure errors (NOT code errors)
+
+These indicate the rush environment is broken, not your code. Pattern-match the error output:
+
+| Error pattern | Recovery action |
+|--------------|-----------------|
+| `inputsSnapshot not found` | Run `ow-rush: command="install"`, then retry build |
+| `shrinkwrap-deps.json` is missing | Run `ow-rush: command="install"`, then retry build |
+| `pnpm-lock` drift / out-of-date | Run `ow-rush: command="update"`, then retry build |
+| `last-install.flag` missing | Run `ow-rush: command="install"`, then retry build |
+
+Run the recovery action **once**, then retry the build. If the build still fails with the same infra error, escalate as failure (Step 7c) — do NOT loop retrying the same recovery.
+
+#### 7b. Network / auth errors (NOT recoverable in-loop)
+
+These need human intervention. Do NOT retry.
+
+| Error pattern | Action |
+|--------------|--------|
+| `RUSH_BUILD_CACHE_CREDENTIAL` expired/invalid | Skip build cache: set `RUSH_BUILD_CACHE_ENABLED=false`, retry once. If still fails → 7c |
+| `npm error code E401` (ADO npm auth) | Report immediately as failure (7c) — auth must be fixed manually |
+| Network timeout / DNS failure | Wait 30s, retry once. If still fails → 7c |
+
+#### 7c. Code errors (the normal case)
+
+Type errors, missing imports, lint failures. Retry with fixes:
 - Read the error output carefully
-- Fix the issues (type errors, missing imports, etc.)
+- Fix the issues
 - Rebuild
-- Max 3 build-fix attempts before reporting failure
+- **Max 3 build-fix attempts** before reporting failure
 
 **Important:** If you had to change code to fix build errors, make an additional commit before proceeding.
+
+#### 7d. ALWAYS report failure to orchestrator
+
+If you abandon the build (3 attempts exhausted, or unrecoverable infra/auth error), you **MUST**:
+
+1. Send `build_done` with `status: failure` to `ow-orchestrator` (see Step 11 schema)
+2. Append the NDJSON report to `{reportFile}` with `buildStatus: "failure"` and detailed `buildErrors`
+3. Do NOT go idle silently — orchestrator is blocked waiting for your build_done message
+
+```
+SendMessage to ow-orchestrator:
+  "phase: build_done
+   cycle: <N>
+   buildStatus: failure
+   buildErrors: [<error class: infra|auth|code>, <one-line summary>]
+   details: <full narrative — what failed, what recovery was tried, why it could not continue>"
+```
+
+Failing without notifying the orchestrator deadlocks the entire pipeline.
 
 ### Step 8: Test
 
@@ -152,6 +198,8 @@ If scoped tests fail:
 - Fix failing tests or the code they test
 - Re-run tests
 - Max 3 test-fix attempts before reporting failure
+
+**If you abandon (3 attempts exhausted), you MUST still send `build_done` with `testStatus: failure` and append the NDJSON report. Do NOT go idle silently.** Orchestrator is blocked waiting for your message — without it, the entire pipeline deadlocks.
 
 ### Step 9: Start Dev Server
 ```
