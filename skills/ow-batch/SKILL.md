@@ -202,11 +202,51 @@ Agent({
 })
 ```
 
-### 2f. Wait for orchestrator's BATCH_RESULT SendMessage
+### 2f. Start Watchdog (background polling, observation only)
+
+Before waiting for the result, start a background polling loop that records pipeline state every 5 minutes. This gives you (and the user, on review) visibility into long-running tasks. **The watchdog never kills the team or takes any other action — it is purely observational.**
+
+Reasoning: rush build can legitimately take 15+ minutes. We don't want false alarms or premature termination. We just want a paper trail of "is the pipeline still alive" while we wait.
+
+Run this in the background using Bash with `run_in_background: true`:
+
+```bash
+watchdogStart=$(date +%s)
+while true; do
+  sleep 300  # 5 minutes
+  now=$(date +%s)
+  elapsedSec=$((now - watchdogStart))
+  elapsedMin=$((elapsedSec / 60))
+
+  # Check progress.log mtime
+  if [ -f "${sessionDir}/progress.log" ]; then
+    logMtime=$(stat -c %Y "${sessionDir}/progress.log" 2>/dev/null || echo 0)
+    idleSec=$((now - logMtime))
+    idleMin=$((idleSec / 60))
+    lastLine=$(tail -1 "${sessionDir}/progress.log" 2>/dev/null || echo "(empty)")
+  else
+    idleMin="?"
+    lastLine="(no progress.log yet)"
+  fi
+
+  # Check report.json size as a secondary activity signal
+  reportSize=$(stat -c %s "${sessionDir}/report.json" 2>/dev/null || echo 0)
+
+  echo "[$(date +%H:%M:%S)] 🔍 watchdog task ${i}: elapsed=${elapsedMin}min, log_idle=${idleMin}min, report_bytes=${reportSize}, last: ${lastLine}" >> ${batchLog}
+done
+```
+
+Capture the background process ID (e.g. `watchdogPid`) so you can kill it later.
+
+> **What to watch for in batch.log:** if `log_idle` keeps growing past 15-20 minutes while `elapsed` continues, the pipeline is probably stuck. The watchdog will not act on this — but the existing 30-min hard timeout (Step 2g below) eventually catches it. The watchdog log gives you the diagnostic trail.
+
+### 2g. Wait for orchestrator's BATCH_RESULT SendMessage
 
 You are now blocked, waiting for the orchestrator to send a SendMessage to `team-lead` containing `BATCH_RESULT:`.
 
 **Important — do NOT rely on idle notifications.** Team agents go idle frequently between SendMessages while waiting for replies; an idle notification does NOT mean the pipeline is done. The ONLY reliable signal of completion is a SendMessage to you containing the `BATCH_RESULT:` prefix.
+
+When the BATCH_RESULT arrives, kill the watchdog: `kill ${watchdogPid} 2>/dev/null`.
 
 Watch for the SendMessage. When you receive it:
 
@@ -216,7 +256,7 @@ Parse the message:
 - `BATCH_RESULT: failure | ERROR: <reason>` → extract `<reason>`
   - Append to batch log: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
 
-**Timeout fallback (30 minutes):** If no `BATCH_RESULT:` message arrives within 30 minutes from task start, mark as timeout. Before giving up, do ONE check: tail the session's progress.log to see if the workflow actually finished but the orchestrator forgot the final SendMessage:
+**Timeout fallback (60 minutes):** If no `BATCH_RESULT:` message arrives within 60 minutes from task start, mark as timeout. (Rush build can legitimately take 15-20 min, so be generous.) Before giving up, do ONE check: tail the session's progress.log to see if the workflow actually finished but the orchestrator forgot the final SendMessage:
 ```bash
 tail -1 ${sessionDir}/progress.log
 ```
@@ -224,13 +264,17 @@ If the last line says `✅ Workflow complete` or contains a PR URL, mark as succ
 
 Append:
 - Success-recovered-from-log: `[$(date +%H:%M:%S)] ⚠️  Task ${i} complete (recovered from log, orchestrator missed final SendMessage): PR <url>`
-- Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 30min`
+- Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 60min`
 
-### 2g. Kill the team
+### 2h. Kill the watchdog and team
+
+```bash
+kill ${watchdogPid} 2>/dev/null
+```
 
 Send `{"type":"shutdown_request"}` to all 5 agents via SendMessage. This frees memory before the next task starts.
 
-### 2h. Append to summary
+### 2i. Append to summary
 
 Append a row to `{batchSummary}`:
 
@@ -238,7 +282,7 @@ Append a row to `{batchSummary}`:
 | {i} | {taskDescription} | ✅ success / ❌ failed / ⏰ timeout | {PR URL or "—"} | {sessionDir} |
 ```
 
-### 2i. Continue to next task
+### 2j. Continue to next task
 
 Do NOT abort the batch on a single failure. Move to task `i+1`.
 
