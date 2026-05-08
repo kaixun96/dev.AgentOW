@@ -240,30 +240,76 @@ Capture the background process ID (e.g. `watchdogPid`) so you can kill it later.
 
 > **What to watch for in batch.log:** if `log_idle` keeps growing past 15-20 minutes while `elapsed` continues, the pipeline is probably stuck. The watchdog will not act on this — but the existing 30-min hard timeout (Step 2g below) eventually catches it. The watchdog log gives you the diagnostic trail.
 
-### 2g. Wait for orchestrator's BATCH_RESULT SendMessage
+### 2g. Active Wait Loop — log-driven completion + idle nudge
 
-You are now blocked, waiting for the orchestrator to send a SendMessage to `team-lead` containing `BATCH_RESULT:`.
+**Critical insight:** Claude harness has turn boundaries — when an agent finishes a turn, it goes idle and stays idle until a NEW SendMessage arrives. Agents frequently end turns at semantically-natural points (e.g. right after sending a SendMessage), interpreting "I just sent a message" as "task complete". This causes pipeline-wide deadlocks where everyone is waiting for someone.
 
-**Important — do NOT rely on idle notifications.** Team agents go idle frequently between SendMessages while waiting for replies; an idle notification does NOT mean the pipeline is done. The ONLY reliable signal of completion is a SendMessage to you containing the `BATCH_RESULT:` prefix.
+The MD instruction "do NOT end your turn between X and Y" is a prompt hint, not a harness guarantee. Models often disregard it.
 
-When the BATCH_RESULT arrives, kill the watchdog: `kill ${watchdogPid} 2>/dev/null`.
+**Strategy: don't trust SendMessage as the completion signal. Trust progress.log.**
 
-Watch for the SendMessage. When you receive it:
+Why progress.log works: `echo ... >> progress.log` is a Bash tool call, executed deterministically by the harness. If the orchestrator wrote `✅ Workflow complete`, the work IS done — even if it then forgot to send BATCH_RESULT.
 
-Parse the message:
-- `BATCH_RESULT: success | PR: <url>` → extract `<url>`
-  - Append to batch log: `[$(date +%H:%M:%S)] ✅ Task ${i} complete: PR <url>`
-- `BATCH_RESULT: failure | ERROR: <reason>` → extract `<reason>`
-  - Append to batch log: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
+**This is the active wait loop.** On each idle notification (Claude wakes you periodically), do:
 
-**Timeout fallback (60 minutes):** If no `BATCH_RESULT:` message arrives within 60 minutes from task start, mark as timeout. (Rush build can legitimately take 15-20 min, so be generous.) Before giving up, do ONE check: tail the session's progress.log to see if the workflow actually finished but the orchestrator forgot the final SendMessage:
-```bash
-tail -1 ${sessionDir}/progress.log
+```python
+# Pseudocode for the wait logic
+while True:
+    receive next event (SendMessage OR idle notification OR external trigger)
+
+    # Check 1: Did the orchestrator/anyone send BATCH_RESULT? (rare but happy path)
+    if last_message contains "BATCH_RESULT:":
+        parse, exit loop
+
+    # Check 2: Did progress.log signal completion? (PRIMARY truth source)
+    last_log_line = tail -1 ${sessionDir}/progress.log
+    if last_log_line contains "✅ Workflow complete" OR matches "PR: https://..."
+        extract PR URL from log (or from latest report.json line)
+        log: "✅ Task ${i} complete (detected via progress.log): PR <url>"
+        exit loop
+
+    # Check 3: Are we stalled? (active recovery)
+    log_idle = current_time - mtime(progress.log)
+    if log_idle > 5 minutes:
+        # Determine which agent should be active based on last log entry
+        last_entry = tail -1 progress.log
+        target_agent = match last_entry to expected next actor:
+            - "Plan approved" / "Generator started"  → ow-generator
+            - "Generator code_done"                   → ow-generator (continue to build)
+            - "Generator build_done" / "Eval started" → ow-orchestrator (collect responses)
+            - "Eval completed" / "ALL PASS"           → ow-orchestrator (run review/PR)
+            - "Review completed"                      → ow-orchestrator (create PR)
+            - other                                    → ow-orchestrator (catch-all)
+
+        # Nudge the stuck agent
+        SendMessage(to=target_agent,
+            message="WATCHDOG NUDGE: pipeline log idle for ${log_idle}min. " +
+                    "Last entry: '${last_entry}'. " +
+                    "Please continue your next step OR send your status/failure message.")
+
+        log: "🔔 Nudged ${target_agent} (idle ${log_idle}min)"
+
+    # Check 4: Hard timeout
+    if total_elapsed > 60 minutes:
+        # Final fallback: one more progress.log check
+        if last_line of progress.log indicates completion:
+            recover URL, mark success
+        else:
+            mark as timeout
+        exit loop
 ```
-If the last line says `✅ Workflow complete` or contains a PR URL, mark as success and parse the URL from progress.log instead. Otherwise mark as timeout.
 
-Append:
-- Success-recovered-from-log: `[$(date +%H:%M:%S)] ⚠️  Task ${i} complete (recovered from log, orchestrator missed final SendMessage): PR <url>`
+**Implementation notes:**
+- The "wake on idle notification" happens automatically — every idle notification you receive is an opportunity to run the checks above. Treat each idle wake as one iteration of the loop.
+- You have BOTH the background watchdog (Step 2f, writes to batch.log) AND this active wait logic. They complement: the watchdog gives diagnostic visibility; the active wait logic detects completion and nudges.
+- Nudging the same agent repeatedly is fine — the model will either continue work or send back a "I'm stuck because X" message, both are useful.
+
+When you exit the loop (any path), kill the watchdog: `kill ${watchdogPid} 2>/dev/null`.
+
+Append the appropriate batch.log entry:
+- Detected via SendMessage: `[$(date +%H:%M:%S)] ✅ Task ${i} complete (via SendMessage): PR <url>`
+- Detected via progress.log: `[$(date +%H:%M:%S)] ✅ Task ${i} complete (via progress.log): PR <url>`
+- Failure detected: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
 - Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 60min`
 
 ### 2h. Kill the watchdog and team
