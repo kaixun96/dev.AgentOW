@@ -202,125 +202,46 @@ Agent({
 })
 ```
 
-### 2f. Start Watchdog (background polling, observation only)
+### 2f. Wait for completion (timeout-bounded)
 
-Before waiting for the result, start a background polling loop that records pipeline state every 5 minutes. This gives you (and the user, on review) visibility into long-running tasks. **The watchdog never kills the team or takes any other action — it is purely observational.**
+Wait for one of three signals, whichever comes first:
 
-Reasoning: rush build can legitimately take 15+ minutes. We don't want false alarms or premature termination. We just want a paper trail of "is the pipeline still alive" while we wait.
+1. **BATCH_RESULT SendMessage** from orchestrator (preferred path)
+2. **30-minute hard timeout** from task start (safety net)
+3. **A non-BATCH_RESULT message** from any agent (e.g. an error or a "stuck" notification) — handle as task failure
 
-Run this in the background using Bash with `run_in_background: true`:
+When you wake (idle notification or new message), check what you have:
 
 ```bash
-watchdogStart=$(date +%s)
-while true; do
-  sleep 300  # 5 minutes
-  now=$(date +%s)
-  elapsedSec=$((now - watchdogStart))
-  elapsedMin=$((elapsedSec / 60))
-
-  # Check progress.log mtime
-  if [ -f "${sessionDir}/progress.log" ]; then
-    logMtime=$(stat -c %Y "${sessionDir}/progress.log" 2>/dev/null || echo 0)
-    idleSec=$((now - logMtime))
-    idleMin=$((idleSec / 60))
-    lastLine=$(tail -1 "${sessionDir}/progress.log" 2>/dev/null || echo "(empty)")
-  else
-    idleMin="?"
-    lastLine="(no progress.log yet)"
-  fi
-
-  # Check report.json size as a secondary activity signal
-  reportSize=$(stat -c %s "${sessionDir}/report.json" 2>/dev/null || echo 0)
-
-  echo "[$(date +%H:%M:%S)] 🔍 watchdog task ${i}: elapsed=${elapsedMin}min, log_idle=${idleMin}min, report_bytes=${reportSize}, last: ${lastLine}" >> ${batchLog}
-done
+# Did orchestrator send BATCH_RESULT?
+# (Look at the most recent SendMessage to team-lead)
 ```
 
-Capture the background process ID (e.g. `watchdogPid`) so you can kill it later.
+If `BATCH_RESULT: success | PR: <url>` → success.
+If `BATCH_RESULT: failure | ERROR: <reason>` → failure.
 
-> **What to watch for in batch.log:** if `log_idle` keeps growing past 15-20 minutes while `elapsed` continues, the pipeline is probably stuck. The watchdog will not act on this — but the existing 30-min hard timeout (Step 2g below) eventually catches it. The watchdog log gives you the diagnostic trail.
+**On 30-minute timeout, do ONE final check** — read progress.log to see if the workflow actually finished but the orchestrator forgot to send BATCH_RESULT:
 
-### 2g. Active Wait Loop — log-driven completion + idle nudge
-
-**Critical insight:** Claude harness has turn boundaries — when an agent finishes a turn, it goes idle and stays idle until a NEW SendMessage arrives. Agents frequently end turns at semantically-natural points (e.g. right after sending a SendMessage), interpreting "I just sent a message" as "task complete". This causes pipeline-wide deadlocks where everyone is waiting for someone.
-
-The MD instruction "do NOT end your turn between X and Y" is a prompt hint, not a harness guarantee. Models often disregard it.
-
-**Strategy: don't trust SendMessage as the completion signal. Trust progress.log.**
-
-Why progress.log works: `echo ... >> progress.log` is a Bash tool call, executed deterministically by the harness. If the orchestrator wrote `✅ Workflow complete`, the work IS done — even if it then forgot to send BATCH_RESULT.
-
-**This is the active wait loop.** On each idle notification (Claude wakes you periodically), do:
-
-```python
-# Pseudocode for the wait logic
-while True:
-    receive next event (SendMessage OR idle notification OR external trigger)
-
-    # Check 1: Did the orchestrator/anyone send BATCH_RESULT? (rare but happy path)
-    if last_message contains "BATCH_RESULT:":
-        parse, exit loop
-
-    # Check 2: Did progress.log signal completion? (PRIMARY truth source)
-    last_log_line = tail -1 ${sessionDir}/progress.log
-    if last_log_line contains "✅ Workflow complete" OR matches "PR: https://..."
-        extract PR URL from log (or from latest report.json line)
-        log: "✅ Task ${i} complete (detected via progress.log): PR <url>"
-        exit loop
-
-    # Check 3: Are we stalled? (active recovery)
-    log_idle = current_time - mtime(progress.log)
-    if log_idle > 5 minutes:
-        # Determine which agent should be active based on last log entry
-        last_entry = tail -1 progress.log
-        target_agent = match last_entry to expected next actor:
-            - "Plan approved" / "Generator started"  → ow-generator
-            - "Generator code_done"                   → ow-generator (continue to build)
-            - "Generator build_done" / "Eval started" → ow-orchestrator (collect responses)
-            - "Eval completed" / "ALL PASS"           → ow-orchestrator (run review/PR)
-            - "Review completed"                      → ow-orchestrator (create PR)
-            - other                                    → ow-orchestrator (catch-all)
-
-        # Nudge the stuck agent
-        SendMessage(to=target_agent,
-            message="WATCHDOG NUDGE: pipeline log idle for ${log_idle}min. " +
-                    "Last entry: '${last_entry}'. " +
-                    "Please continue your next step OR send your status/failure message.")
-
-        log: "🔔 Nudged ${target_agent} (idle ${log_idle}min)"
-
-    # Check 4: Hard timeout
-    if total_elapsed > 60 minutes:
-        # Final fallback: one more progress.log check
-        if last_line of progress.log indicates completion:
-            recover URL, mark success
-        else:
-            mark as timeout
-        exit loop
+```bash
+tail -5 ${sessionDir}/progress.log
 ```
 
-**Implementation notes:**
-- The "wake on idle notification" happens automatically — every idle notification you receive is an opportunity to run the checks above. Treat each idle wake as one iteration of the loop.
-- You have BOTH the background watchdog (Step 2f, writes to batch.log) AND this active wait logic. They complement: the watchdog gives diagnostic visibility; the active wait logic detects completion and nudges.
-- Nudging the same agent repeatedly is fine — the model will either continue work or send back a "I'm stuck because X" message, both are useful.
+- If you see `✅ Workflow complete` and a PR URL → mark as success-recovered-from-log, parse URL.
+- Otherwise → mark as timeout.
 
-When you exit the loop (any path), kill the watchdog: `kill ${watchdogPid} 2>/dev/null`.
+**Honest design note:** we used to have a background watchdog that wrote diagnostic logs every 5 min, plus an "active wait loop" that was supposed to nudge stuck agents. Both turned out to be ineffective — Claude Agent Teams' idle notifications fire only on state-change, not periodically, so a true deadlock state generates no further notifications and the dispatcher cannot wake itself to nudge. The 30-minute timeout is the only mechanism that reliably triggers, so we rely on it alone. Stalled tasks lose ~30 minutes; we move on to the next task and let the user inspect failed sessions afterward.
 
 Append the appropriate batch.log entry:
-- Detected via SendMessage: `[$(date +%H:%M:%S)] ✅ Task ${i} complete (via SendMessage): PR <url>`
-- Detected via progress.log: `[$(date +%H:%M:%S)] ✅ Task ${i} complete (via progress.log): PR <url>`
-- Failure detected: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
-- Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 60min`
+- Success via SendMessage: `[$(date +%H:%M:%S)] ✅ Task ${i} complete: PR <url>`
+- Success recovered from log: `[$(date +%H:%M:%S)] ⚠️  Task ${i} complete (recovered from log): PR <url>`
+- Failure: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
+- Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 30min`
 
-### 2h. Kill the watchdog and team
-
-```bash
-kill ${watchdogPid} 2>/dev/null
-```
+### 2g. Kill the team
 
 Send `{"type":"shutdown_request"}` to all 5 agents via SendMessage. This frees memory before the next task starts.
 
-### 2i. Append to summary
+### 2h. Append to summary
 
 Append a row to `{batchSummary}`:
 
@@ -328,7 +249,7 @@ Append a row to `{batchSummary}`:
 | {i} | {taskDescription} | ✅ success / ❌ failed / ⏰ timeout | {PR URL or "—"} | {sessionDir} |
 ```
 
-### 2j. Continue to next task
+### 2i. Continue to next task
 
 Do NOT abort the batch on a single failure. Move to task `i+1`.
 
