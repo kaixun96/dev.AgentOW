@@ -202,40 +202,68 @@ Agent({
 })
 ```
 
-### 2f. Wait for completion (timeout-bounded)
+### 2f. Wait for completion (with recovery on timeout)
 
-Wait for one of three signals, whichever comes first:
+Wait for one of these signals, whichever comes first:
 
 1. **BATCH_RESULT SendMessage** from orchestrator (preferred path)
-2. **30-minute hard timeout** from task start (safety net)
-3. **A non-BATCH_RESULT message** from any agent (e.g. an error or a "stuck" notification) — handle as task failure
+2. **30-minute "stall" checkpoint** — first attempt to recover
+3. **60-minute hard timeout** — final give-up
 
-When you wake (idle notification or new message), check what you have:
+**On BATCH_RESULT received:**
+- `BATCH_RESULT: success | PR: <url>` → success.
+- `BATCH_RESULT: failure | ERROR: <reason>` → failure.
 
-```bash
-# Did orchestrator send BATCH_RESULT?
-# (Look at the most recent SendMessage to team-lead)
-```
+**On 30-min stall checkpoint (first recovery attempt):**
 
-If `BATCH_RESULT: success | PR: <url>` → success.
-If `BATCH_RESULT: failure | ERROR: <reason>` → failure.
-
-**On 30-minute timeout, do ONE final check** — read progress.log to see if the workflow actually finished but the orchestrator forgot to send BATCH_RESULT:
+The timeout firing is itself a wake event for the dispatcher — use it to actively recover, not give up. The mechanism: SendMessage to a team agent **always** wakes it into a new turn (this is a harness guarantee, unlike idle notifications). So we send a targeted nudge and wait another 30 min.
 
 ```bash
 tail -5 ${sessionDir}/progress.log
 ```
 
-- If you see `✅ Workflow complete` and a PR URL → mark as success-recovered-from-log, parse URL.
-- Otherwise → mark as timeout.
+First, check if work is actually done but BATCH_RESULT was forgotten:
+- If `✅ Workflow complete` is in the log → mark success-recovered-from-log, parse URL, done.
 
-**Honest design note:** we used to have a background watchdog that wrote diagnostic logs every 5 min, plus an "active wait loop" that was supposed to nudge stuck agents. Both turned out to be ineffective — Claude Agent Teams' idle notifications fire only on state-change, not periodically, so a true deadlock state generates no further notifications and the dispatcher cannot wake itself to nudge. The 30-minute timeout is the only mechanism that reliably triggers, so we rely on it alone. Stalled tasks lose ~30 minutes; we move on to the next task and let the user inspect failed sessions afterward.
+Otherwise, identify the stuck agent from the last log entry, then SendMessage to nudge:
+
+| Last log entry pattern | Stuck on | Wake target |
+|------------------------|----------|-------------|
+| `🚀 Session started` / `📋 Planner started` | Planning | `ow-planner` |
+| `✅ Plan approved` / `🔨 Generator started (cycle N)` | Generator coding/building | `ow-generator` |
+| `🔨 Generator code_done` (no `build_done` follow-up) | Generator should continue to build/test | `ow-generator` |
+| `🔨 Generator build_done` / `🔍 Eval started` | Orchestrator collecting responses | `ow-orchestrator` |
+| `✅ ALL PASS` / `📝 Quick review` | Orchestrator running review/PR | `ow-orchestrator` |
+| `📝 Review completed` / `🚀 Creating PR` | Orchestrator creating PR | `ow-orchestrator` |
+| anything else | Catch-all | `ow-orchestrator` |
+
+Send the nudge:
+
+```
+SendMessage to <wake target>:
+  "WAKE — pipeline has been idle for 30+ minutes. Last log entry:
+   '<last_line>'. Resume your next step now. If you are blocked,
+   send your status (build_done with status:failure, or BATCH_RESULT
+   failure to team-lead). Do not stay idle."
+```
+
+Append to batch.log: `[$(date +%H:%M:%S)] 🔔 Task ${i} stalled at 30min, waking ${wakeTarget}`
+
+Then continue waiting another 30 min (total 60 min budget).
+
+**On 60-min hard timeout (final):**
+
+Check progress.log one last time:
+- If `✅ Workflow complete` appears → success-recovered-from-log.
+- Otherwise → timeout, give up. Append: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 60min (wake attempt did not recover)`.
 
 Append the appropriate batch.log entry:
 - Success via SendMessage: `[$(date +%H:%M:%S)] ✅ Task ${i} complete: PR <url>`
 - Success recovered from log: `[$(date +%H:%M:%S)] ⚠️  Task ${i} complete (recovered from log): PR <url>`
 - Failure: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
-- Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 30min`
+- Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 60min`
+
+**Why this works (and the previous active-wait didn't):** the 30-min checkpoint is a one-shot wake of the dispatcher (from the timeout itself), not an attempt at periodic polling. SendMessage to a team agent is guaranteed to wake it (forces a new turn). So we get exactly ONE nudge attempt at the right moment, then exactly ONE final timeout — bounded, predictable, no dead code.
 
 ### 2g. Kill the team
 
