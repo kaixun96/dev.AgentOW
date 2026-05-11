@@ -4,7 +4,37 @@
 
 A Claude Code plugin that runs a full pipeline of specialized agents to take you from a feature description to a draft PR, inside a GitHub Codespace.
 
-> See [docs/architecture.md](docs/architecture.md) for the full invocation flow diagram.
+```mermaid
+flowchart TD
+    A([💬 User describes feature]) --> B{Mode?}
+    B -- "/ow-team" --> C[💡 Brainstorm<br/>clarify intent]
+    B -- "/ow-team --auto" --> D
+    B -- "/ow-batch" --> D
+    C --> D[📋 Planner<br/>research + plan]
+    D --> E{Approve?}
+    E -- yes --> F[🔨 Generator<br/>code → build → test → dev server]
+    E -- revise --> D
+    F -.code_done.-> G & H
+    G[🔍 Evaluator<br/>Playwright + DOM]
+    H[📝 Reviewer<br/>checklist + deep review]
+    F --> I{All pass?}
+    G --> I
+    H --> I
+    I -- fail --> F
+    I -- pass --> J[🚀 git push + draft PR on ADO]
+    J --> K([🎉 PR URL])
+
+    style A fill:#7c5cff,stroke:#7c5cff,color:#fff
+    style K fill:#4ade80,stroke:#4ade80,color:#000
+    style C fill:#60a5fa,stroke:#60a5fa,color:#fff
+    style D fill:#60a5fa,stroke:#60a5fa,color:#fff
+    style F fill:#fbbf24,stroke:#fbbf24,color:#000
+    style G fill:#fbbf24,stroke:#fbbf24,color:#000
+    style H fill:#fbbf24,stroke:#fbbf24,color:#000
+    style J fill:#4ade80,stroke:#4ade80,color:#000
+```
+
+> See [docs/architecture.md](docs/architecture.md) for the full invocation flow diagram with details.
 
 ---
 
