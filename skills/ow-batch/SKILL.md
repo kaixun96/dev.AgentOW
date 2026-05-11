@@ -202,74 +202,106 @@ Agent({
 })
 ```
 
-### 2f. Wait for completion (with recovery on timeout)
+### 2f. Start a background watchdog that wakes you on events
 
-Wait for one of these signals, whichever comes first:
+**Why this is needed:** Claude Code is turn-based. The dispatcher only wakes on (1) user message, (2) teammate SendMessage, or (3) a notification from a tool it's monitoring. Idle notifications do NOT wake you. So without an explicit mechanism, a stalled team puts the dispatcher to sleep indefinitely.
 
-1. **BATCH_RESULT SendMessage** from orchestrator (preferred path)
-2. **30-minute "stall" checkpoint** — first attempt to recover
-3. **60-minute hard timeout** — final give-up
+**Mechanism:** launch a Bash watchdog as `run_in_background`, then use `Monitor` on its background id. Each stdout line the watchdog emits becomes a notification that wakes the dispatcher into a new turn. This gives us deterministic periodic wakes.
 
-**On BATCH_RESULT received:**
-- `BATCH_RESULT: success | PR: <url>` → success.
-- `BATCH_RESULT: failure | ERROR: <reason>` → failure.
-
-**On 30-min stall checkpoint (first recovery attempt):**
-
-The timeout firing is itself a wake event for the dispatcher — use it to actively recover, not give up. The mechanism: SendMessage to a team agent **always** wakes it into a new turn (this is a harness guarantee, unlike idle notifications). So we send a targeted nudge and wait another 30 min.
+Launch the watchdog:
 
 ```bash
-tail -5 ${sessionDir}/progress.log
+# Run with run_in_background: true
+TASK_START=$(date +%s)
+SESSION_DIR='{sessionDir}'
+
+while true; do
+  sleep 60   # poll every minute
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - TASK_START))
+  ELAPSED_MIN=$((ELAPSED / 60))
+
+  # Check completion
+  if [ -f "$SESSION_DIR/progress.log" ] && tail -5 "$SESSION_DIR/progress.log" | grep -q "✅ Workflow complete"; then
+    LAST_PR=$(tail -10 "$SESSION_DIR/progress.log" | grep -oE 'https://[^ ]+pullrequest/[0-9]+' | tail -1)
+    echo "WAKE_COMPLETE | PR=${LAST_PR:-unknown}"
+    exit 0
+  fi
+
+  LOG_MTIME=$(stat -c %Y "$SESSION_DIR/progress.log" 2>/dev/null || echo 0)
+  LOG_IDLE=$((NOW - LOG_MTIME))
+  LOG_IDLE_MIN=$((LOG_IDLE / 60))
+  LAST_LINE=$(tail -1 "$SESSION_DIR/progress.log" 2>/dev/null || echo "(empty)")
+
+  # 30-min stall checkpoint (fires once)
+  if [ $ELAPSED -ge 1800 ] && [ ! -f "$SESSION_DIR/.stall-nudged" ]; then
+    touch "$SESSION_DIR/.stall-nudged"
+    echo "WAKE_STALL_30MIN | log_idle=${LOG_IDLE_MIN}min | last: $LAST_LINE"
+  fi
+
+  # 60-min hard timeout
+  if [ $ELAPSED -ge 3600 ]; then
+    echo "WAKE_TIMEOUT_60MIN | log_idle=${LOG_IDLE_MIN}min | last: $LAST_LINE"
+    exit 1
+  fi
+done
 ```
 
-First, check if work is actually done but BATCH_RESULT was forgotten:
-- If `✅ Workflow complete` is in the log → mark success-recovered-from-log, parse URL, done.
+Capture the background process id as `{watchdogBgId}`.
 
-Otherwise, identify the stuck agent from the last log entry, then SendMessage to nudge:
+Now call `Monitor` on `{watchdogBgId}`. Monitor streams each stdout line as a notification — these are the events that will wake you.
 
-| Last log entry pattern | Stuck on | Wake target |
-|------------------------|----------|-------------|
-| `🚀 Session started` / `📋 Planner started` | Planning | `ow-planner` |
-| `✅ Plan approved` / `🔨 Generator started (cycle N)` | Generator coding/building | `ow-generator` |
-| `🔨 Generator code_done` (no `build_done` follow-up) | Generator should continue to build/test | `ow-generator` |
-| `🔨 Generator build_done` / `🔍 Eval started` | Orchestrator collecting responses | `ow-orchestrator` |
-| `✅ ALL PASS` / `📝 Quick review` | Orchestrator running review/PR | `ow-orchestrator` |
-| `📝 Review completed` / `🚀 Creating PR` | Orchestrator creating PR | `ow-orchestrator` |
-| anything else | Catch-all | `ow-orchestrator` |
+### 2g. Handle wake events from Monitor
 
-Send the nudge:
+You will receive notifications one at a time. For each:
+
+**`WAKE_COMPLETE | PR=<url>`** → workflow completed successfully (orchestrator wrote `✅ Workflow complete` to progress.log; PR URL extracted). Use this URL. Done.
+
+**`WAKE_STALL_30MIN | log_idle=Xmin | last: <line>`** → pipeline has been silent for 30 min. Determine stuck agent from the last log line, then SendMessage to nudge:
+
+| Last log entry pattern | Wake target |
+|------------------------|-------------|
+| `📋 Planner started` (no completion) | `ow-planner` |
+| `✅ Plan approved` / `🔨 Generator started (cycle N)` | `ow-generator` |
+| `🔨 Generator code_done` (no `build_done` follow-up) | `ow-generator` |
+| `🔨 Generator build_done` / `🔍 Eval started` | `ow-orchestrator` |
+| `✅ ALL PASS` / `📝 Quick review` / `Review completed` / `🚀 Creating PR` | `ow-orchestrator` |
+| anything else | `ow-orchestrator` |
 
 ```
 SendMessage to <wake target>:
-  "WAKE — pipeline has been idle for 30+ minutes. Last log entry:
-   '<last_line>'. Resume your next step now. If you are blocked,
-   send your status (build_done with status:failure, or BATCH_RESULT
-   failure to team-lead). Do not stay idle."
+  "WAKE — pipeline log idle for X min. Last entry: '<last_line>'.
+   Resume your next step now. If blocked, send your build_done with
+   status:failure or BATCH_RESULT failure to team-lead. Do not stay
+   idle — the dispatcher is waiting."
 ```
 
-Append to batch.log: `[$(date +%H:%M:%S)] 🔔 Task ${i} stalled at 30min, waking ${wakeTarget}`
+Append to batch.log: `[$(date +%H:%M:%S)] 🔔 Task ${i} stall at 30min, woke ${wakeTarget}`
 
-Then continue waiting another 30 min (total 60 min budget).
+Continue waiting (Monitor will fire again on the next event).
 
-**On 60-min hard timeout (final):**
+**`WAKE_TIMEOUT_60MIN | log_idle=Xmin | last: <line>`** → final timeout. Final progress.log check:
+- If `✅ Workflow complete` is now in the log → success-recovered-from-log
+- Otherwise → mark timeout, give up
 
-Check progress.log one last time:
-- If `✅ Workflow complete` appears → success-recovered-from-log.
-- Otherwise → timeout, give up. Append: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 60min (wake attempt did not recover)`.
+**BATCH_RESULT SendMessage from orchestrator** → parse and done (this can arrive at any time; it overrides waiting for watchdog wake events).
+
+When you exit the wait (any path), kill the watchdog:
+```bash
+kill ${watchdogBgId} 2>/dev/null
+```
 
 Append the appropriate batch.log entry:
 - Success via SendMessage: `[$(date +%H:%M:%S)] ✅ Task ${i} complete: PR <url>`
-- Success recovered from log: `[$(date +%H:%M:%S)] ⚠️  Task ${i} complete (recovered from log): PR <url>`
+- Success via watchdog WAKE_COMPLETE: `[$(date +%H:%M:%S)] ✅ Task ${i} complete (watchdog detected via log): PR <url>`
 - Failure: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
 - Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 60min`
 
-**Why this works (and the previous active-wait didn't):** the 30-min checkpoint is a one-shot wake of the dispatcher (from the timeout itself), not an attempt at periodic polling. SendMessage to a team agent is guaranteed to wake it (forces a new turn). So we get exactly ONE nudge attempt at the right moment, then exactly ONE final timeout — bounded, predictable, no dead code.
-
-### 2g. Kill the team
+### 2h. Kill the team
 
 Send `{"type":"shutdown_request"}` to all 5 agents via SendMessage. This frees memory before the next task starts.
 
-### 2h. Append to summary
+### 2i. Append to summary
 
 Append a row to `{batchSummary}`:
 
@@ -277,7 +309,7 @@ Append a row to `{batchSummary}`:
 | {i} | {taskDescription} | ✅ success / ❌ failed / ⏰ timeout | {PR URL or "—"} | {sessionDir} |
 ```
 
-### 2i. Continue to next task
+### 2j. Continue to next task
 
 Do NOT abort the batch on a single failure. Move to task `i+1`.
 
