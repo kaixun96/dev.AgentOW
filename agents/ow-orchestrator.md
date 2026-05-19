@@ -354,12 +354,9 @@ description: |
 
   ## Changes
   <list from generator tasksCompleted>
-
-  ## Testing
-  - Build: {buildStatus}
-  - Unit tests: {passed} passed, {failed} failed
-  - Playwright verification: {criteriaResults count} criteria passed
 ```
+
+Do NOT include a "Testing" / "Test plan" section in the description — the team uses its own validation channels and the auto-generated test plan adds noise.
 
 Capture the returned `prId` and `prUrl`.
 
