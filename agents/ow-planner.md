@@ -145,7 +145,56 @@ Write a plan file to `{planDir}/plan.md` with this structure:
 
 ## Risks & Gotchas
 - <anything that could go wrong>
+
+## Visual Validation
+
+This section is MANDATORY. It tells the evaluator how to capture BEFORE/AFTER screenshots of the changed UI surface for embedding in the PR description.
+
+### Surface Trace
+- **Changed component**: `<ComponentName>` in `<exact/path/Component.tsx>`
+- **Renders inside**: `<ParentComponent>` in `<path/Parent.tsx>:<line>` (when `<condition>`)
+- **User trigger**: `<describe interaction>` on `<element-or-button>` in `<path/Source.tsx>:<line>`
+- **DOM selector**: `<exact CSS or data-automation-id selector>`
+- **Selector source**: `<path/Source.tsx>:<line>` defines this attribute here
+- **Pattern**: A | B | C | D | skip
+- **Setup needed** (only for Pattern B/C):
+  - <e.g. POST /_api/comments with body {...} as adminUser>
+  - <e.g. open page as nonAdminUser, click like button>
+- **Test page**: <SharePoint URL, or "default" for ElevationTest>
+- **Flights**: `['1535']` or specific flight IDs
+
+### Verification
+- **After click, expected DOM container**: `<selector that appears after trigger>` (e.g. `[class*="fui-OverlayDrawer"]`)
+- **Inside that container, expected element**: `<discriminator that proves this is OUR PR's surface, not similar UI>` (e.g. `<h2>Specific text from changed component</h2>`)
+
+### Pattern definitions
+
+| Pattern | Meaning |
+|---------|---------|
+| **A** | Simple click — element exists on every published SitePage by default (social bar, command bar, page analytics) |
+| **B** | Requires REST data setup before trigger (e.g. needs an existing comment) |
+| **C** | Requires a SECOND user's action before trigger (e.g. "X people liked YOUR comment") |
+| **D** | Requires external product (Planner / Stream / Yammer) — NOT available on FIC synthetic tenant. Always skip. |
+| **skip** | Surface trace cannot be reliably determined OR is server-side (no UI surface). MUST include `reasonForSkip`. |
+
+### When to skip
+- Pattern D (external product dependency)
+- Server-side only changes (no UI surface affected)
+- Surface is rendered conditionally in ways that cannot be triggered in test (e.g. error states that require backend failure)
+- The changed code is in a hook/utility shared by many components and no single trigger demonstrates THIS PR's effect
+
+If skipping, replace the entire Surface Trace section with:
 ```
+### Surface Trace
+- **Pattern**: skip
+- **reasonForSkip**: <specific reason, e.g. "Server-side change in API endpoint, no UI surface affected">
+```
+```
+
+**Critical rules for Visual Validation**:
+- **Every selector MUST cite source (`file:line`).** Do NOT guess or use "similar looking" selectors from other components.
+- **The expected container + discriminator must be specific to THIS PR.** Generic things like "any Drawer rendered" are not acceptable — the evaluator needs to prove it captured the right surface, not just any UI.
+- **If you cannot trace the surface from source code, mark pattern=skip.** Do NOT fabricate a trigger you "think" might work.
 
 **Critical:** Every task MUST reference exact file paths discovered during research. No placeholder paths.
 

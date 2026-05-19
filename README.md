@@ -162,6 +162,15 @@ You provide one input. You get back one draft PR URL. Nothing in between.
 - Plan approval: auto
 - Review critical issues: auto-fix within the cycle limit; if still failing, PR is created as draft anyway
 
+### Screenshot existing PRs — independent of the pipeline
+
+```
+/ow-screenshot 2219557                          # one PR
+/ow-screenshot 2219557 2219558 2219559          # multiple PRs
+```
+
+For each PR, the agent traces the changed UI from source code, captures BEFORE (prod CDN) and AFTER (PR build) screenshots, and posts them as a PR comment. PRs where the surface can't be traced (server-side changes, external dependencies) are auto-skipped with a reason.
+
 ### Batch mode — drop a list, get a list of PRs
 
 ```
@@ -218,7 +227,7 @@ Three-layer harness:
 | **Agents** | Workflow separation | orchestrator, planner, generator, evaluator, reviewer |
 | **Skills** | Knowledge injection | build rules, test conventions, PR workflow, Playwright |
 
-### MCP Tools (15)
+### MCP Tools (16)
 
 | Tool | Description |
 |------|-------------|
@@ -231,6 +240,7 @@ Three-layer harness:
 | `ow-git` | Run git commands with structured output |
 | `ow-session-{open,send,capture,list,kill,interrupt}` | tmux pane control |
 | `ow-pr-create` | Push branch + create draft PR on Azure DevOps |
+| `ow-pr-attach` | Upload screenshots to a PR; append to description or post a comment |
 | `ow-version` | Check plugin version and update availability |
 
 ### Agents
@@ -251,6 +261,7 @@ All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cy
 |-------|------------------|
 | `ow-team` | Run the full pipeline (entry point) |
 | `ow-batch` | Run multiple tasks overnight, one PR per task |
+| `ow-screenshot` | Capture BEFORE/AFTER screenshots for existing PR(s) and post as PR comment |
 | `ow-dev-build` | rush build/install/update |
 | `ow-dev-test` | rush test, Jest |
 | `ow-dev-git` | git, branch, checkout |

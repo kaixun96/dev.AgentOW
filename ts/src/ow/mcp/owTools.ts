@@ -7,6 +7,7 @@ import { RushCli } from "../tools/rushCli.js";
 import { TmuxManager } from "../tools/tmuxManager.js";
 import { GitClient } from "../tools/gitClient.js";
 import { PrClient } from "../tools/prClient.js";
+import { PrAttach } from "../tools/prAttach.js";
 import { extractDebugLinks, buildFullTestUrl } from "../tools/debugLink.js";
 import { FileLogger, RawOutputLog } from "../../shared/logger.js";
 import {
@@ -37,6 +38,7 @@ export function registerOwTools(
   const tmux = new TmuxManager();
   const git = new GitClient(OW.odspWebRoot);
   const pr = new PrClient(OW.odspWebRoot, logger);
+  const prAttach = new PrAttach(OW.odspWebRoot, logger);
 
   // ── 1. ow-status ──────────────────────────────────────────────────────────
   registerMcpTool(server, "ow-status", {
@@ -355,5 +357,27 @@ export function registerOwTools(
       workItems: input.workItems,
     }, extras.signal);
     return successResultWithDebug(logger, "ow-pr-create", result);
+  });
+
+  // ── 16. ow-pr-attach ─────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-pr-attach", {
+    description: "Upload files (typically PNG screenshots) as attachments to an existing PR on Azure DevOps, then optionally append a comment or extend the PR description. Use {{name}} placeholders in commentMarkdown / appendToDescription to reference uploaded attachment URLs.",
+    inputSchema: {
+      prId: z.number().describe("Pull request ID to attach files to"),
+      attachments: z.array(z.object({
+        name: z.string().describe("Filename used on ADO, e.g. 'before-pr2219557.png'"),
+        localPath: z.string().describe("Absolute path to the local file to upload"),
+      })).describe("Files to upload as PR attachments"),
+      commentMarkdown: z.string().optional().describe("Markdown for a new PR comment thread. Use {{name}} (matching attachment.name) to embed attachment URLs."),
+      appendToDescription: z.string().optional().describe("Markdown to append to the PR's existing description. Use {{name}} placeholders for attachment URLs."),
+    },
+  }, async (input, extras) => {
+    const result = await prAttach.attach({
+      prId: input.prId,
+      attachments: input.attachments,
+      commentMarkdown: input.commentMarkdown,
+      appendToDescription: input.appendToDescription,
+    }, extras.signal);
+    return successResultWithDebug(logger, "ow-pr-attach", result);
   });
 }

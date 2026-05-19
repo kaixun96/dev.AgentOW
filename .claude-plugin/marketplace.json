@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Agentic tooling for odsp-web development in Codespaces",
-    "version": "0.3.2"
+    "version": "0.4.0"
   },
   "plugins": [
     {
       "name": "agentOW",
       "source": "./",
       "description": "odsp-web agentic tooling. Registers ow MCP server with rush, tmux, git, and debug link tools.",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "author": {
         "name": "kaixun"
       },

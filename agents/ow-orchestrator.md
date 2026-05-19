@@ -7,6 +7,7 @@ allowedTools:
   - ow-status
   - ow-session-list
   - ow-pr-create
+  - ow-pr-attach
   - Read
   - Bash
   - SendMessage
@@ -358,6 +359,69 @@ description: |
   - Build: {buildStatus}
   - Unit tests: {passed} passed, {failed} failed
   - Playwright verification: {criteriaResults count} criteria passed
+```
+
+Capture the returned `prId` and `prUrl`.
+
+#### Step 7c.2: Attach Visual Validation Screenshots (if captured)
+
+Read the evaluator's last NDJSON line. If `visualValidation.status == "captured"`, attach the BEFORE/AFTER screenshots to the PR:
+
+```
+ow-pr-attach({
+  prId: <prId from Step 7c>,
+  attachments: [
+    { name: "before-<component>.png", localPath: <visualValidation.beforePath> },
+    { name: "after-<component>.png", localPath: <visualValidation.afterPath> }
+  ],
+  appendToDescription: `
+## Visual Validation
+
+| BEFORE | AFTER |
+|--------|-------|
+| {{before-<component>.png}} | {{after-<component>.png}} |
+
+- **Pattern**: <visualValidation.pattern>
+- **Component**: <visualValidation.component>
+- **Trigger selector**: \`<visualValidation.selector>\`
+
+🤖 Auto-captured by ow-evaluator during pipeline run.
+`
+})
+```
+
+If `visualValidation.status == "skipped"`, append a brief note to the PR description instead:
+
+```
+ow-pr-attach({
+  prId: <prId>,
+  attachments: [],
+  appendToDescription: `
+## Visual Validation
+
+⏭️ Skipped: <visualValidation.reasonForSkipOrFail>
+`
+})
+```
+
+If `visualValidation.status == "failed"`, log the failure but proceed — the PR is still valid, the screenshots just couldn't be captured:
+
+```
+ow-pr-attach({
+  prId: <prId>,
+  attachments: [],
+  appendToDescription: `
+## Visual Validation
+
+⚠️ Failed to capture: <visualValidation.reasonForSkipOrFail>
+Manual screenshot recommended.
+`
+})
+```
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 📸 Visual validation attached to PR" >> {progressLog}
 ```
 
 #### Step 7d: Report Completion

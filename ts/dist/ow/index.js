@@ -6,7 +6,7 @@ var __export = (target, all) => {
 };
 
 // src/ow/index.ts
-import * as fs3 from "fs";
+import * as fs4 from "fs";
 import * as path2 from "path";
 import * as url2 from "url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -13852,8 +13852,8 @@ function date4(params) {
 config(en_default());
 
 // src/ow/mcp/owTools.ts
-import * as cp5 from "child_process";
-import * as fs2 from "fs";
+import * as cp6 from "child_process";
+import * as fs3 from "fs";
 
 // src/shared/constants.ts
 var OW = {
@@ -14130,6 +14130,141 @@ ${prResult.stdout}`);
   }
 };
 
+// src/ow/tools/prAttach.ts
+import * as cp5 from "child_process";
+import * as fs2 from "fs/promises";
+var ODSP_WEB_REPO_ID2 = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
+var ADO_ORG2 = "https://dev.azure.com/onedrive";
+var ADO_PROJECT2 = "ODSP-Web";
+var API_VERSION = "7.0";
+function execCmd2(cmd, cwd, signal) {
+  return new Promise((resolve) => {
+    const proc = cp5.exec(cmd, { cwd, signal, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+      resolve({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
+    });
+  });
+}
+async function getAdoToken(signal) {
+  const result = await execCmd2(
+    "az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv",
+    process.cwd(),
+    signal
+  );
+  if (result.exitCode !== 0 || !result.stdout.trim()) {
+    throw new Error(
+      `Failed to get ADO access token via 'az account get-access-token'. Ensure you have run 'az login' for the Microsoft tenant.
+${result.stderr}`
+    );
+  }
+  return result.stdout.trim();
+}
+function replacePlaceholders(text, uploaded) {
+  let out = text;
+  for (const { name, url: url3 } of uploaded) {
+    out = out.split(`{{${name}}}`).join(url3);
+  }
+  return out;
+}
+var PrAttach = class {
+  constructor(cwd = OW.odspWebRoot, logger2) {
+    this.cwd = cwd;
+    this.logger = logger2;
+  }
+  cwd;
+  logger;
+  async attach(input, signal) {
+    const token = await getAdoToken(signal);
+    const baseUrl = `${ADO_ORG2}/${ADO_PROJECT2}/_apis/git/repositories/${ODSP_WEB_REPO_ID2}/pullRequests/${input.prId}`;
+    const uploaded = [];
+    for (const att of input.attachments) {
+      const fileData = await fs2.readFile(att.localPath);
+      this.logger?.info("pr-attach", `uploading ${att.name} (${fileData.byteLength} bytes) to PR #${input.prId}`);
+      const uploadUrl = `${baseUrl}/attachments/${encodeURIComponent(att.name)}?api-version=${API_VERSION}`;
+      const resp = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/octet-stream"
+        },
+        body: new Uint8Array(fileData),
+        signal
+      });
+      if (!resp.ok) {
+        const errBody = await resp.text();
+        throw new Error(`Failed to upload attachment '${att.name}' (HTTP ${resp.status}): ${errBody}`);
+      }
+      const parsed = await resp.json();
+      const url3 = parsed.url;
+      if (!url3) {
+        throw new Error(`ADO did not return a URL for attachment '${att.name}'. Response: ${JSON.stringify(parsed)}`);
+      }
+      uploaded.push({ name: att.name, url: url3 });
+      this.logger?.info("pr-attach", `uploaded ${att.name} -> ${url3}`);
+    }
+    let commentPosted = false;
+    if (input.commentMarkdown) {
+      const content = replacePlaceholders(input.commentMarkdown, uploaded);
+      const threadUrl = `${baseUrl}/threads?api-version=${API_VERSION}`;
+      const resp = await fetch(threadUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          comments: [{ parentCommentId: 0, content, commentType: 1 }],
+          status: 1
+          // active
+        }),
+        signal
+      });
+      if (!resp.ok) {
+        const errBody = await resp.text();
+        throw new Error(`Failed to post PR comment (HTTP ${resp.status}): ${errBody}`);
+      }
+      commentPosted = true;
+      this.logger?.info("pr-attach", `comment posted on PR #${input.prId}`);
+    }
+    let descriptionUpdated = false;
+    if (input.appendToDescription) {
+      const getUrl = `${baseUrl}?api-version=${API_VERSION}`;
+      const getResp = await fetch(getUrl, {
+        headers: { "Authorization": `Bearer ${token}` },
+        signal
+      });
+      if (!getResp.ok) {
+        const errBody = await getResp.text();
+        throw new Error(`Failed to fetch PR for description update (HTTP ${getResp.status}): ${errBody}`);
+      }
+      const pr = await getResp.json();
+      const existing = pr.description ?? "";
+      const append = replacePlaceholders(input.appendToDescription, uploaded);
+      const newDescription = existing.trim() + "\n\n" + append;
+      const patchResp = await fetch(getUrl, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ description: newDescription }),
+        signal
+      });
+      if (!patchResp.ok) {
+        const errBody = await patchResp.text();
+        throw new Error(`Failed to update PR description (HTTP ${patchResp.status}): ${errBody}`);
+      }
+      descriptionUpdated = true;
+      this.logger?.info("pr-attach", `description updated on PR #${input.prId}`);
+    }
+    return {
+      prId: input.prId,
+      uploaded,
+      commentPosted,
+      descriptionUpdated
+    };
+  }
+};
+
 // src/ow/tools/debugLink.ts
 function extractDebugLinks(rushOutput) {
   const lines = rushOutput.split("\n");
@@ -14191,7 +14326,7 @@ function truncateLines(lines, max = 20) {
 // src/ow/mcp/owTools.ts
 function execSimple(cmd) {
   return new Promise((resolve, reject) => {
-    cp5.exec(cmd, (err, stdout) => {
+    cp6.exec(cmd, (err, stdout) => {
       if (err) reject(err);
       else resolve(stdout.trim());
     });
@@ -14202,6 +14337,7 @@ function registerOwTools(server2, logger2, logDir) {
   const tmux = new TmuxManager();
   const git = new GitClient(OW.odspWebRoot);
   const pr = new PrClient(OW.odspWebRoot, logger2);
+  const prAttach = new PrAttach(OW.odspWebRoot, logger2);
   registerMcpTool(server2, "ow-status", {
     description: "Environment snapshot: git branch, node version, rush install state, tmux sessions. Call this FIRST."
   }, async (extras) => {
@@ -14209,7 +14345,7 @@ function registerOwTools(server2, logger2, logDir) {
       git.branch(extras.signal).catch(() => "unknown"),
       execSimple("node -v").catch(() => "unknown"),
       tmux.listWindows(extras.signal),
-      fs2.promises.access(`${OW.odspWebRoot}/common/temp/last-install.flag`).then(() => true).catch(() => false)
+      fs3.promises.access(`${OW.odspWebRoot}/common/temp/last-install.flag`).then(() => true).catch(() => false)
     ]);
     return successResultWithDebug(logger2, "ow-status", {
       branch,
@@ -14436,7 +14572,7 @@ function registerOwTools(server2, logger2, logDir) {
     const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? `${OW.odspWebRoot}/../dev.AgentOW`;
     let version2 = "unknown";
     try {
-      const pkg = JSON.parse(await fs2.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
+      const pkg = JSON.parse(await fs3.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
       version2 = pkg.version ?? "unknown";
     } catch {
     }
@@ -14485,6 +14621,26 @@ function registerOwTools(server2, logger2, logDir) {
     }, extras.signal);
     return successResultWithDebug(logger2, "ow-pr-create", result);
   });
+  registerMcpTool(server2, "ow-pr-attach", {
+    description: "Upload files (typically PNG screenshots) as attachments to an existing PR on Azure DevOps, then optionally append a comment or extend the PR description. Use {{name}} placeholders in commentMarkdown / appendToDescription to reference uploaded attachment URLs.",
+    inputSchema: {
+      prId: external_exports.number().describe("Pull request ID to attach files to"),
+      attachments: external_exports.array(external_exports.object({
+        name: external_exports.string().describe("Filename used on ADO, e.g. 'before-pr2219557.png'"),
+        localPath: external_exports.string().describe("Absolute path to the local file to upload")
+      })).describe("Files to upload as PR attachments"),
+      commentMarkdown: external_exports.string().optional().describe("Markdown for a new PR comment thread. Use {{name}} (matching attachment.name) to embed attachment URLs."),
+      appendToDescription: external_exports.string().optional().describe("Markdown to append to the PR's existing description. Use {{name}} placeholders for attachment URLs.")
+    }
+  }, async (input, extras) => {
+    const result = await prAttach.attach({
+      prId: input.prId,
+      attachments: input.attachments,
+      commentMarkdown: input.commentMarkdown,
+      appendToDescription: input.appendToDescription
+    }, extras.signal);
+    return successResultWithDebug(logger2, "ow-pr-attach", result);
+  });
 }
 
 // src/ow/mcp/instructions.ts
@@ -14519,6 +14675,7 @@ You are connected to the ow MCP server \u2014 a dev toolkit for odsp-web develop
 
 ### PR Creation
 - ow-pr-create       \u2014 Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
+- ow-pr-attach       \u2014 Upload screenshots/files as attachments to an existing PR; optionally append to description or post a comment with the attachment URLs.
 
 ## Development Loop
 
@@ -14554,7 +14711,7 @@ if (command !== "mcp") {
 var distDir = path2.dirname(url2.fileURLToPath(import.meta.url));
 var logsDir = path2.join(distDir, "logs");
 var toolLogDir = path2.join(logsDir, "tools");
-fs3.mkdirSync(toolLogDir, { recursive: true });
+fs4.mkdirSync(toolLogDir, { recursive: true });
 purgeLogs(logsDir, 7);
 var logger = new FileLogger(logsDir, "ow-mcp");
 var server = new McpServer(

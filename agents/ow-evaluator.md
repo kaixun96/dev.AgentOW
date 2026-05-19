@@ -202,11 +202,44 @@ For each **UI criterion** (previously marked PENDING_BUILD):
 4. **Screenshot**: `browser_screenshot()` — save evidence. Note the screenshot path.
 5. **Record result**: PASS if DOM state matches criterion, FAIL with specific details if not.
 
-### Step UI-3: Send Results to Orchestrator
+### Step UI-3: BEFORE/AFTER Visual Validation (if plan has Surface Trace)
+
+Read the plan file. If it contains a `## Visual Validation` section with `Pattern: A/B/C` (not `skip` or `D`), capture BEFORE/AFTER screenshots for the PR description.
+
+**The plan's Surface Trace tells you exactly what to do:**
+- `DOM selector` — the element you click to open the surface
+- `Setup needed` — REST calls or multi-user actions before the click
+- `Test page` — the SharePoint URL to load
+- `Expected DOM container` + `discriminator` — used to verify you captured the right surface, not a similar one
+
+**Procedure** (do this twice — once for BEFORE, once for AFTER):
+
+**BEFORE** (renders prod CDN):
+1. `browser_navigate(url=<testPage>)` — NO debug params
+2. Wait for SPFx to load (snapshot until you see webparts)
+3. Perform any Setup steps from the plan
+4. Click the `DOM selector`
+5. Wait for the expected container to appear in `browser_snapshot()`
+6. **Verify discriminator** — confirm the expected element (text/attribute) is inside the container. If not, this is the wrong surface — STOP, mark visual validation as FAILED.
+7. `browser_screenshot()` — save to `<sessionDir>/evaluation/iter<N>/before-<component>.png`
+
+**AFTER** (renders local PR build via generator's debug link):
+1. Get `fullTestUrl` from `ow-debuglink(sharePointPageUrl=<testPage>)` — this prepends the localhost debug query string to the test page URL
+2. `browser_navigate(url=<fullTestUrl>)`
+3. Allow the debug bundle prompt if it appears
+4. Same setup + click as BEFORE
+5. Verify discriminator again
+6. `browser_screenshot()` — save to `<sessionDir>/evaluation/iter<N>/after-<component>.png`
+
+**If discriminator does not match on either capture:** the plan's selector / expected container is wrong. Mark visual validation as FAILED with specific evidence of what was found vs expected. The generator's fix cycle will re-trigger the planner if needed.
+
+**If plan has `Pattern: skip` or `Pattern: D`**: skip this step entirely. The PR description will note the reason for skipping.
+
+### Step UI-4: Send Results to Orchestrator
 
 Send UI verification results back to `ow-orchestrator` via `SendMessage`.
 
-### Step UI-4: Write Final Evidence Report
+### Step UI-5: Write Final Evidence Report
 
 Write UI results to `<sessionDir>/evaluation/YYYY-MM-DD-iter<N>-ui-verification.md`:
 
@@ -236,7 +269,7 @@ Write UI results to `<sessionDir>/evaluation/YYYY-MM-DD-iter<N>-ui-verification.
 - Criterion {id}: <description> — Suggested fix: <file:line + specific change>
 ```
 
-### Step UI-5: Append NDJSON Report
+### Step UI-6: Append NDJSON Report
 
 Append to `{reportFile}`:
 
@@ -253,10 +286,21 @@ Append to `{reportFile}`:
   "criteriaResults": [
     {"id": 2, "description": "<criterion>", "methods": ["PlaywrightMCP"], "status": "PASS|FAIL", "evidence": "<DOM snippet / screenshot path>"}
   ],
+  "visualValidation": {
+    "status": "captured | skipped | failed",
+    "pattern": "A|B|C|D|skip",
+    "beforePath": "<absolute path to before-*.png>",
+    "afterPath": "<absolute path to after-*.png>",
+    "component": "<component name from plan>",
+    "selector": "<DOM selector used>",
+    "reasonForSkipOrFail": "<only if status != captured>"
+  },
   "blockers": [],
   "details": "<narrative>"
 }
 ```
+
+`visualValidation` is required in the NDJSON. If `Pattern: skip` in plan, set `status: skipped`. If captured, populate `beforePath` and `afterPath` for the orchestrator to use in `ow-pr-attach`.
 
 ---
 
