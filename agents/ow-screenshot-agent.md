@@ -124,7 +124,16 @@ Determine the pattern:
 - <one-line explanation>
 ```
 
-**If pattern is `skip` or `D`**, post a comment via `ow-pr-attach` explaining the skip reason, then exit. Do not attempt screenshots.
+**If pattern is `skip`**, post a comment via `ow-pr-attach` explaining the reason, then exit. Do not attempt screenshots.
+
+**If pattern is `D` (external product dependency)**: **DO NOT skip immediately.** Many surfaces look external but are actually reachable on the synthetic tenant (e.g. Viva Amplify via `/_layouts/15/viva-amplify.aspx`). First run a short **probe** (30-45 seconds) to check reachability:
+
+- **Web part dependencies**: open the web part picker, search for the dependency by name, check the result count.
+- **App surface dependencies**: `browser_navigate` to the app's entry URL (e.g. `/_layouts/15/<app>.aspx`), inspect the snapshot for page title, hub chrome, and access-denied signals.
+
+After the probe:
+- **Reachable** (web part picker returns results / app URL returns expected title with no access-denied) → promote to Pattern A/B/C capture using the verified entry path. Update Surface Trace with the actual reachable trigger.
+- **Confirmed unreachable** (web part picker returns 0 results / app URL returns access-denied / redirect to generic SP page) → THEN post comment with the probe evidence and skip. Examples of confirmed-unreachable: PR 2219485 Planner web part (picker search returns 0 results).
 
 ## Step 3: Get the PR Debug Link
 
@@ -158,10 +167,33 @@ Determine flights (default `1535` for Wave-6; pick from PR description "Visual v
 
 Build the AFTER URL:
 ```
-<testPage>?debugManifestsFile=<PR_MANIFESTS>&loadSPFX=true&debugFlights=<flights>&market=qps-ploc
+<testPage>?debugManifestsFile=<PR_MANIFESTS>&loadSPFX=true&debugFlights=<flights>
 ```
 
-### BEFORE (prod CDN)
+⚠️ **Do NOT add `market=qps-ploc`.** It renders pseudo-localized text (Ĺōàď ďēb...) that pollutes the AFTER screenshots. The technical proof that the PR build loaded is the `prBuildCount > 0` console probe (assert in spec), not visual pseudo-loc.
+
+### Approach: write a per-PR spec, don't just navigate-and-click in MCP
+
+For non-trivial PRs (anything beyond Pattern A simple click), **write a Playwright `.spec.ts` file** that:
+- Creates and publishes a page (parameterized by GUID to avoid collisions)
+- Performs Pattern B REST setup or Pattern C second-user actions inline
+- Navigates BEFORE (no debug params) and AFTER (with debug params)
+- Asserts `prBuildCount > 0` on AFTER (the technical proof)
+- Asserts the **discriminator** is present in both BEFORE and AFTER DOM
+- Captures full-page screenshots
+- **Cleans up tenant state in a `finally` block** — delete created pages, revert list settings, remove seeded data, log out second user. The synthetic tenant is shared; leaving garbage behind breaks the next run.
+
+Save the spec to `sp-client/integration-tests/sp-pages-playwright/src/test/PRValidation/PR<prId><Component>.spec.ts`.
+
+Run it:
+```bash
+cd sp-client/integration-tests/sp-pages-playwright
+rushx playwright --grep "PR #<prId>"
+```
+
+For trivial Pattern A PRs you may instead use Playwright MCP directly (navigate + click + snapshot + screenshot) without writing a spec file, but **only if no tenant state mutation is needed**. The moment you need to create a page, seed REST data, or use a second user, switch to spec-file mode for proper cleanup.
+
+### BEFORE (prod CDN) — for MCP direct mode
 
 1. `browser_navigate(url=<testPage>)`
 2. Wait for page to fully load (snapshot until SPFx webparts are present)
@@ -170,10 +202,10 @@ Build the AFTER URL:
 5. `browser_snapshot()` — verify the discriminator is present. If not, STOP: selector is wrong.
 6. `browser_screenshot()` → save to `{outDir}/before.png`
 
-### AFTER (PR build)
+### AFTER (PR build) — for MCP direct mode
 
 1. `browser_navigate(url=<afterUrl>)`
-2. If a "Load debug scripts?" prompt appears, click "Allow" (or its localized equivalent under `market=qps-ploc`)
+2. If a "Load debug scripts?" prompt appears, click "Allow"
 3. Same setup + click as BEFORE
 4. `browser_snapshot()` — verify the discriminator is still present (sanity check that PR build still renders the surface)
 5. `browser_screenshot()` → save to `{outDir}/after.png`

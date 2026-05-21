@@ -204,7 +204,7 @@ For each **UI criterion** (previously marked PENDING_BUILD):
 
 ### Step UI-3: BEFORE/AFTER Visual Validation (if plan has Surface Trace)
 
-Read the plan file. If it contains a `## Visual Validation` section with `Pattern: A/B/C` (not `skip` or `D`), capture BEFORE/AFTER screenshots for the PR description.
+Read the plan file. If it contains a `## Visual Validation` section with `Pattern: A/B/C`, capture BEFORE/AFTER screenshots for the PR description.
 
 **The plan's Surface Trace tells you exactly what to do:**
 - `DOM selector` — the element you click to open the surface
@@ -231,9 +231,22 @@ Read the plan file. If it contains a `## Visual Validation` section with `Patter
 5. Verify discriminator again
 6. `browser_screenshot()` — save to `<sessionDir>/evaluation/iter<N>/after-<component>.png`
 
+⚠️ **Do NOT add `market=qps-ploc`** to the AFTER URL. It renders pseudo-localized text (Ĺōàď ďēb...) that pollutes the screenshots. The technical proof that the PR build loaded should come from the `prBuildCount > 0` console assertion in your verification (read it from `window`), not from visual pseudo-localization.
+
 **If discriminator does not match on either capture:** the plan's selector / expected container is wrong. Mark visual validation as FAILED with specific evidence of what was found vs expected. The generator's fix cycle will re-trigger the planner if needed.
 
-**If plan has `Pattern: skip` or `Pattern: D`**: skip this step entirely. The PR description will note the reason for skipping.
+**If plan has `Pattern: skip`**: skip this step entirely. The PR description will note the reason for skipping.
+
+**If plan has `Pattern: D` (external dependency)**: **DO NOT skip immediately.** Run a probe first to check if the dependency is reachable on the synthetic tenant:
+
+- **Web part dependency**: `browser_navigate` to the test page, open the web part picker, search for the dependency by name, snapshot to check result count.
+- **App surface dependency**: `browser_navigate` to the app entry URL from the plan's probe hint (e.g. `/_layouts/15/viva-amplify.aspx`), snapshot to check for the expected page title and access-denied signals.
+
+Then:
+- **Reachable** (picker shows results / app loads correctly) → promote to Pattern A/B/C capture using the verified entry path.
+- **Confirmed unreachable** (0 picker results / access-denied / redirect) → THEN mark as skipped with the probe evidence.
+
+If the tenant state needs to be mutated (created pages, seeded comments, list settings changed), **clean up before exiting** — delete pages, revert settings, etc. The synthetic tenant is shared; leaving garbage breaks the next run.
 
 ### Step UI-4: Send Results to Orchestrator
 

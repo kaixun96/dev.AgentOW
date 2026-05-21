@@ -174,8 +174,8 @@ This section is MANDATORY. It tells the evaluator how to capture BEFORE/AFTER sc
 | **A** | Simple click — element exists on every published SitePage by default (social bar, command bar, page analytics) |
 | **B** | Requires REST data setup before trigger (e.g. needs an existing comment) |
 | **C** | Requires a SECOND user's action before trigger (e.g. "X people liked YOUR comment") |
-| **D** | Requires external product (Planner / Stream / Yammer) — NOT available on FIC synthetic tenant. Always skip. |
-| **skip** | Surface trace cannot be reliably determined OR is server-side (no UI surface). MUST include `reasonForSkip`. |
+| **D** | Depends on an external product (Planner / Stream / Yammer / Viva Amplify). The evaluator will **probe first** to check if the dependency is reachable on the synthetic tenant. Mark this as `D` — DO NOT mark as `skip` — and include the probe hint in the trace (e.g. "Try web part picker for 'Planner'" or "Try /_layouts/15/viva-amplify.aspx"). |
+| **skip** | Surface trace cannot be reliably determined from source code OR is server-side (no UI surface affected). MUST include `reasonForSkip`. |
 
 ### When to skip
 - Pattern D (external product dependency)
