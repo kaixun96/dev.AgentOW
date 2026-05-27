@@ -98,9 +98,9 @@ Add to `~/.claude/settings.json`:
 
 Provides brainstorming and deep code review skills that agentOW integrates with.
 
-```bash
-claude plugin marketplace add anthropics/claude-code-superpowers
-claude plugin install superpowers --scope user
+```
+/plugin marketplace add obra/superpowers-marketplace
+/plugin install superpowers@superpowers-marketplace
 ```
 
 ### 5. Register Playwright MCP
