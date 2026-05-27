@@ -106,12 +106,10 @@ Provides brainstorming and deep code review skills that agentOW integrates with.
 ### 5. Register Playwright MCP
 
 ```bash
-claude mcp add playwright npx @playwright/mcp@latest --user-data-dir=/workspaces/.playwright-profile
+claude mcp add playwright npx @playwright/mcp@latest
 ```
 
-The `--user-data-dir` flag is required so that the SharePoint login session persists across runs — without it, every screenshot capture would need a fresh manual login.
-
-On first run, the evaluator opens a browser. Log in to SharePoint manually once — the session persists.
+On first run, the evaluator opens a browser. Log in to SharePoint manually if prompted.
 
 ### 6. Restart Claude Code and verify
 
