@@ -69,12 +69,9 @@ You can run it in two modes — see [Quick Start](#quick-start).
 
 ### 1. Install the plugin
 
-Run from the odsp-web project root:
-
 ```bash
-cd /workspaces/odsp-web
 claude plugin marketplace add kaixun96/dev.AgentOW
-claude plugin install agentOW@agentOW --scope project
+claude plugin install agentOW@agentOW
 ```
 
 Zero clone, zero build — the compiled MCP server is shipped with the plugin.
