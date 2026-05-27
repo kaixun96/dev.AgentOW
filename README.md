@@ -116,7 +116,6 @@ On first run, the evaluator opens a browser. Log in to SharePoint manually if pr
 ```bash
 claude plugin list        # agentOW should be enabled
 claude mcp list           # ow server should be connected
-claude agent              # agents should be listed
 ```
 
 ---
@@ -180,14 +179,7 @@ For each PR, the agent traces the changed UI from source code, captures BEFORE (
 
 Designed for "leave it overnight, come back to PRs". Each task gets a fresh agent team, runs in `--auto` mode, and produces its own PR. Failures in one task do not affect the rest. A summary file lists every result and PR URL.
 
-> **Don't** invoke `claude agent ow-orchestrator` directly — always use `/ow-team` or `/ow-batch`. The orchestrator requires a properly set up Agent Team to function.
-
-### Individual agents
-
-```
-claude agent ow-planner
-> Research and plan how to fix the elevation background bug on mobile
-```
+> **Don't** invoke `ow-orchestrator` directly — always use `/ow-team` or `/ow-batch`. The orchestrator requires a properly set up Agent Team to function.
 
 ### MCP tools directly
 
