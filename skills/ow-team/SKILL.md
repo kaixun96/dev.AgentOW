@@ -84,6 +84,15 @@ echo "[$(date +%H:%M:%S)] 🤖 Mode: AUTO (no user interaction)" >> {progressLog
 echo "[$(date +%H:%M:%S)] 💬 Mode: INTERACTIVE (will ask for plan approval)" >> {progressLog}
 ```
 
+**Launch the progress-watcher backstop in the background.** This is a Node daemon that tails `report.json` (NDJSON) and watches `evaluation/iter*/` for new screenshots / findings, then appends human-readable lines to `progress.log` whenever the orchestrator forgets to. Without this, long pipelines look frozen to the user because the orchestrator LLM skips low-priority echo calls under load.
+
+```bash
+nohup node ${CLAUDE_PLUGIN_ROOT}/tools/progress-watcher.mjs {sessionDir} > {sessionDir}/.progress-watcher.out 2>&1 &
+echo "watcher pid: $!" >> {progressLog}
+```
+
+The watcher exits cleanly when the user kills the team or session. It's idempotent — safe to start multiple times (subsequent starts re-tail from the saved offset).
+
 ---
 
 ## Step 1.5: Brainstorm (superpowers) — INTERACTIVE MODE ONLY
@@ -125,9 +134,11 @@ Read all 5 agent MD files using the `Read` tool. Store the full content of each.
 | `{plannerMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-planner.md` |
 | `{generatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-generator.md` |
 | `{evaluatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator.md` |
+| `{evaluatorRuleMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-rule.md` |
+| `{evaluatorVisionMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-vision.md` |
 | `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
 
-Read all 5 in parallel. Do not proceed until all reads are complete.
+Read all 7 in parallel. Do not proceed until all reads are complete.
 
 ---
 
@@ -151,15 +162,17 @@ Spawn all 5 agents using the `Agent` tool. Use `subagent_type: general-purpose` 
 
 > **Why general-purpose:** Custom `subagent_type` values like `agentOW:*` are not supported for team member spawning. Agent behavior comes entirely from the `prompt` parameter — each agent receives its full definition inlined.
 
-### Agents 1–4 — idle members (spawn FIRST, before orchestrator)
+### Agents 1–6 — idle members (spawn FIRST, before orchestrator)
 
-Spawn all 4 idle agents FIRST so they are ready to receive messages when the orchestrator starts.
+Spawn all 6 idle agents FIRST so they are ready to receive messages when the orchestrator starts.
 
 | `name` | MD variable |
 |--------|-------------|
 | `ow-planner` | `{plannerMd}` |
 | `ow-generator` | `{generatorMd}` |
 | `ow-evaluator` | `{evaluatorMd}` |
+| `ow-evaluator-rule` | `{evaluatorRuleMd}` |
+| `ow-evaluator-vision` | `{evaluatorVisionMd}` |
 | `ow-review-agent` | `{reviewMd}` |
 
 ```
@@ -187,7 +200,7 @@ prompt:
   Then stop all work.
 ```
 
-### Agent 5 — ow-orchestrator (active, spawn LAST)
+### Agent 7 — ow-orchestrator (active, spawn LAST)
 
 > **Why last:** The orchestrator immediately sends SendMessage to ow-planner on startup. If planner hasn't been spawned yet, the message is lost and the pipeline deadlocks. Spawning idle agents first ensures all teammates are ready.
 
@@ -227,6 +240,8 @@ prompt:
     - ow-planner
     - ow-generator
     - ow-evaluator
+    - ow-evaluator-rule
+    - ow-evaluator-vision
     - ow-review-agent
 
   CRITICAL: After sending SendMessage to a teammate, you MUST wait for
@@ -241,16 +256,18 @@ prompt:
 
 ## Step 5: Start Monitoring and Serve as User-Relay
 
-After all 5 agents are spawned, tell the user:
+After all 7 agents are spawned, tell the user:
 
 ```
 Team "{teamName}" is live.
 
-  ow-orchestrator   — running (driving the pipeline)
-  ow-planner        — idle (waiting for orchestrator)
-  ow-generator      — idle (waiting for orchestrator)
-  ow-evaluator      — idle (waiting for orchestrator)
-  ow-review-agent   — idle (waiting for orchestrator)
+  ow-orchestrator      — running (driving the pipeline)
+  ow-planner           — idle (waiting for orchestrator)
+  ow-generator         — idle (waiting for orchestrator)
+  ow-evaluator         — idle (dry-run + code-inspection)
+  ow-evaluator-rule    — idle (UI verification: rule half)
+  ow-evaluator-vision  — idle (UI verification: cold-eye vision half)
+  ow-review-agent      — idle (waiting for orchestrator)
 
 Session workspace: {sessionDir}
 Progress log:      {progressLog}

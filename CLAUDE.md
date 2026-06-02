@@ -95,8 +95,8 @@ npm run dev         # tsx (for development)
 
 ## Gotchas
 
-- After modifying MCP server code, rebuild AND restart Claude Code for changes to take effect.
-- The plugin is installed from a cached copy — after rebuilding, the cache may need refreshing.
+- **`npm run build` auto-syncs to plugin cache** (`agents/*.md`, `docs/*.md`, `ts/dist/*` all copied into `~/.claude/plugins/cache/agentOW/agentOW/<version>/`). After build, **restart Claude Code** to reload the MCP server bundle into the active process — already-running MCP processes hold the old bundle in memory and won't see new code until they restart. Already-running agent SUB-processes (planner/evaluator/etc) also use the markdown they read at activation; they won't see updated agent .md until you start a new session.
+- The plugin is installed from a cached copy — confirm sync worked by `diff -q /workspaces/dev.AgentOW/ts/dist/ow/index.js ~/.claude/plugins/cache/agentOW/agentOW/0.3.2/ts/dist/ow/index.js`.
 - Hook scripts must be executable (`chmod +x`).
 - NDJSON report lines must be valid JSON — use `JSON.stringify()`, not manual string building.
 - The orchestrator's `SendMessage` only works with Agent Teams enabled.

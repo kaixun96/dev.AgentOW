@@ -1,3 +1,10 @@
 node_modules/
 *.log
 .aero/
+
+# throwaway debug scripts (underscore prefix convention)
+tools/_*.mjs
+
+# user-local docs / external skill mirrors — do not vendor into this repo
+docs/superpowers/
+docs/replace-component/

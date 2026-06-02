@@ -1,4 +1,7 @@
 import * as cp from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { OW } from "../../shared/constants.js";
 import type { FileLogger } from "../../shared/logger.js";
 
@@ -62,9 +65,15 @@ export class PrClient {
     }
     this.logger?.info("pr-create", `pushed ${branch}`);
 
-    // 4. Create PR
+    // 4. Create PR — write description to a tmp file so newlines survive shell quoting.
+    // (JSON.stringify on a multi-line string emits literal \n inside double quotes,
+    //  which az CLI then passes verbatim to ADO and the markdown renderer treats
+    //  the whole body as one line. Using `@<file>` keeps real newlines.)
     const target = input.targetBranch ?? "main";
     const draft = input.draft ?? true;
+
+    const descFile = path.join(os.tmpdir(), `ow-pr-desc-${Date.now()}.md`);
+    fs.writeFileSync(descFile, input.description, "utf8");
 
     const azArgs = [
       "az", "repos", "pr", "create",
@@ -72,7 +81,7 @@ export class PrClient {
       "--source-branch", branch,
       "--target-branch", target,
       "--title", JSON.stringify(input.title),
-      "--description", JSON.stringify(input.description),
+      "--description", `@${descFile}`,
       "--draft", String(draft),
       "--org", ADO_ORG,
       "--project", ADO_PROJECT,
@@ -85,7 +94,12 @@ export class PrClient {
     const azCmd = azArgs.join(" ");
     this.logger?.info("pr-create", `running: ${azCmd.slice(0, 200)}`);
 
-    const prResult = await execCmd(azCmd, this.cwd, signal);
+    let prResult: Awaited<ReturnType<typeof execCmd>>;
+    try {
+      prResult = await execCmd(azCmd, this.cwd, signal);
+    } finally {
+      try { fs.unlinkSync(descFile); } catch { /* ignore */ }
+    }
     if (prResult.exitCode !== 0) {
       throw new Error(
         `az repos pr create failed (exit ${prResult.exitCode}):\n${prResult.stderr}\n\n` +
