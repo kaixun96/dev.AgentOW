@@ -75,6 +75,23 @@ ow-git: command="checkout", args="-b user/kaixun/<feature-name> origin/main"
 
 If the branch already exists, just check it out. Then confirm rush install is up to date.
 
+### Step 2.5: Reproduce-before-fix (cycle > 1 only) — SWE-agent discipline
+
+**Skip this step entirely when `cycle === 1`** (nothing to reproduce yet — no broken state on disk).
+
+When `cycle > 1`, you are fixing a bug the evaluator found. Before editing a single line, you MUST capture the broken state so the PR carries proof the fix actually applies. This mirrors SWE-agent's "create a script to reproduce the error and execute it... to confirm the error" rule, applied to UI/visual bugs:
+
+1. Confirm the dev server from the prior cycle is still up (`ow-status` → check `agentow:rush` window). If not, restart it.
+2. Use the prior cycle's debug URL (in `report.json`'s most recent `build_done` event, field `debugUrl`).
+3. Navigate to the affected page in headed chromium via `mcp__playwright__browser_navigate` + the same debug URL the evaluator used (look at `{sessionDir}/evaluation/iter<N-1>/playwright-output.log` for `>>> [AgentOW AFTER] capturedUrl=...`).
+4. Reproduce the trigger (e.g. click the bookmark icon on the SocialBar so the panel opens).
+5. Call `mcp__playwright__browser_snapshot` and save the JSON output to `{sessionDir}/repro/iter<N>-pre-fix-snapshot.json`. Also `mcp__playwright__browser_take_screenshot` → `{sessionDir}/repro/iter<N>-pre-fix.png`.
+6. Cross-check the broken-state artifact against the evaluator's blockers — if the broken state in your snapshot does NOT match what the evaluator described, STOP and re-read the evaluator's report; the bug may have already been fixed or you may be looking at the wrong surface.
+
+After editing + committing the fix, immediately repeat the snapshot capture into `{sessionDir}/repro/iter<N>-post-fix-snapshot.json` and `{sessionDir}/repro/iter<N>-post-fix.png` BEFORE sending `code_done`. The orchestrator attaches both pairs to the PR.
+
+This step has zero new tooling — it reuses `mcp__playwright__browser_*` you already have. Cost is ~30s per cycle; benefit is that you (and any reviewer) can see "this commit fixed this specific defect" rather than trusting the build pipeline alone.
+
 ### Step 3: Implement Tasks
 
 For each task in the plan, in order:
@@ -292,3 +309,6 @@ If you encounter merge conflicts after `git pull` or branch operations:
 - Always append your NDJSON report, even on failure.
 - Keep the rush start tmux session alive — the evaluator needs it.
 - If stuck after 3 attempts at build or test, report `"partial"` with clear blockers.
+- **Take a snapshot to confirm it did.** Borrowing Anthropic computer-use-demo's `loop.py:50-53` discipline: any code edit that touches a `.tsx` rendering path is unverified until you (a) reload the dev server URL in headed chromium via `mcp__playwright__browser_navigate`, (b) call `mcp__playwright__browser_snapshot`, (c) confirm the aria tree shows the change you intended. Skip ONLY if the edit is provably non-rendering (pure type, pure constant, pure helper not in render path).
+- **Words, not code, when describing what you changed.** When emitting `code_done`, describe the change in concrete English (which file, which element, what attribute moved) — do NOT paste TSX/SCSS fragments into the message body. The evaluator parses the message and is calibrated for English descriptions, not code echoes.
+- **Never emit partial code in edits.** Borrowing micro-agent's `systemPrompt.ts`: when using Write/Edit, never use placeholders like `// ...existing imports`, `// rest of file unchanged`, or any ellipsis-style abbreviation. Always supply the complete replacement text. Partial code corrupts the next iteration's input.

@@ -48,7 +48,9 @@ SendMessage to team-lead:
 |-------|------|
 | `ow-planner` | Research: analyze codebase, draft plan (orchestrator handles user approval) |
 | `ow-generator` | Build: implement plan, build, test, start dev server |
-| `ow-evaluator` | Verify: check acceptance criteria via code inspection + Playwright |
+| `ow-evaluator` | Verify (dry-run + code-inspection mode only): pre-flight plan contract + non-UI criteria. Kept for backward compatibility. |
+| `ow-evaluator-rule` | Verify (UI rule half): probe parsing, aria-diff, pixel-diff, structural-diff, axe, hard gates. Has code/plan/probe access. |
+| `ow-evaluator-vision` | Verify (UI vision half): cold-eye review of AFTER PNG with NO code/plan/probe access. Catches occlusion, overflow, alignment. |
 | `ow-review-agent` | Review: pre-PR code review (optional, on user request) |
 
 ## Pipeline Architecture
@@ -90,10 +92,59 @@ touch /workspaces/odsp-web/.aero/<session-name>/progress.log
 
 Set: `progressLog` = `{sessionDir}/progress.log`
 
-Write first progress entry:
+Write first progress entries. **CRITICAL — single-quote vs double-quote:**
+
+`$(date +%H:%M:%S)` only expands when the command is run through bash with **double quotes** around the string (or no quotes). If you wrap the whole Bash command in single quotes (`Bash(command='echo "[$(date)]..." >> log')`), Bash sees the literal `$(date)` and writes it unexpanded. **Always use double quotes for the outer Bash command argument**, and double quotes inside the echo string:
+
+## CRITICAL — progress.log mandatory write protocol
+
+`progress.log` is the **user's only real-time view** into the pipeline. The user is watching this file in their IDE and cannot see your internal NDJSON, SendMessage traffic, or sub-agent stdout. If you don't write to progress.log, the user sees a frozen file for 30+ minutes and assumes the pipeline is dead.
+
+**Rule: every state transition triggers exactly ONE Bash call to echo a log line, BEFORE doing anything else in that step.** Not after. Not "I'll batch them later". Before. The echo is the first tool call when you enter a new state.
+
+Mandatory log events (one line each, with timestamp prefix):
+
+| When | Echo this |
+|---|---|
+| Session starts | `🚀 Session started: <name>` |
+| User prompt arrives | `💬 USER PROMPT:` + heredoc with full prompt |
+| Mode decided | `🤖 Mode: AUTO` or `💬 Mode: INTERACTIVE` |
+| Planner dispatched | `📋 Planner started` |
+| Planner returns | `📋 Planner completed — <auto-approving / awaiting approval>` |
+| Plan approved | `✅ Plan approved` |
+| Plan dry-run dispatched | `🔍 Step 1.5 — plan dry-run by evaluator` |
+| Dry-run verdict | `✅ Plan dry-run READY` or `⚠️ Plan dry-run REVISE (N concerns)` |
+| Generator dispatched | `🔨 Generator started (cycle N)` |
+| code_done received | `🔨 code_done — branch <name> @ <sha>` |
+| Parallel dispatch | `⚡ Parallel dispatch: evaluator (code inspection) + review-agent` |
+| Each of the 3 parallel responses | `✅ Received: <agent> — <verdict>` |
+| build_done | `✅ Build passed` or `❌ Build failed` |
+| UI verification start | `🔍 UI verification started — dual evaluator (rule + vision)` |
+| Rule eval done | `🔍 Rule evaluator: <verdict>` |
+| Vision eval done | `🔍 Vision evaluator: <verdict>` |
+| Screenshots produced | `📸 BEFORE: <path>` + `📸 AFTER: <path>` + `📸 COMPOSITE: <path>` |
+| Merged verdict | `✅ Cycle N PASS` or `❌ Cycle N FAIL → fix cycle N+1` |
+| PR creation | `🚀 Creating PR...` |
+| PR created | `✅ PR <id> created (draft) — <url>` |
+| Workflow done | `✅ Workflow complete` |
+
+**Anti-pattern check**: if `tail -5 {progressLog}` shows the last entry is older than 3 minutes AND you are mid-pipeline (not waiting for user), you forgot to log. Write a `🕐 still working: <current-state>` line immediately, then continue.
+
+`$(date +%H:%M:%S)` only expands when the command is run through bash with **double quotes** around the string (or no quotes). If you wrap the whole Bash command in single quotes (`Bash(command='echo "[$(date)]..." >> log')`), Bash sees the literal `$(date)` and writes it unexpanded. **Always use double quotes for the outer Bash command argument**, and double quotes inside the echo string:
+
 ```bash
 echo "[$(date +%H:%M:%S)] 🚀 Session started: <session-name>" >> {progressLog}
+echo "[$(date +%H:%M:%S)] 💬 USER PROMPT:" >> {progressLog}
+cat >> {progressLog} <<'PROMPT_EOF'
+<paste the user's original message verbatim here — heredoc preserves newlines, quotes, $ literals>
+PROMPT_EOF
 ```
+
+**Verification step (do this once at session start):** after writing the first two echo lines, `tail -2 {progressLog}` and confirm the lines start with `[HH:MM:SS]` not `[$(date +%H:%M:%S)]`. If you see the literal `$(date...)` string, you used single quotes — re-run the echos with double quotes before continuing.
+
+The heredoc block (`<<'PROMPT_EOF' ... PROMPT_EOF`) IS supposed to preserve `$` literals — that's why it's quoted. The bug only affects the timestamp echo lines.
+
+**Rule for the rest of the session**: every time the user sends a new message (mid-cycle direction, course-correction, question, "重新跑一下", etc.), append it to progressLog as another `💬 USER PROMPT:` block BEFORE doing any other work in response. This keeps the log a complete transcript of what the user asked for, not just what agents did.
 
 Tell the user: "Starting session `<session-name>`"
 
@@ -155,7 +206,48 @@ echo "[$(date +%H:%M:%S)] ✅ Plan approved" >> {progressLog}
 
 After user approval, read `reportFile` and parse the planner's NDJSON line.
 - If `status: "failure"` → inform user and stop.
-- If `status: "success"` → extract `planPath`, proceed.
+- If `status: "success"` → extract `planPath`, proceed to **Step 1.5 (plan dry-run)** before invoking the generator.
+
+#### Step 1.5: evaluator plan dry-run (negotiated contract)
+
+**Why:** Before any code is written, the evaluator must confirm it can actually verify the plan as drafted. Anthropic's harness-design guide ("Negotiated contract") makes this the difference between converging and diverging loops — if the evaluator catches "I can't verify this" or "this probe collides with OOTB chrome" after generator has already coded, the failure cascades. Caught at Step 1.5, the planner revises before any commit.
+
+Real precedent: BookmarkPanel iter6 wrote `[class*="fui-OverlayDrawer"]` as a probe selector. That selector matched both the target BookmarkPanel **and** the OOTB SuiteNav Save-for-later drawer (same chrome). Evaluator only noticed after 6 iterations of confidently-passing-wrong-evidence. A 30-second dry-run by the evaluator at Step 1.5 would have caught it.
+
+Dispatch the evaluator in a NEW mode `plan_dry_run`:
+
+```
+SendMessage to ow-evaluator:
+  mode: plan_dry_run
+  planPath: <planPath>
+  reportFile: <reportFile>
+  cycle: 0
+```
+
+The evaluator (see `ow-evaluator.md` §Plan Dry-Run mode) reads the plan and returns NDJSON with verdict `READY | REVISE` plus a list of `concerns` it found. Examples of REVISE-triggering concerns:
+
+- `probe-selector-not-pr-scoped`: a probe `selector` could match OOTB chrome (SuiteNav, command bar, manage-page panel, survey toast) because it does not contain a PR-specific `data-automation-id` or class suffix.
+- `screenshotGate-mustContain-missing-or-generic`: required for Pattern A/B/C but absent, or the selector is the same generic class-based one used in probes (no isolation).
+- `screenshotGate-mustNotContain-missing-ootb-look-alikes`: did not list the standard OOTB look-alikes for this surface (SocialBar surfaces must list `[aria-label*="Recently saved"]`; page-chrome surfaces must list `[data-automation-id="manage-page-panel"]`; any modal surface must list `[role="alertdialog"]`).
+- `acceptance-criterion-unverifiable`: criterion is marked `[Playwright]` but has no concrete DOM assertion the evaluator can run.
+- `discriminator-not-collision-proof`: the discriminator selector matches multiple surfaces; needs a PR-specific `data-automation-id` introduced by the change.
+- `surface-trace-too-vague`: trigger step like "click the bookmark button" without specifying that the SocialBar bookmark flow has TWO clicks (toggle then message) — known failure mode.
+
+Write progress:
+```bash
+echo "[$(date +%H:%M:%S)] 🔍 Step 1.5 — plan dry-run by evaluator" >> {progressLog}
+```
+
+Wait for the evaluator's `plan_dry_run` response, then:
+
+| evaluator verdict | orchestrator action |
+|---|---|
+| `READY` | proceed to Step 2 (invoke generator). Log `[ok] Plan accepted by evaluator — concerns: 0`. |
+| `REVISE` | forward concerns to `ow-planner` via SendMessage with text `"Evaluator pre-flight raised <N> concerns: <bullet list>. Please revise the plan to address each."`. Wait for planner's revised plan. Then **re-run Step 1.5 against the revised plan**. Max 3 dry-run rounds before escalating to user. |
+
+`--auto` mode does not skip Step 1.5 — the user-approval gate is what `--auto` skips. Dry-run is internal contract negotiation between planner and evaluator and runs unconditionally.
+
+After READY:
 
 ### Step 2: Invoke ow-generator
 
@@ -240,26 +332,83 @@ Check if the plan has **UI acceptance criteria** that require Playwright verific
 - **If YES** → proceed to Step 5 (UI Verification)
 - **If NO** → skip to Step 6 (Final Assessment)
 
-### Step 5: UI Verification (if needed)
+### Step 5: UI Verification (dual-evaluator ensemble)
+
+**Architecture:** Two evaluators run in parallel against the same AFTER state:
+- `ow-evaluator-rule` — has full code/plan/probe access; runs Playwright, parses probes, computes aria/pixel/structural diffs, checks hard gates.
+- `ow-evaluator-vision` — **tool-isolated** (only Read + Write); sees ONLY the AFTER PNG and an optional visualVocabulary excerpt. Cold-eye review for occlusion, overflow, alignment, placeholder/text collision that probes cannot detect.
+
+Confirmation bias is mechanically prevented: vision agent literally cannot read source, plan, or rule findings.
 
 Write progress:
 ```bash
-echo "[$(date +%H:%M:%S)] 🔍 Evaluator: UI verification started" >> {progressLog}
+echo "[$(date +%H:%M:%S)] 🔍 UI verification started — dual evaluator (rule + vision)" >> {progressLog}
+mkdir -p {sessionDir}/evaluation/iter<N>
 ```
 
-Send follow-up message to `ow-evaluator`:
+#### Step 5a: Dispatch rule evaluator FIRST
+
+Rule agent runs the full Playwright BEFORE/AFTER capture (renders prod CDN for BEFORE, then local PR debug bundle for AFTER), produces `before-<name>.png` + `after-<name>.png` + cropped variants + `composite-<name>.png`, computes aria-diff / pixel-diff / structural-diff, parses probes, and emits `rule-findings.json`. Vision agent will consume only the AFTER cropped PNG produced here, so rule MUST run first.
+
 ```
-mode: ui_verification
-cycle: <N>
-buildStatus: success
-rushStartTarget: <from generator build_done>
-debugUrl: <from generator build_done>
+SendMessage to ow-evaluator-rule:
+  mode: ui_verification
+  cycle: <N>
+  buildStatus: success
+  rushStartTarget: <from generator build_done>
+  planPath: <planPath>
+  outDir: {sessionDir}/evaluation/iter<N>
+  reportFile: <reportFile>
+
+  # CROSS-CYCLE ARTIFACTS (treat prior cycle as adversarial input, not memory):
+  #   {sessionDir}/evaluation/iter<N-1>/rule-findings.json
+  #   {sessionDir}/evaluation/iter<N-1>/vision-findings.json
+  #   {sessionDir}/evaluation/iter<N-1>/reflection.md
+  #   {sessionDir}/calibration.md
 ```
 
-**Wait for the evaluator's UI verification response.** Write progress:
+Wait for `mode: ui_verification_rule_complete` response. It returns:
+- `ruleFindingsPath` — path to `rule-findings.json`
+- `expectedAfterPath` — `expected-after.md` (you may inspect, vision MUST NOT see it)
+- `result: PASS|FAIL`
+- Artifacts written to outDir: `before-<name>.png`, `after-<name>.png`, `before-<name>-cropped.png`, `after-<name>-cropped.png`, `composite-<name>.png`, `diff-<name>.png`, `before-aria.json`, `after-aria.json`, `before-probes.json`, `after-probes.json`, `aria-diff.json`, `pixel-diff.json`, `structural-diff.json`, `playwright-output.log`
+
+#### Step 5b: Dispatch vision evaluator (cold-eye)
+
+Locate the AFTER PNG produced by rule. Then:
+
+```
+SendMessage to ow-evaluator-vision:
+  afterPngPath: {sessionDir}/evaluation/iter<N>/after-<name>-cropped.png
+  outDir: {sessionDir}/evaluation/iter<N>
+  visualVocabularyPath: {sessionDir}/calibration.md   # optional; vision only reads the visualVocabulary section
+```
+
+**Do NOT pass:** planPath, rule findings, prior verdicts, probe results, code paths, expected-after.md. Vision's `disallowedTools` blocks code/plan access anyway — passing them would be ignored, but keeping the message minimal makes intent clear.
+
+Wait for `mode: ui_verification_vision_complete` response with `visionFindingsPath` + `verdict` + `issueCount` + `firstGlanceImpression`.
+
+#### Step 5c: Merge verdicts
+
 ```bash
-echo "[$(date +%H:%M:%S)] 🔍 Evaluator: UI verification completed" >> {progressLog}
+echo "[$(date +%H:%M:%S)] 🔍 Rule: <rule verdict> | Vision: <vision verdict>" >> {progressLog}
 ```
+
+| Rule | Vision | Merged | Action |
+|------|--------|--------|--------|
+| PASS | PASS | **PASS** | proceed to Step 6 |
+| FAIL | * | **FAIL** | fix cycle, blockers from rule-findings.json |
+| PASS | FAIL | **FAIL** | fix cycle, blockers from vision-findings.json (target: generator) |
+
+Vision FAIL overrides rule PASS. This is the whole point of the ensemble — rule cannot see occlusion/overflow because no probe captures it; if vision flags a `severity: blocker` issue (e.g. "placeholder gray slash overlaps title text at (x,y)"), the cycle FAILs even if every probe is green.
+
+When merging vision findings into the blocker list for the next generator cycle, prefix the description with `[vision]` and include the coordinate + element observation verbatim so the generator can reproduce.
+
+#### Step 5d: Write reflection.md for next cycle
+
+The rule agent writes `reflection.md` (existing behavior). After the merge, if vision contributed any blocker, append a `## Vision tripwires` section listing each vision blocker so next cycle's rule agent can pre-emptively add a probe.
+
+If `reflection.md` is missing after Step 5c, log a warning — Reflexion's verbal memory chain is broken without it.
 
 ### Step 6: Final Assessment
 
@@ -279,7 +428,16 @@ Read `reportFile` for structured NDJSON data.
    echo "[$(date +%H:%M:%S)] ⚠️  Evaluation FAIL — starting fix cycle <N+1>" >> {progressLog}
    ```
    - Show blockers from evaluator
-   - Go back to **Step 2** with `cycle = N + 1` and `blockers` from evaluator
+   - **Route blockers by `target:` tag** (see `visual-quality-*` blocker schema in ow-evaluator.md):
+     - **Any blocker tagged `target: generator`** → dispatch to **generator** in cycle N+1. Generator must address the code defect (CSS, template, etc.). Even ONE generator-target blocker forces a generator cycle — do NOT let evaluator self-heal around it.
+     - **All blockers tagged `target: evaluator-spec` (no generator blockers)** → dispatch to **evaluator only** in cycle N+1; generator stays idle. Evaluator rewrites the spec, re-runs Playwright.
+     - **Untagged blockers** (legacy / non-visual-quality) → default to dispatching **generator** (safer default — code fix is more likely to be the real issue).
+   - Go back to **Step 2** with `cycle = N + 1` and `blockers` from evaluator, with the dispatch target chosen by the rule above.
+
+**Anti-laziness check**: in the cycle log, count `target: generator` vs `target: evaluator-spec` ratio across the session. If 3+ consecutive cycles produce ONLY `target: evaluator-spec` blockers, raise a concern in the log:
+```
+echo "[$(date +%H:%M:%S)] ⚠️  3+ consecutive cycles blame spec, not code — evaluator may be hiding real visual-quality regressions behind tooling excuses. Inspect visual-result.json blockers manually." >> {progressLog}
+```
 
 **If evaluator result is PASS but review-agent verdict is REQUEST_CHANGES with critical issues:**
 
@@ -301,8 +459,6 @@ echo "[$(date +%H:%M:%S)] ⚠️  Review REQUEST_CHANGES (critical: {N}) — sta
 echo "[$(date +%H:%M:%S)] ✅ ALL PASS — evaluation + review complete" >> {progressLog}
 ```
 Proceed to Step 7.
-
-### Step 7: Completion
 
 #### Step 7a: Deep Review (superpowers, optional)
 
@@ -362,7 +518,9 @@ Capture the returned `prId` and `prUrl`.
 
 #### Step 7c.2: Attach Visual Validation Screenshots (if captured)
 
-Read the evaluator's last NDJSON line. If `visualValidation.status == "captured"`, attach the BEFORE/AFTER screenshots to the PR:
+**HARD RULE — screenshots go in the PR description, NOT in a comment.** Always use `appendToDescription`. **NEVER pass `commentMarkdown`** to `ow-pr-attach` in this step. Comments are second-class — reviewers scanning the PR list see the description, not buried comment threads. The previous behavior of posting to a comment thread (PR 2242096 / earlier sessions) was wrong and is no longer permitted.
+
+Read the evaluator's last NDJSON line. If `visualValidation.status == "captured"`, attach the BEFORE/AFTER screenshots to the PR description:
 
 ```
 ow-pr-attach({
