@@ -8,7 +8,8 @@ import { TmuxManager } from "../tools/tmuxManager.js";
 import { GitClient } from "../tools/gitClient.js";
 import { PrClient } from "../tools/prClient.js";
 import { PrAttach } from "../tools/prAttach.js";
-import { extractDebugLinks, buildFullTestUrl } from "../tools/debugLink.js";
+import { extractDebugLinks, fetchDebugUrlsFromLanding, buildDebugQueryString, buildFullTestUrl } from "../tools/debugLink.js";
+import { runRecipeLint } from "../tools/recipeLint.js";
 import { FileLogger, RawOutputLog } from "../../shared/logger.js";
 import {
   registerMcpTool,
@@ -167,21 +168,49 @@ export function registerOwTools(
 
   // ── 6. ow-debuglink ───────────────────────────────────────────────────────
   registerMcpTool(server, "ow-debuglink", {
-    description: "Extract debug link URL from rush start tmux output. Pass sharePointPageUrl to get a ready-to-use fullTestUrl for browser testing.",
+    description: "Extract debug link from rush start session and build fullTestUrl for browser testing. (1) Captures tmux output to find the landing page URL. (2) Fetches landing HTML (skips self-signed TLS) to extract loader + manifests URLs. (3) Optionally builds fullTestUrl = page URL + ?debug=true&loader=...&debugManifestsFile=...&debugFlights=...",
     inputSchema: {
       target: z.string().optional().describe("Tmux target (default: agentow:rush)"),
-      sharePointPageUrl: z.string().optional().describe("SharePoint page URL. When provided, returns fullTestUrl = page URL + debug query string combined."),
+      sharePointPageUrl: z.string().optional().describe("SharePoint page URL. When provided, returns fullTestUrl with the debug query string appended."),
+      flights: z.string().optional().describe("Optional flight numbers, comma-separated (e.g. '1535')."),
     },
   }, async (input, extras) => {
     const target = input.target ?? `${OW.tmuxSession}:${OW.rushWindow}`;
     const captured = await tmux.capture(target, 200, extras.signal);
     const links = extractDebugLinks(captured);
+
+    let loader: string | undefined;
+    let manifests: string | undefined;
+    let debugQueryString: string | undefined;
     let fullTestUrl: string | undefined;
-    if (input.sharePointPageUrl && links.debugQueryString) {
-      fullTestUrl = buildFullTestUrl(input.sharePointPageUrl, links.debugQueryString);
+
+    if (links.landingPage) {
+      try {
+        const urls = await fetchDebugUrlsFromLanding(links.landingPage, extras.signal);
+        loader = urls.loader;
+        manifests = urls.manifests;
+        if (loader && manifests) {
+          debugQueryString = buildDebugQueryString(loader, manifests, input.flights);
+        }
+      } catch (err) {
+        logger.error("ow-debuglink", `Failed to fetch landing page: ${(err as Error).message}`);
+      }
     }
+
+    // Fallback to any debugQueryString printed in tmux (older rush behavior)
+    if (!debugQueryString && links.debugQueryString) {
+      debugQueryString = links.debugQueryString.replace(/^\?/, "");
+    }
+
+    if (input.sharePointPageUrl && debugQueryString) {
+      fullTestUrl = buildFullTestUrl(input.sharePointPageUrl, debugQueryString);
+    }
+
     return successResultWithDebug(logger, "ow-debuglink", {
-      ...links,
+      landingPage: links.landingPage,
+      loader,
+      manifests,
+      debugQueryString,
       fullTestUrl,
       tmuxTarget: target,
     });
@@ -379,5 +408,25 @@ export function registerOwTools(
       appendToDescription: input.appendToDescription,
     }, extras.signal);
     return successResultWithDebug(logger, "ow-pr-attach", result);
+  });
+
+  // ── ow-recipe-lint ────────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-recipe-lint", {
+    description: "Run deterministic SPDS / ReplaceComponent recipe checks (Tier 1). Three modes: (1) prId — fetch PR's changed files from ADO; (2) files — lint explicit absolute paths; (3) localDiff — enumerate changed .tsx/.scss between two local git refs and lint at headRef (pre-PR mode, used by /ow-team adversarial stage). Rules: bundleIcon-required, no-hardcoded-style-values, no-fui-var-in-scss, no-experimental-import.",
+    inputSchema: {
+      prId: z.number().optional().describe("Azure DevOps PR id. When set, the tool fetches the PR's changed .tsx/.scss files at lastMergeSourceCommit and lints them."),
+      commitSha: z.string().optional().describe("Optional commit SHA. When set with prId, file contents are read from this commit (local git first, ADO fallback) instead of lastMergeSourceCommit — used to re-evaluate after a local fix commit."),
+      files: z.array(z.string()).optional().describe("Optional absolute file paths to lint instead of fetching by prId. Useful for fixtures or pre-fix commits."),
+      localDiff: z.object({
+        baseRef: z.string().optional().describe("Base git ref (default: origin/main)"),
+        headRef: z.string().optional().describe("Head git ref (default: HEAD)"),
+      }).optional().describe("Pre-PR mode: enumerate changed .tsx/.scss between baseRef and headRef using three-dot diff semantics, lint files at headRef. Used by the /ow-team adversarial stage before a PR exists."),
+    },
+  }, async (input, extras) => {
+    const result = await runRecipeLint(
+      { prId: input.prId, commitSha: input.commitSha, files: input.files, localDiff: input.localDiff },
+      extras.signal,
+    );
+    return jsonResult(result);
   });
 }
