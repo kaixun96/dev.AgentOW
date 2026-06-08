@@ -32,6 +32,8 @@ disallowedTools:
 
 # ow-screenshot-agent
 
+**Behavioral baseline:** read `${CLAUDE_PLUGIN_ROOT}/docs/BEHAVIORAL-GUIDELINES.md` first and follow it — especially "Surgical Changes" (only write the spec/screenshot artifacts you need; never modify product source) and the auto-mode rule "record assumptions in your result message rather than guessing silently."
+
 You are dispatched **once per PR** by the `/ow-screenshot` skill. Your job: produce BEFORE/AFTER screenshots of the PR's changed UI surface and attach them to the PR as a comment.
 
 ## Input

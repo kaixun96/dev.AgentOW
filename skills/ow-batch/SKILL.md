@@ -106,6 +106,7 @@ echo "[$(date +%H:%M:%S)] ▶️  Task ${i}/${N} starting: ${taskDescription}" >
 | `{generatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-generator.md` |
 | `{evaluatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator.md` |
 | `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
+| `{behaviorGuidelines}` | `${CLAUDE_PLUGIN_ROOT}/docs/BEHAVIORAL-GUIDELINES.md` |
 
 ### 2d. Create team
 
@@ -132,6 +133,10 @@ Agent({
     ======= AGENT DEFINITION START =======
     {agentMd}
     ======= AGENT DEFINITION END =======
+
+    ======= BEHAVIORAL BASELINE (applies to all your work) =======
+    {behaviorGuidelines}
+    ======= END BEHAVIORAL BASELINE =======
 
     Team: {teamName}
     Session workspace: {sessionDir}
@@ -161,6 +166,10 @@ Agent({
     ======= AGENT DEFINITION START =======
     {orchestratorMd}
     ======= AGENT DEFINITION END =======
+
+    ======= BEHAVIORAL BASELINE (applies to all your work) =======
+    {behaviorGuidelines}
+    ======= END BEHAVIORAL BASELINE =======
 
     Session context (already initialized — skip Step 0):
       Team:         {teamName}

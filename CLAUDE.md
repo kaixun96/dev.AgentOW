@@ -1,5 +1,9 @@
 # dev.AgentOW — Developer Guide
 
+## Behavioral Baseline
+
+Both **runtime agents** and **anyone developing this plugin** follow [`docs/BEHAVIORAL-GUIDELINES.md`](docs/BEHAVIORAL-GUIDELINES.md): think before coding, simplicity first, surgical changes, goal-driven execution. The `ow-team` and `ow-batch` launchers inline that doc into every spawned agent's prompt, so editing it once propagates the baseline everywhere.
+
 ## Source Layout
 
 ```

@@ -124,9 +124,9 @@ echo "[$(date +%H:%M:%S)] 💡 Brainstorm completed — user intent confirmed" >
 
 ---
 
-## Step 2: Read All Agent MD Files
+## Step 2: Read All Agent MD Files + Behavioral Guidelines
 
-Read all 5 agent MD files using the `Read` tool. Store the full content of each.
+Read all agent MD files plus the shared behavioral guidelines using the `Read` tool. Store the full content of each.
 
 | Variable | File path |
 |----------|-----------|
@@ -137,8 +137,9 @@ Read all 5 agent MD files using the `Read` tool. Store the full content of each.
 | `{evaluatorRuleMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-rule.md` |
 | `{evaluatorVisionMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-vision.md` |
 | `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
+| `{behaviorGuidelines}` | `${CLAUDE_PLUGIN_ROOT}/docs/BEHAVIORAL-GUIDELINES.md` |
 
-Read all 7 in parallel. Do not proceed until all reads are complete.
+Read all 8 in parallel. Do not proceed until all reads are complete. `{behaviorGuidelines}` is the shared behavioral baseline inlined into every agent below.
 
 ---
 
@@ -186,6 +187,10 @@ prompt:
   {agentMd}
   ======= AGENT DEFINITION END =======
 
+  ======= BEHAVIORAL BASELINE (applies to all your work) =======
+  {behaviorGuidelines}
+  ======= END BEHAVIORAL BASELINE =======
+
   Team: {teamName}
   Session workspace: {sessionDir}
   Shared report file: {reportFile}
@@ -214,6 +219,10 @@ prompt:
   ======= AGENT DEFINITION START =======
   {orchestratorMd}
   ======= AGENT DEFINITION END =======
+
+  ======= BEHAVIORAL BASELINE (applies to all your work) =======
+  {behaviorGuidelines}
+  ======= END BEHAVIORAL BASELINE =======
 
   Session context (already initialized — skip Step 0):
     Team:         {teamName}
