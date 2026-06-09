@@ -6,8 +6,8 @@ var __export = (target, all) => {
 };
 
 // src/ow/index.ts
-import * as fs6 from "fs";
-import * as path4 from "path";
+import * as fs5 from "fs";
+import * as path3 from "path";
 import * as url2 from "url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -850,10 +850,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path5) {
-  if (!path5)
+function getElementAtPath(obj, path4) {
+  if (!path4)
     return obj;
-  return path5.reduce((acc, key) => acc?.[key], obj);
+  return path4.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -1236,11 +1236,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path5, issues) {
+function prefixIssues(path4, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path5);
+    iss.path.unshift(path4);
     return iss;
   });
 }
@@ -1423,7 +1423,7 @@ function formatError(error48, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error48, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error49, path5 = []) => {
+  const processError = (error49, path4 = []) => {
     var _a2, _b;
     for (const issue2 of error49.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
@@ -1433,7 +1433,7 @@ function treeifyError(error48, mapper = (issue2) => issue2.message) {
       } else if (issue2.code === "invalid_element") {
         processError({ issues: issue2.issues }, issue2.path);
       } else {
-        const fullpath = [...path5, ...issue2.path];
+        const fullpath = [...path4, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -1465,8 +1465,8 @@ function treeifyError(error48, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path5 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path5) {
+  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path4) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -13443,13 +13443,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path5 = ref.slice(1).split("/").filter(Boolean);
-  if (path5.length === 0) {
+  const path4 = ref.slice(1).split("/").filter(Boolean);
+  if (path4.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path5[0] === defsKey) {
-    const key = path5[1];
+  if (path4[0] === defsKey) {
+    const key = path4[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -13852,8 +13852,8 @@ function date4(params) {
 config(en_default());
 
 // src/ow/mcp/owTools.ts
-import * as cp7 from "child_process";
-import * as fs5 from "fs";
+import * as cp6 from "child_process";
+import * as fs4 from "fs";
 
 // src/shared/constants.ts
 var OW = {
@@ -14331,221 +14331,6 @@ function buildDebugQueryString(loader, manifests, flights) {
   return parts.join("&");
 }
 
-// src/ow/tools/recipeLint.ts
-import * as cp6 from "child_process";
-import * as fs4 from "fs/promises";
-import * as os2 from "os";
-import * as path3 from "path";
-var ADO_REPO_ID = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
-var ADO_API = "https://dev.azure.com/onedrive/ODSP-Web/_apis/git/repositories";
-var API_VERSION2 = "7.0";
-var RULES = {
-  BUNDLEICON: { id: "spds-button-bundleicon-required", doc: "docs/replace-component-recipe.md#C2.5.1" },
-  HARDCODE: { id: "spds-no-hardcoded-style-values", doc: "docs/replace-component-recipe.md#C0-rule2" },
-  SCSS_LEAK: { id: "spds-no-fui-var-in-scss", doc: "docs/replace-component-recipe.md#C4" },
-  EXPERIMENTAL: { id: "spds-no-experimental-import", doc: "docs/replace-component-recipe.md#forbidden" }
-};
-function exec6(cmd, signal) {
-  return new Promise((resolve) => {
-    cp6.exec(
-      cmd,
-      { signal, maxBuffer: 32 * 1024 * 1024 },
-      (err, stdout) => resolve({ stdout: stdout.toString(), exitCode: err?.code ?? 0 })
-    );
-  });
-}
-async function adoToken(signal) {
-  const r = await exec6(
-    "az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv",
-    signal
-  );
-  const token = r.stdout.trim();
-  if (!token) throw new Error("Failed to acquire ADO token. Run `az login` for the Microsoft tenant.");
-  return token;
-}
-async function curlJson(url3, token, signal) {
-  const r = await exec6(`curl -sL -H "Authorization: Bearer ${token}" "${url3}"`, signal);
-  return JSON.parse(r.stdout);
-}
-async function fetchPrChangedFiles(prId, signal) {
-  const token = await adoToken(signal);
-  const pr = await curlJson(`${ADO_API}/${ADO_REPO_ID}/pullRequests/${prId}?api-version=${API_VERSION2}`, token, signal);
-  const sourceSha = pr.lastMergeSourceCommit?.commitId;
-  if (!sourceSha) throw new Error(`PR ${prId}: no lastMergeSourceCommit`);
-  const changes = await curlJson(
-    `${ADO_API}/${ADO_REPO_ID}/commits/${sourceSha}/changes?api-version=${API_VERSION2}`,
-    token,
-    signal
-  );
-  const files = (changes.changes ?? []).filter((c) => !c.item.isFolder && /\.(tsx?|scss)$/.test(c.item.path)).map((c) => c.item.path);
-  return { sourceSha, files };
-}
-async function readLocalFileAtCommit(repoRoot, repoPath, sha, signal) {
-  const relPath = repoPath.replace(/^\//, "");
-  const r = await exec6(`git -C "${repoRoot}" show "${sha}:${relPath}"`, signal);
-  if (r.exitCode !== 0) return null;
-  return r.stdout;
-}
-async function localDiffChangedFiles(repoRoot, baseRef, headRef, signal) {
-  const r = await exec6(`git -C "${repoRoot}" diff --name-only "${baseRef}...${headRef}"`, signal);
-  if (r.exitCode !== 0) {
-    throw new Error(`git diff failed: baseRef=${baseRef} headRef=${headRef}
-${r.stdout}`);
-  }
-  return r.stdout.split("\n").map((p) => p.trim()).filter((p) => p.length > 0 && /\.(tsx?|scss)$/.test(p)).map((p) => "/" + p);
-}
-async function fetchFileAt(repoPath, sha, token, signal) {
-  const url3 = `${ADO_API}/${ADO_REPO_ID}/items?path=${encodeURIComponent(repoPath)}&versionDescriptor.version=${sha}&versionDescriptor.versionType=commit&api-version=${API_VERSION2}`;
-  const r = await exec6(`curl -sL -H "Authorization: Bearer ${token}" "${url3}"`, signal);
-  return r.stdout;
-}
-function pushFinding(out, rule, file2, line, col, message, extra = {}) {
-  out.push({ rule: rule.id, severity: "tier1", doc: rule.doc, file: file2, line, col, message, ...extra });
-}
-function lintTsFile(filePath, text, out) {
-  const lines = text.split("\n");
-  const bundled = /* @__PURE__ */ new Set();
-  for (const line of lines) {
-    const m = line.match(/\bconst\s+([A-Z]\w*)\s*(?::[^=]+)?=\s*bundleIcon\s*\(/);
-    if (m) bundled.add(m[1]);
-  }
-  const iconRe = /icon=\{\s*<\s*([A-Z]\w*(?:Regular|Filled))\s*\/?\s*>/g;
-  for (let i = 0; i < lines.length; i++) {
-    let m;
-    while ((m = iconRe.exec(lines[i])) !== null) {
-      const icon = m[1];
-      if (!bundled.has(icon)) {
-        const base = icon.replace(/Regular$|Filled$/, "");
-        pushFinding(
-          out,
-          RULES.BUNDLEICON,
-          filePath,
-          i + 1,
-          m.index + 1,
-          `Icon <${icon}/> used directly inside a Button icon slot. Wrap with bundleIcon(${base}Filled, ${base}Regular).`,
-          { icon, fixHint: `const ${base}Icon = bundleIcon(${base}Filled, ${base}Regular);` }
-        );
-      }
-    }
-  }
-  for (let i = 0; i < lines.length; i++) {
-    if (/@msinternal\/sharepoint-ui-react[^'"`\s]*\/experimental/.test(lines[i])) {
-      pushFinding(
-        out,
-        RULES.EXPERIMENTAL,
-        filePath,
-        i + 1,
-        1,
-        `Forbidden import from sharepoint-ui-react experimental subpath. Use the stable umbrella.`
-      );
-    }
-  }
-  let idx = 0;
-  while (idx < text.length) {
-    const start = text.indexOf("makeStyles(", idx);
-    if (start === -1) break;
-    const braceStart = text.indexOf("{", start);
-    if (braceStart === -1) break;
-    let depth = 0, j = braceStart;
-    for (; j < text.length; j++) {
-      if (text[j] === "{") depth++;
-      else if (text[j] === "}") {
-        depth--;
-        if (depth === 0) {
-          j++;
-          break;
-        }
-      }
-    }
-    const body = text.slice(braceStart, j);
-    const bodyStartLine = text.slice(0, braceStart).split("\n").length;
-    const bodyLines = body.split("\n");
-    const hardRe = /:\s*['"`]([^'"`]*?(?:#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|\d+(?:\.\d+)?(?:px|em|rem))[^'"`]*?)['"`]/g;
-    for (let k = 0; k < bodyLines.length; k++) {
-      let m;
-      while ((m = hardRe.exec(bodyLines[k])) !== null) {
-        pushFinding(
-          out,
-          RULES.HARDCODE,
-          filePath,
-          bodyStartLine + k,
-          m.index + 1,
-          `Hardcoded style value "${m[1]}" inside makeStyles. Use tokens.* / typographyStyles.*.`,
-          { value: m[1] }
-        );
-      }
-    }
-    idx = j;
-  }
-}
-function lintScssFile(filePath, text, out) {
-  const lines = text.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/(--fui-[A-Za-z0-9-]+)\s*:/);
-    if (m) {
-      pushFinding(
-        out,
-        RULES.SCSS_LEAK,
-        filePath,
-        i + 1,
-        (m.index ?? 0) + 1,
-        `Fluent v9 CSS variable ${m[1]} declared in .scss. Move to a Griffel makeStyles hook attached only to the v9 element (\xA7C4).`,
-        { var: m[1] }
-      );
-    }
-  }
-}
-function lintOne(filePath, text, out) {
-  if (filePath.endsWith(".scss")) lintScssFile(filePath, text, out);
-  else if (/\.tsx?$/.test(filePath)) lintTsFile(filePath, text, out);
-}
-async function runRecipeLint(input, signal) {
-  const findings = [];
-  const scanned = [];
-  const repoRoot = "/workspaces/odsp-web";
-  if (input.files && input.files.length > 0) {
-    for (const f of input.files) {
-      const text = await fs4.readFile(f, "utf8");
-      scanned.push(f);
-      lintOne(f, text, findings);
-    }
-    return { mode: "files", scanned, findings, count: findings.length };
-  }
-  if (input.localDiff) {
-    const baseRef = input.localDiff.baseRef ?? "origin/main";
-    const headRef = input.localDiff.headRef ?? "HEAD";
-    const files2 = await localDiffChangedFiles(repoRoot, baseRef, headRef, signal);
-    for (const repoPath of files2) {
-      const text = await readLocalFileAtCommit(repoRoot, repoPath, headRef, signal);
-      if (text == null) continue;
-      scanned.push(repoPath);
-      lintOne(repoPath, text, findings);
-    }
-    return { mode: "localDiff", baseRef, headRef, scanned, findings, count: findings.length };
-  }
-  if (input.prId == null) throw new Error("ow-recipe-lint requires one of: prId, files[], or localDiff");
-  const { sourceSha, files } = await fetchPrChangedFiles(input.prId, signal);
-  const overrideSha = input.commitSha;
-  const token = await adoToken(signal);
-  const tmpDir = await fs4.mkdtemp(path3.join(os2.tmpdir(), `recipe-lint-pr${input.prId}-`));
-  for (const repoPath of files) {
-    let text = null;
-    if (overrideSha) {
-      text = await readLocalFileAtCommit(repoRoot, repoPath, overrideSha, signal);
-      if (text == null) {
-        text = await fetchFileAt(repoPath, overrideSha, token, signal);
-      }
-    } else {
-      text = await fetchFileAt(repoPath, sourceSha, token, signal);
-    }
-    const localPath = path3.join(tmpDir, repoPath.replace(/^\//, "").replace(/\//g, "__"));
-    await fs4.writeFile(localPath, text);
-    scanned.push(repoPath);
-    lintOne(repoPath, text, findings);
-  }
-  return { mode: "pr", prId: input.prId, scanned, findings, count: findings.length };
-}
-
 // src/shared/mcpHelpers.ts
 function registerMcpTool(server2, name, config2, handler) {
   server2.registerTool(name, config2, handler);
@@ -14585,7 +14370,7 @@ function truncateLines(lines, max = 20) {
 // src/ow/mcp/owTools.ts
 function execSimple(cmd) {
   return new Promise((resolve, reject) => {
-    cp7.exec(cmd, (err, stdout) => {
+    cp6.exec(cmd, (err, stdout) => {
       if (err) reject(err);
       else resolve(stdout.trim());
     });
@@ -14604,7 +14389,7 @@ function registerOwTools(server2, logger2, logDir) {
       git.branch(extras.signal).catch(() => "unknown"),
       execSimple("node -v").catch(() => "unknown"),
       tmux.listWindows(extras.signal),
-      fs5.promises.access(`${OW.odspWebRoot}/common/temp/last-install.flag`).then(() => true).catch(() => false)
+      fs4.promises.access(`${OW.odspWebRoot}/common/temp/last-install.flag`).then(() => true).catch(() => false)
     ]);
     return successResultWithDebug(logger2, "ow-status", {
       branch,
@@ -14853,7 +14638,7 @@ function registerOwTools(server2, logger2, logDir) {
     const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? `${OW.odspWebRoot}/../dev.AgentOW`;
     let version2 = "unknown";
     try {
-      const pkg = JSON.parse(await fs5.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
+      const pkg = JSON.parse(await fs4.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
       version2 = pkg.version ?? "unknown";
     } catch {
     }
@@ -14922,24 +14707,6 @@ function registerOwTools(server2, logger2, logDir) {
     }, extras.signal);
     return successResultWithDebug(logger2, "ow-pr-attach", result);
   });
-  registerMcpTool(server2, "ow-recipe-lint", {
-    description: "Run deterministic SPDS / ReplaceComponent recipe checks (Tier 1). Three modes: (1) prId \u2014 fetch PR's changed files from ADO; (2) files \u2014 lint explicit absolute paths; (3) localDiff \u2014 enumerate changed .tsx/.scss between two local git refs and lint at headRef (pre-PR mode, used by /ow-team adversarial stage). Rules: bundleIcon-required, no-hardcoded-style-values, no-fui-var-in-scss, no-experimental-import.",
-    inputSchema: {
-      prId: external_exports.number().optional().describe("Azure DevOps PR id. When set, the tool fetches the PR's changed .tsx/.scss files at lastMergeSourceCommit and lints them."),
-      commitSha: external_exports.string().optional().describe("Optional commit SHA. When set with prId, file contents are read from this commit (local git first, ADO fallback) instead of lastMergeSourceCommit \u2014 used to re-evaluate after a local fix commit."),
-      files: external_exports.array(external_exports.string()).optional().describe("Optional absolute file paths to lint instead of fetching by prId. Useful for fixtures or pre-fix commits."),
-      localDiff: external_exports.object({
-        baseRef: external_exports.string().optional().describe("Base git ref (default: origin/main)"),
-        headRef: external_exports.string().optional().describe("Head git ref (default: HEAD)")
-      }).optional().describe("Pre-PR mode: enumerate changed .tsx/.scss between baseRef and headRef using three-dot diff semantics, lint files at headRef. Used by the /ow-team adversarial stage before a PR exists.")
-    }
-  }, async (input, extras) => {
-    const result = await runRecipeLint(
-      { prId: input.prId, commitSha: input.commitSha, files: input.files, localDiff: input.localDiff },
-      extras.signal
-    );
-    return jsonResult(result);
-  });
 }
 
 // src/ow/mcp/instructions.ts
@@ -14975,7 +14742,6 @@ You are connected to the ow MCP server \u2014 a dev toolkit for odsp-web develop
 ### PR Creation
 - ow-pr-create       \u2014 Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
 - ow-pr-attach       \u2014 Upload screenshots/files as attachments to an existing PR; optionally append to description or post a comment with the attachment URLs.
-- ow-recipe-lint     \u2014 Run Tier 1 deterministic SPDS/ReplaceComponent recipe checks on a PR (by id) or local files. Returns structured findings with rule id + file:line + doc anchor. Used by the adversarial PR validation loop.
 
 ## Development Loop
 
@@ -15008,10 +14774,10 @@ if (command !== "mcp") {
   process.stdout.write("Usage: agentow mcp\n  Start as an MCP server (stdio transport).\n");
   process.exit(1);
 }
-var distDir = path4.dirname(url2.fileURLToPath(import.meta.url));
-var logsDir = path4.join(distDir, "logs");
-var toolLogDir = path4.join(logsDir, "tools");
-fs6.mkdirSync(toolLogDir, { recursive: true });
+var distDir = path3.dirname(url2.fileURLToPath(import.meta.url));
+var logsDir = path3.join(distDir, "logs");
+var toolLogDir = path3.join(logsDir, "tools");
+fs5.mkdirSync(toolLogDir, { recursive: true });
 purgeLogs(logsDir, 7);
 var logger = new FileLogger(logsDir, "ow-mcp");
 var server = new McpServer(

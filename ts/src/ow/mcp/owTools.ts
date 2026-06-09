@@ -9,7 +9,6 @@ import { GitClient } from "../tools/gitClient.js";
 import { PrClient } from "../tools/prClient.js";
 import { PrAttach } from "../tools/prAttach.js";
 import { extractDebugLinks, fetchDebugUrlsFromLanding, buildDebugQueryString, buildFullTestUrl } from "../tools/debugLink.js";
-import { runRecipeLint } from "../tools/recipeLint.js";
 import { FileLogger, RawOutputLog } from "../../shared/logger.js";
 import {
   registerMcpTool,
@@ -408,25 +407,5 @@ export function registerOwTools(
       appendToDescription: input.appendToDescription,
     }, extras.signal);
     return successResultWithDebug(logger, "ow-pr-attach", result);
-  });
-
-  // ── ow-recipe-lint ────────────────────────────────────────────────────────
-  registerMcpTool(server, "ow-recipe-lint", {
-    description: "Run deterministic SPDS / ReplaceComponent recipe checks (Tier 1). Three modes: (1) prId — fetch PR's changed files from ADO; (2) files — lint explicit absolute paths; (3) localDiff — enumerate changed .tsx/.scss between two local git refs and lint at headRef (pre-PR mode, used by /ow-team adversarial stage). Rules: bundleIcon-required, no-hardcoded-style-values, no-fui-var-in-scss, no-experimental-import.",
-    inputSchema: {
-      prId: z.number().optional().describe("Azure DevOps PR id. When set, the tool fetches the PR's changed .tsx/.scss files at lastMergeSourceCommit and lints them."),
-      commitSha: z.string().optional().describe("Optional commit SHA. When set with prId, file contents are read from this commit (local git first, ADO fallback) instead of lastMergeSourceCommit — used to re-evaluate after a local fix commit."),
-      files: z.array(z.string()).optional().describe("Optional absolute file paths to lint instead of fetching by prId. Useful for fixtures or pre-fix commits."),
-      localDiff: z.object({
-        baseRef: z.string().optional().describe("Base git ref (default: origin/main)"),
-        headRef: z.string().optional().describe("Head git ref (default: HEAD)"),
-      }).optional().describe("Pre-PR mode: enumerate changed .tsx/.scss between baseRef and headRef using three-dot diff semantics, lint files at headRef. Used by the /ow-team adversarial stage before a PR exists."),
-    },
-  }, async (input, extras) => {
-    const result = await runRecipeLint(
-      { prId: input.prId, commitSha: input.commitSha, files: input.files, localDiff: input.localDiff },
-      extras.signal,
-    );
-    return jsonResult(result);
   });
 }
