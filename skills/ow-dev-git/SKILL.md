@@ -8,21 +8,26 @@ description: "Must invoke this skill if use/match: git, branch, checkout, merge,
 ## CRITICAL RULES
 
 - **ALL** branches MUST follow: `user/<alias>/<feature-name>`
-- **ALWAYS** branch from `origin/main` (fetch first)
+- **ALWAYS** branch from a fresh `origin/main` (fetch first) — never from whatever branch you happen to be on
 - **NEVER** commit directly to `main`
 - **ALWAYS** run `rush install` after switching branches or pulling changes
+- **VERIFY** the new branch's merge-base equals `origin/main` HEAD before adding any commit — if it doesn't, the eventual PR diff will include the inverse of every commit landed on main since your stale starting point (one batch run lost this and produced a 145-file PR for a 3-file fix)
 
 ## Branch Workflow
 
 ```bash
-# 1. Fetch latest
-git fetch origin
+# 1. Fetch latest main
+git fetch origin main
 
-# 2. Create feature branch from latest main
-git checkout -b user/<alias>/<feature-name> origin/main
+# 2. Create (or reset) the feature branch off the freshly-fetched origin/main.
+#    `-B` (capital) creates the branch, or resets it to origin/main if it already
+#    exists from a previous run — guarantees a clean merge-base regardless of the
+#    branch you were on when this started.
+git checkout -B user/<alias>/<feature-name> origin/main
 
-# 3. Verify branch
-git rev-parse --abbrev-ref HEAD
+# 3. Verify the merge-base is origin/main HEAD (the two SHAs MUST match):
+git merge-base origin/main HEAD
+git rev-parse origin/main
 
 # 4. Install deps (required after branch switch)
 rush install
