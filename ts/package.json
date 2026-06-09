@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build": "tsup && npm run sync-cache",
-    "sync-cache": "test -d /home/vscode/.claude/plugins/cache/agentOW/agentOW/0.3.2 && cp -r ./dist/* /home/vscode/.claude/plugins/cache/agentOW/agentOW/0.3.2/ts/dist/ && cp -r ../agents/*.md /home/vscode/.claude/plugins/cache/agentOW/agentOW/0.3.2/agents/ && cp -r ../docs/*.md /home/vscode/.claude/plugins/cache/agentOW/agentOW/0.3.2/docs/ 2>/dev/null && cp -r ../skills/* /home/vscode/.claude/plugins/cache/agentOW/agentOW/0.3.2/skills/ 2>/dev/null; mkdir -p /home/vscode/.claude/plugins/cache/agentOW/agentOW/0.3.2/tools && cp -r ../tools/* /home/vscode/.claude/plugins/cache/agentOW/agentOW/0.3.2/tools/ 2>/dev/null; echo 'cache synced'",
+    "sync-cache": "VERSION=$(node -p \"require('../.claude-plugin/plugin.json').version\") && CACHE=/home/vscode/.claude/plugins/cache/agentOW/agentOW/$VERSION && test -d $CACHE && cp -r ./dist/* $CACHE/ts/dist/ && cp -r ../agents/*.md $CACHE/agents/ && cp -r ../docs/*.md $CACHE/docs/ 2>/dev/null && cp -r ../skills/* $CACHE/skills/ 2>/dev/null; mkdir -p $CACHE/tools && cp -r ../tools/* $CACHE/tools/ 2>/dev/null; echo \"cache synced to $CACHE\"",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/ow/index.ts mcp"
   },
