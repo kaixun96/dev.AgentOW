@@ -105,9 +105,97 @@ git log <prevCommit>..<currCommit> --stat -- <files from plan>  # what changed
 
 Same as upstream UI-1 — extract Pattern A/B/C/D, Surface Trace, probes, screenshotGate, Visual Expectations.
 
+### Step R-1.5: Read ADO bug ticket for repro conditions (MANDATORY when plan is bug-fix)
+
+When the plan references a bug ID (e.g. `bug-3077474`, `Bug 3077474`, "Fix Bug ###"), you MUST fetch the bug ticket BEFORE generating the spec and let the ticket's repro steps drive the spec scenario — not the plan's prose, not your reasoning about the diff.
+
+```
+mcp__plugin_odsp-web-mcp-servers-opt-in_ado__wit_work_item(
+  action='get', project='ODSP-Web', id=<bug-id>
+)
+```
+
+Extract specifically:
+- **`System.Title`** — often encodes a critical scope qualifier in parentheses, e.g. "(have sub page)", "(when offline)", "(after switching mode)". These are necessary preconditions, not flavor.
+- **`Microsoft.VSTS.TCM.ReproSteps`** — the exact action sequence the reporter used. Reproduce it verbatim, including order, terminology ("quick delete"), and any structural setup (subpage hierarchy, multi-user, specific list-template).
+- **`bug-triage` enrichment block** (if present) — usually pinpoints the code anchor + likely root cause.
+
+**Recipe-vs-bug pitfall**: If your spec uses a structurally different scenario than the ticket (deleting a leaf page vs. deleting a parent-with-subpage; toggling a flag once vs. quick-toggling 3× in a row), the bug code path will NOT execute even if every other piece works (FIC ✓, provision ✓, workbench ✓, deletion ✓, screenshots ✓). The discriminator will silently come back NEUTRAL/INCONCLUSIVE and you will mis-attribute the failure to "the fix is defensive transient".
+
+**Forbidden self-talk after R-1.5**:
+- "The bug fix is probably a transient-window defect" — only conclude this AFTER your spec actually reproduces the ticket's exact structural scenario and end-state still shows no diff.
+- "The repro structure doesn't matter, the callback fires either way" — wrong by construction. Reproduce the structure literally; do not generalize.
+
+Cite the ticket fields you used in rule-findings.json under a `bugTicketRepro` key (title, repro steps quoted, code anchor) so reviewers can verify you actually read the ticket.
+
 ### Step R-2: Confirm dev server + extract localhost loader URLs
 
 Same as upstream UI-2.
+
+### Step R-2.5: Choose Playwright `--environment` + FIC auth research (MANDATORY before R-3)
+
+**Default**: `--environment prod` (FIC synthetic prod-pool tenant — what 95% of UI PRs use).
+
+**Switch to `--environment dogfood`** when the plan touches any surface gated by a *server-side* tenant feature that prod-pool synthetic tenants lack. Verified cases:
+
+| Surface | Reason | Spec must set |
+|---|---|---|
+| `smartwiki.aspx`, `_api/smartwikilibrary/*`, anything under `odsp-common/sp-smart-wiki-*` | prod pool returns `EnsureSmartWikiLibraryFeature() → HTTP 400 "feature is not available"`; dogfood pool's synthetic tenants return `200` | `--environment dogfood` |
+| Full Visual Refresh chrome (white SuiteNav / canvas shadow / site card) | `_spPageContextInfo.IsNextGenSharePointExperienceOptedIn=false` on prod pool | `--environment dogfood` (still partial — full chrome only on real df) |
+
+Recipe: read the plan's affected files; if any path matches the table, the spec invocation in R-4 MUST include `--environment dogfood`. Record the choice in rule-findings as `environment: "prod" \| "dogfood"`.
+
+**FIC auth research protocol — MANDATORY before writing any `skippedReason` / `verificationMode` that mentions auth, FIC, tenant, or "no test page"**:
+
+1. Read `tools/playwright-utilities/src/configuration/GlobalSetup.ts:32-46` — list of TRIPS pools per environment is the canonical source. Cite the pool name (e.g. `ODSPWebTestLocalSPDF`) in your reasoning.
+2. Read `tools/playwright-utilities/src/utilities/AuthUtilities.ts:addFicCookieAsync` — confirm FIC is per-`tenantId`, not hard-bound to one tenant.
+3. Consult wiki: https://onedrive.visualstudio.com/ODSP-Web/_wiki/wikis/ODSP-Web.wiki/140190/Federated-Identity-Credential-(FIC)-Authentication-in-Playwright (search via `mcp__plugin_odsp-web-mcp-servers-opt-in_bluebird__search_wiki` if WebFetch returns AAD signin).
+4. Run an empirical probe before claiming auth-walled: try the spec under each candidate environment (`prod`, `dogfood`, `msit`) and capture `[SW-PROBE] auth probe` + `provision` JSON from console. Only after probes across all candidates fail may you assert "tenant feature unavailable" — and even then, label as `tenant feature unavailable (not auth-walled)`.
+
+**Forbidden language in rule-findings.json**:
+
+- `"auth-walled FIC tenant"` — FIC is not an auth wall; it auto-issues per-tenant tokens.
+- `"requires interactive Microsoft login"` — FIC is fully non-interactive.
+- `"cannot script headlessly"` — verified false for SmartWiki provision (REST `EnsureSmartWikiLibraryFeature()` + `ApplyListDesign()` = 30 lines of `page.evaluate`, see `AgentOW_SmartWiki_FicDogfood.spec.ts`).
+- `"no SmartWiki test page on tenant"` — wrong premise; tests provision their own library.
+
+If you find yourself writing any of the above strings, STOP and run the probe in step 4 first.
+
+### Step R-2.6: Hover-gated UI? Decide headless vs xvfb-headed runner (MANDATORY before R-4)
+
+Some Fluent v9 components conditionally render UI on real CSS `:hover` state — e.g. PageActionsMenu kebab in SmartWiki tree, ContextualMenu trigger buttons in some Panel headers, hover-revealed action toolbars in DocumentCard. In **headless** Playwright these elements **never render into the DOM** because Playwright's `hover()` dispatches DOM events but does not flip the browser's `:hover` pseudo-class (no real pointer). React's `useHover` / `useIsOverflowed` / `useFocusable` hooks then `return null` for the action slot.
+
+**Symptoms that the spec is hover-gated**:
+- Locator like `button[aria-label*="Page actions"]` / `button[aria-label*="More options"]` / `[role="menuitem"]` times out
+- DOM dump shows `pageActionsButtonCount=0` despite the page being fully loaded
+- CSS-injection bypass (`display:flex !important`) does NOT help — confirms React conditional render, not CSS hide
+
+**Recipe** (verified 2026-06-04 on bug-3077474):
+
+```bash
+# Must `env -u VSCODE_IPC_HOOK_CLI` to bypass SPTest fixture's Codespace Browser Tunnel branch
+# (tools/playwright-utilities/src/core/SPTest.ts:166). Without this, --headed in a codespace
+# tries to tunnel the browser to your local machine and times out at "setting up browser".
+env -u VSCODE_IPC_HOOK_CLI xvfb-run -a --server-args="-screen 0 1920x1200x24" \
+  node_modules/.bin/heft playwright --environment <prod|dogfood> \
+  --grep "<test-id>" --headed --workers=1 --timeout=540000 2>&1 | tee {outDir}/playwright-output.log
+```
+
+**Spec must also**:
+- Handle the **"Load debug scripts" Allow dialog** — headed mode shows it even with `?debug=true&noredir=true`; headless auto-skips. Click it before any other locator:
+  ```ts
+  try {
+    const allowBtn = page.getByRole('button', { name: /Load debug scripts|Allow|Ĺōàď/i }).first();
+    await allowBtn.waitFor({ state: 'visible', timeout: 8000 });
+    await allowBtn.click();
+  } catch { /* not present (headless or already dismissed) */ }
+  ```
+- Use real `locator.hover()` — under xvfb headed it actually triggers `:hover` and React useHover flips → kebab renders.
+- Portal-rendered confirm dialogs (`@fluentui/react-components` Portal escapes test scope): if `getByRole('button')` times out, fall back to DOM query: `document.querySelectorAll('button')` filter by `textContent === '<exact-label>'` then `.click()`.
+
+Record the decision in rule-findings.json under `runner: { mode: 'headless' | 'xvfb-headed', rationale: '...' }`.
+
+**Forbidden iterations**: if hover-gated UI is suspected and you've already burned ≥2 headless cycles, **stop**. Do not try `force:true`, CSS injection, or dispatched mouseenter — these were empirically falsified on bug-3077474 across iter3-iter5. Switch to xvfb-headed immediately.
 
 ### Step R-3: Generate Playwright spec from plan
 
@@ -121,7 +209,8 @@ Even when calibration.md does not explicitly demand a BEFORE comparison probe, B
 
 ```bash
 cd sp-client/integration-tests/sp-pages-playwright
-rushx playwright --grep "<test-id>" --workers=1 --timeout=540000 2>&1 | tee {outDir}/playwright-output.log
+# Use the environment chosen in R-2.5. Default = prod; SmartWiki/server-gated → dogfood.
+rushx playwright --environment <prod|dogfood> --grep "<test-id>" --workers=1 --timeout=540000 2>&1 | tee {outDir}/playwright-output.log
 ```
 
 ### Step R-4b: aria-diff (deterministic, no LLM)
@@ -203,7 +292,9 @@ Template:
 ```json
 {
   "cycle": <N>,
-  "verdict": "PASS|FAIL",
+  "verdict": "PASS|FAIL|INCONCLUSIVE",
+  "environment": "prod|dogfood|msit",
+  "environmentRationale": "<one line citing R-2.5 table row or 'default prod'>",
   "hardGateFailures": [
     { "code": "<symptom>", "predicted": "...", "actual": "...", "evidence": "..." }
   ],

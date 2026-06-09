@@ -348,6 +348,10 @@ mkdir -p {sessionDir}/evaluation/iter<N>
 
 #### Step 5a: Dispatch rule evaluator FIRST
 
+> **⛔ STRICT SEQUENCING — DO NOT PARALLELIZE STEPS 5a AND 5b.**
+> You MUST send the SendMessage in this Step 5a, then **wait for the `ui_verification_rule_complete` response** before sending ANY message in Step 5b. The vision agent in 5b consumes the AFTER PNG that rule produces here — dispatching them in parallel (or sending vision first) causes vision to poll forever for a file that does not exist yet, deadlocking the cycle.
+> Do NOT use a single turn with two parallel SendMessage calls. Two separate turns: (1) send to rule + wait, (2) send to vision + wait.
+
 Rule agent runs the full Playwright BEFORE/AFTER capture (renders prod CDN for BEFORE, then local PR debug bundle for AFTER), produces `before-<name>.png` + `after-<name>.png` + cropped variants + `composite-<name>.png`, computes aria-diff / pixel-diff / structural-diff, parses probes, and emits `rule-findings.json`. Vision agent will consume only the AFTER cropped PNG produced here, so rule MUST run first.
 
 ```
@@ -374,6 +378,8 @@ Wait for `mode: ui_verification_rule_complete` response. It returns:
 - Artifacts written to outDir: `before-<name>.png`, `after-<name>.png`, `before-<name>-cropped.png`, `after-<name>-cropped.png`, `composite-<name>.png`, `diff-<name>.png`, `before-aria.json`, `after-aria.json`, `before-probes.json`, `after-probes.json`, `aria-diff.json`, `pixel-diff.json`, `structural-diff.json`, `playwright-output.log`
 
 #### Step 5b: Dispatch vision evaluator (cold-eye)
+
+> **⛔ PRECONDITION:** You must have already received `ui_verification_rule_complete` from Step 5a in a prior turn. If you have not, go back to Step 5a — do NOT dispatch vision speculatively. Vision will block forever polling for an AFTER PNG that only rule can produce.
 
 Locate the AFTER PNG produced by rule. Then:
 
