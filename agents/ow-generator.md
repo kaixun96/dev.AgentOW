@@ -67,13 +67,40 @@ If `cycle > 1`, also read the evaluator's blockers and prioritize fixing those i
 ow-status
 ```
 
-If on `main` or not on a feature branch, create one:
+**ALWAYS** fork the feature branch from a fresh `origin/main` — never from whatever branch the dispatcher happened to be on. Build mode depends on `cycle`:
+
+#### cycle === 1 (first cycle): always create branch from fresh origin/main
+
+Even if `ow-status` shows you're already on `user/<alias>/<something>` (left over from a prior session or batch task), do NOT build on top of it. Fork a new branch off `origin/main`:
+
 ```
-ow-git: command="fetch", args="origin"
-ow-git: command="checkout", args="-b user/kaixun/<feature-name> origin/main"
+ow-git: command="fetch", args="origin main"
+ow-git: command="checkout", args="-B user/<alias>/<feature-name> origin/main"
 ```
 
-If the branch already exists, just check it out. Then confirm rush install is up to date.
+`-B` (capital) is intentional: it creates the branch, or resets it to point at `origin/main` if a stale branch with the same name exists from a previous run. This guarantees the branch's merge-base equals `origin/main` HEAD, so the PR diff contains ONLY your changes, not the inverse of every commit landed on main since the dispatcher checked out its old branch.
+
+Verify before continuing:
+```
+ow-git: command="merge-base", args="origin/main HEAD"
+ow-git: command="rev-parse", args="origin/main"
+```
+The two SHAs MUST be equal. If they aren't, abort and re-run the fetch + checkout.
+
+#### cycle > 1: stay on the existing feature branch
+
+The branch was already created in cycle 1 and has the prior cycle's commits. Just confirm you're on it:
+```
+ow-git: command="rev-parse", args="--abbrev-ref HEAD"
+```
+If you're not on the expected branch (recover from `report.json`'s most recent generator entry, field `branch`), check it out without `-B`:
+```
+ow-git: command="checkout", args="user/<alias>/<feature-name>"
+```
+
+#### After branch setup
+
+Then confirm rush install is up to date.
 
 ### Step 2.5: Reproduce-before-fix (cycle > 1 only) — SWE-agent discipline
 
