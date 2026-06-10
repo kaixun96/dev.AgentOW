@@ -15,7 +15,7 @@ flowchart TD
     E -- yes --> F[🔨 Generator<br/>code → build → test → dev server]
     E -- revise --> D
     F -.code_done.-> G & H
-    G[🔍 Evaluator<br/>Playwright + DOM]
+    G[🔍 Dual Evaluator<br/>rule + vision ensemble]
     H[📝 Reviewer<br/>checklist + deep review]
     F --> I{All pass?}
     G --> I
@@ -46,7 +46,7 @@ You describe a feature. The agent team:
 2. Researches the codebase and drafts an implementation plan
 3. Asks for your approval
 4. Implements the plan (code, build, test, start dev server)
-5. Verifies acceptance criteria via Playwright MCP on a SharePoint page
+5. Verifies acceptance criteria via Playwright (dual evaluator: rule checks + cold-eye vision review)
 6. Reviews the code (quick checklist + optional deep review)
 7. If issues are found, fixes them (up to 5 cycles)
 8. Pushes the branch and creates a draft PR on Azure DevOps
@@ -189,8 +189,10 @@ Each `/ow-team` run creates `/workspaces/odsp-web/.aero/<session-name>/` with:
 | File / Dir | Written by | Contents |
 |---|---|---|
 | `plans/plan.md` | planner | Spec, acceptance criteria, task list |
-| `evaluation/YYYY-MM-DD-iter<N>.md` | evaluator | Per-criterion verification + screenshots |
-| `evaluation/iter<N>/*.png` | evaluator | DOM screenshots |
+| `evaluation/iter<N>/rule-findings.json` | evaluator-rule | Per-criterion verdict + probe values |
+| `evaluation/iter<N>/vision-findings.json` | evaluator-vision | Cold-eye PNG review verdict |
+| `evaluation/iter<N>/reflection.md` | evaluator-rule | What worked, what didn't, what to fix next cycle |
+| `evaluation/iter<N>/{before,after,composite}-*.png` | evaluator-rule | BEFORE/AFTER/composite screenshots |
 | `review.md` | review-agent | Code review findings |
 | `report.json` | all agents | NDJSON status records |
 | `progress.log` | orchestrator | Real-time pipeline progress (visible via Monitor) |
@@ -207,7 +209,7 @@ Three-layer harness:
 | **Agents** | Workflow separation | orchestrator, planner, generator, evaluator, reviewer |
 | **Skills** | Knowledge injection | build rules, test conventions, PR workflow, Playwright |
 
-### MCP Tools (16)
+### MCP Tools (17)
 
 | Tool | Description |
 |------|-------------|
@@ -221,6 +223,7 @@ Three-layer harness:
 | `ow-session-{open,send,capture,list,kill,interrupt}` | tmux pane control |
 | `ow-pr-create` | Push branch + create draft PR on Azure DevOps |
 | `ow-pr-attach` | Upload screenshots to a PR; append to description or post a comment |
+| `ow-recipe-lint` | Run deterministic Tier 1 SPDS / ReplaceComponent recipe checks on a PR or local files |
 | `ow-version` | Check plugin version and update availability |
 
 ### Agents
@@ -230,7 +233,9 @@ Three-layer harness:
 | `ow-orchestrator` | Drive the pipeline (no source code access — pure dispatcher) |
 | `ow-planner` | Research codebase, draft plan |
 | `ow-generator` | Implement, build, test, start dev server |
-| `ow-evaluator` | Verify via Playwright MCP + code inspection |
+| `ow-evaluator` | Code-inspection verification + dry-run plan check |
+| `ow-evaluator-rule` | UI verification half: runs Playwright, parses probes, computes aria/pixel/structural diffs |
+| `ow-evaluator-vision` | UI verification half: cold-eye review of AFTER PNG with no code/plan/probe access |
 | `ow-review-agent` | Pre-PR code review |
 
 All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cycle 2 retains full context from cycle 1.
