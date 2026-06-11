@@ -524,32 +524,54 @@ Capture the returned `prId` and `prUrl`.
 
 #### Step 7c.2: Attach Visual Validation Screenshots (if captured)
 
-**HARD RULE — screenshots go in the PR description, NOT in a comment.** Always use `appendToDescription`. **NEVER pass `commentMarkdown`** to `ow-pr-attach` in this step. Comments are second-class — reviewers scanning the PR list see the description, not buried comment threads. The previous behavior of posting to a comment thread (PR 2242096 / earlier sessions) was wrong and is no longer permitted.
+**HARD RULE — EVERYTHING goes in the PR description, NOTHING goes in a comment.** Always use `appendToDescription`. **NEVER pass `commentMarkdown`** to `ow-pr-attach` at any point in the pipeline. This applies to:
+- BEFORE/AFTER/composite screenshots
+- rule-findings summary (probe values, discriminator, runner cmd, environment, loader hash)
+- vision-findings summary (verdict, first-glance impression, occlusion/overflow issues)
+- Anything the evaluators (rule, vision, code-inspection) produced for the PR
 
-Read the evaluator's last NDJSON line. If `visualValidation.status == "captured"`, attach the BEFORE/AFTER screenshots to the PR description:
+Comments are second-class — reviewers scanning the PR list see the description, not buried comment threads. If you find yourself drafting a `commentMarkdown` payload, stop and put it in `appendToDescription` instead. There is no scenario in which `commentMarkdown` is correct for this pipeline. The previous behavior of posting findings summaries to a comment thread (PR 2242096 / earlier sessions) was wrong and is no longer permitted.
+
+**One single `ow-pr-attach` call per PR.** Bundle ALL screenshots into the `attachments` array and ALL evaluator output (screenshots table + rule findings + vision findings + runner cmd) into one `appendToDescription` payload. Do NOT make two ow-pr-attach calls (one for screenshots, one for findings) — that produces a fragmented PR and tempts the second call to drop into `commentMarkdown`.
+
+Read the evaluator's last NDJSON line. If `visualValidation.status == "captured"`, attach the BEFORE/AFTER screenshots AND both rule + vision findings summaries to the PR description in ONE call:
 
 ```
 ow-pr-attach({
   prId: <prId from Step 7c>,
   attachments: [
     { name: "before-<component>.png", localPath: <visualValidation.beforePath> },
-    { name: "after-<component>.png", localPath: <visualValidation.afterPath> }
+    { name: "after-<component>.png", localPath: <visualValidation.afterPath> },
+    { name: "composite-<component>.png", localPath: <visualValidation.compositePath> }
   ],
   appendToDescription: `
 ## Visual Validation
 
-| BEFORE | AFTER |
-|--------|-------|
-| {{before-<component>.png}} | {{after-<component>.png}} |
+| BEFORE | AFTER | Composite |
+|--------|-------|-----------|
+| {{before-<component>.png}} | {{after-<component>.png}} | {{composite-<component>.png}} |
 
 - **Pattern**: <visualValidation.pattern>
 - **Component**: <visualValidation.component>
 - **Trigger selector**: \`<visualValidation.selector>\`
 
-🤖 Auto-captured by ow-evaluator during pipeline run.
+### Rule evaluator findings
+- Verdict: **<rule.verdict>** (<rule.blockers> blockers, <rule.warnings> warnings)
+- Environment: <rule.environment>
+- Runner: \`<rule.runner.mode>\`
+- Discriminator: <rule.discriminator.summary>
+- Loader hash: <rule.loaderHash>
+
+### Vision evaluator findings
+- Verdict: **<vision.verdict>** (<vision.issueCount> issues)
+- First-glance impression: <vision.firstGlanceImpression>
+
+🤖 Auto-captured by ow-evaluator-rule + ow-evaluator-vision during pipeline run.
 `
 })
 ```
+
+**DO NOT** make a second `ow-pr-attach` call afterwards to post a comment with the same content. The description above is the single source of truth.
 
 If `visualValidation.status == "skipped"`, append a brief note to the PR description instead:
 

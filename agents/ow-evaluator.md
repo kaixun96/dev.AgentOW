@@ -26,6 +26,7 @@ disallowedTools:
   - ow-rush
   - ow-git
   - ow-pr-create
+  - ow-pr-attach
   - ow-session-kill
   - ow-session-interrupt
   - Edit
