@@ -105,6 +105,8 @@ echo "[$(date +%H:%M:%S)] ▶️  Task ${i}/${N} starting: ${taskDescription}" >
 | `{plannerMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-planner.md` |
 | `{generatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-generator.md` |
 | `{evaluatorMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator.md` |
+| `{evaluatorRuleMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-rule.md` |
+| `{evaluatorVisionMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-vision.md` |
 | `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
 | `{behaviorGuidelines}` | `${CLAUDE_PLUGIN_ROOT}/docs/BEHAVIORAL-GUIDELINES.md` |
 
@@ -120,7 +122,7 @@ TeamCreate({
 
 ### 2e. Spawn agents (idle first, orchestrator last)
 
-For each idle agent (`ow-planner`, `ow-generator`, `ow-evaluator`, `ow-review-agent`):
+For each idle agent (`ow-planner`, `ow-generator`, `ow-evaluator`, `ow-evaluator-rule`, `ow-evaluator-vision`, `ow-review-agent`):
 
 ```
 Agent({
