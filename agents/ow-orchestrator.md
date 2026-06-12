@@ -518,6 +518,21 @@ description: |
   <list from generator tasksCompleted>
 ```
 
+**HARD RULE — keep PR description SHORT.** Reviewers TL;DR long descriptions and miss the point. Target:
+- **Summary**: 1-3 sentences. What changes, why. No context dumps, no "investigation history", no test plan.
+- **Changes**: bullet list, ONE line per file or behavior change. No file-level diff explanations, no rationale paragraphs.
+- **Total length**: aim for under 30 lines (excluding the auto-attached Visual Validation section from Step 7c.2).
+
+**Do NOT include in the description** (these tempt reviewers to skip the whole thing):
+- Killswitch GUIDs explained in prose — one short bullet `KS: <name> (KS-off = fix on)` is enough
+- Validation history / "cycle 1 failed because X, cycle 2 failed because Y" — that belongs in `progress.log`, not the PR
+- Detailed root-cause walkthrough — link to the bug ticket; the bug has the writeup
+- Repro steps that duplicate the bug ticket
+- "Why we did this" essay paragraphs — one sentence in Summary is enough
+- Architectural musings, design alternatives, future work
+
+If the description exceeds 30 lines, cut content. Concrete > comprehensive. Reviewers skim; respect their time.
+
 Do NOT include a "Testing" / "Test plan" section in the description — the team uses its own validation channels and the auto-generated test plan adds noise.
 
 Capture the returned `prId` and `prUrl`.
