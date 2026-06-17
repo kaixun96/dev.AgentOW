@@ -1,0 +1,10 @@
+{
+  "name": "agentow-copilot",
+  "description": "Copilot CLI port of agentOW: feature description → draft PR for odsp-web. Main-session implementer + stateless research/verify/review subagents.",
+  "version": "0.1.0",
+  "author": {
+    "name": "kaixun"
+  },
+  "license": "Microsoft Internal",
+  "keywords": ["odsp", "odsp-web", "rush", "codespace", "mcp", "sharepoint", "copilot-cli"]
+}
