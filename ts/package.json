@@ -6,8 +6,8 @@
     "agentow": "./dist/ow/index.js"
   },
   "scripts": {
-    "build": "tsup && npm run sync-cache",
-    "sync-cache": "VERSION=$(node -p \"require('../.claude-plugin/plugin.json').version\") && CACHE=/home/vscode/.claude/plugins/cache/agentOW/agentOW/$VERSION && test -d $CACHE && cp -r ./dist/* $CACHE/ts/dist/ && cp -r ../agents/*.md $CACHE/agents/ && cp -r ../docs/*.md $CACHE/docs/ 2>/dev/null && cp -r ../skills/* $CACHE/skills/ 2>/dev/null; mkdir -p $CACHE/tools && cp -r ../tools/* $CACHE/tools/ 2>/dev/null; echo \"cache synced to $CACHE\"",
+    "build": "tsup && npm run sync-artifacts",
+    "sync-artifacts": "node scripts/sync-build-artifacts.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/ow/index.ts mcp"
   },

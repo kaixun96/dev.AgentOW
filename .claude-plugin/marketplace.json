@@ -17,6 +17,16 @@
         "name": "kaixun"
       },
       "repository": "https://dev.azure.com/onedrive/ODSP-Web"
+    },
+    {
+      "name": "agentow-copilot",
+      "source": "./copilot",
+      "description": "Copilot CLI port of agentOW. Main-session implementer plus stateless research, verify, and review subagents.",
+      "version": "0.1.0",
+      "author": {
+        "name": "kaixun"
+      },
+      "repository": "https://dev.azure.com/onedrive/ODSP-Web"
     }
   ]
 }

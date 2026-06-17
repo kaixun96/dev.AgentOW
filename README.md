@@ -67,66 +67,35 @@ You can run it in two modes — see [Quick Start](#quick-start).
 
 ## Installation
 
-### 1. Install the plugin
+### Claude Code
 
 ```bash
 claude plugin marketplace add kaixun96/dev.AgentOW
 claude plugin install agentOW@agentOW
 ```
 
-Zero clone, zero build — the compiled MCP server is shipped with the plugin.
-
-### 2. Install tmux (if missing)
+### Copilot CLI
 
 ```bash
-sudo apt-get install -y tmux
-```
-
-### 3. Enable Agent Teams
-
-Add to `~/.claude/settings.json`:
-
-```json
-{
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  }
-}
-```
-
-### 4. Install superpowers (recommended)
-
-Provides brainstorming and deep code review skills that agentOW integrates with.
-
-```
-/plugin marketplace add obra/superpowers-marketplace
-/plugin install superpowers@superpowers-marketplace
-```
-
-### 5. Register Playwright MCP
-
-```bash
-claude mcp add playwright npx @playwright/mcp@latest
-```
-
-On first run, the evaluator opens a browser. Log in to SharePoint manually if prompted.
-
-### 6. Restart Claude Code and verify
-
-```bash
-claude plugin list        # agentOW should be enabled
-claude mcp list           # ow server should be connected
+copilot plugin marketplace add kaixun96/dev.AgentOW
+copilot plugin install agentow-copilot@agentOW
 ```
 
 ---
 
 ## Upgrading
 
+### Claude Code
+
 ```bash
 claude plugin update agentOW@agentOW
 ```
 
-Restart Claude Code afterwards. Or call `ow-version` in a session to check what version you're on.
+### Copilot CLI
+
+```bash
+copilot plugin update agentow-copilot@agentOW
+```
 
 ---
 

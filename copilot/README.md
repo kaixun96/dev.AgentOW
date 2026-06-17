@@ -21,18 +21,15 @@ The key insight: the generator needs context continuity across fix cycles, and t
 
 ## Shared MCP server
 
-The TypeScript MCP server (`../ts/`) is **reused unchanged** — Copilot CLI has first-class MCP support. `.mcp.json` points at `../ts/dist/ow/index.js`. Both the Claude and Copilot versions can connect to it independently (each CLI spawns its own MCP process). One tool codebase, two orchestration front-ends.
+The TypeScript MCP server (`../ts/`) is **reused unchanged** — Copilot CLI has first-class MCP support. The built bundle is copied into this plugin at `ts/dist/ow/index.js`, and `.mcp.json` / `plugin.json` launch that self-contained copy. Both the Claude and Copilot versions can connect to the same tool codebase independently (each CLI spawns its own MCP process).
 
-## Install (local, for the thin slice)
+## Install
 
-Prereqs: Copilot CLI ([install](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli)) + `copilot auth`. The `../ts` MCP server must be built (`cd ../ts && npm install && npm run build`).
+Prereqs: Copilot CLI ([install](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli)) + `copilot auth`. The MCP bundle is shipped inside this plugin at `ts/dist/`; maintainers refresh it with `cd ../ts && npm install && npm run build` before publishing.
 
 ```bash
-# From a Copilot CLI session, add this folder as a local plugin
-copilot plugin install ./copilot      # exact local-path syntax: see "Needs verification"
-
-# Register the Playwright MCP (for the evaluator's screenshots)
-# (Copilot MCP config: ~/.copilot/mcp-config.json — see "Needs verification")
+copilot plugin marketplace add kaixun96/dev.AgentOW
+copilot plugin install agentow-copilot@agentOW
 ```
 
 Then:
@@ -47,12 +44,11 @@ copilot                                                               # interact
 
 These are written per the conventions of working Copilot CLI plugins (ironflow-copilot, slidesshare), but each is an integration point I could not test from here. Verify before relying on the port:
 
-1. **`${CLAUDE_PLUGIN_ROOT}` expansion in `.mcp.json`** — does Copilot CLI expand it, and is `../ts/...` resolvable from the plugin root? If not, use an absolute path or Copilot's plugin-root env var.
-2. **Local plugin install syntax** — the exact `copilot plugin install <local-path>` form (vs. marketplace-only).
-3. **MCP config location** — `~/.copilot/mcp-config.json` per the docs; confirm whether plugin-bundled `.mcp.json` is auto-loaded or must be merged in.
-4. **Subagent tool names** — agents declare `tools: [view, grep, glob, shell]` (from ironflow's read-only reviewers + an assumed `shell`). Confirm `shell` is the Copilot name for running commands, and confirm the main session's write/edit tool names.
-5. **`@agentow-copilot:<name>` dispatch + parallelism** — ironflow confirms the `@plugin:agent` syntax and single-message parallel dispatch; confirm it works with this plugin's agent names.
-6. **Headless `--allow-all-tools`** — for the batch loop and unattended runs, confirm headless mode runs the full pipeline (including subagent dispatch) without interactive prompts. ironflow's AGENTS.md flags this as an open adaptation point.
+1. **`${CLAUDE_PLUGIN_ROOT}` expansion in plugin-bundled MCP config** — the MCP bundle is self-contained under `copilot/ts/dist/`, but the host still needs to expand `${CLAUDE_PLUGIN_ROOT}` when launching it.
+2. **Plugin-bundled MCP auto-load** — confirm Copilot loads `mcpServers` from `.claude-plugin/plugin.json` or `.mcp.json`; otherwise users must merge the same `ow` config into `~/.copilot/mcp-config.json`.
+3. **Subagent tool names** — agents declare `tools: [view, grep, glob, shell]` (from ironflow's read-only reviewers + an assumed `shell`). Confirm `shell` is the Copilot name for running commands, and confirm the main session's write/edit tool names.
+4. **`@agentow-copilot:<name>` dispatch + parallelism** — ironflow confirms the `@plugin:agent` syntax and single-message parallel dispatch; confirm it works with this plugin's agent names.
+5. **Headless `--allow-all-tools`** — for the batch loop and unattended runs, confirm headless mode runs the full pipeline (including subagent dispatch) without interactive prompts. ironflow's AGENTS.md flags this as an open adaptation point.
 
 ## Not ported yet
 
