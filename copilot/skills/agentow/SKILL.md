@@ -28,7 +28,32 @@ Create a durable session folder:
 └── report.json
 ```
 
-Append timestamped progress lines before each major state transition. `progress.log` is the user's real-time view when Copilot CLI does not show agent state. Append NDJSON records to `report.json` for planner, each implementation cycle, evaluator, reviewer, and final result.
+Append timestamped progress lines before each major state transition. `progress.log` is the user's real-time view when Copilot CLI does not show agent state. Treat it as a first-class UX surface: concise, emoji-prefixed, and complete enough that the user can understand the run by tailing the file. Append NDJSON records to `report.json` for planner, each implementation cycle, evaluator, reviewer, and final result.
+
+Use the shared progress event contract from `AGENTS.md`. At minimum, write:
+
+```text
+[HH:MM:SS] 🚀 Session started: <session>
+[HH:MM:SS] 💬 USER PROMPT: <prompt>
+[HH:MM:SS] 🤖 Mode: AUTO|INTERACTIVE
+[HH:MM:SS] 📋 Planner started
+[HH:MM:SS] ✅ Planner completed — <summary>
+[HH:MM:SS] 📋 Plan ready — <N> tasks
+[HH:MM:SS] ✅ Plan approved (auto|user)
+[HH:MM:SS] 🔨 Implementation started (cycle N)
+[HH:MM:SS] ✅ Build passed / ❌ Build failed — <reason>
+[HH:MM:SS] 🧪 Tests passed|skipped|failed — <scope>
+[HH:MM:SS] 🖥️ Dev server ready — agentow:rush
+[HH:MM:SS] 🔍 Evaluator started (cycle N)
+[HH:MM:SS] 📸 BEFORE captured — <path>
+[HH:MM:SS] 📸 AFTER captured — <path>
+[HH:MM:SS] ✅ Evaluation PASS / ❌ Evaluation FAIL — <reason>
+[HH:MM:SS] 📝 Reviewer started
+[HH:MM:SS] ✅ Review APPROVE / ⚠️ Review REQUEST_CHANGES — <summary>
+[HH:MM:SS] 🚀 Creating PR...
+[HH:MM:SS] ✅ PR created — <url>
+[HH:MM:SS] ✅ Workflow complete
+```
 
 ## Step 1: Understand the request
 
@@ -38,7 +63,11 @@ Append timestamped progress lines before each major state transition. `progress.
 
 Compose a refined one-paragraph statement of what to build.
 
+Append the refined request to `progress.log` before dispatching the planner.
+
 ## Step 2: Research (dispatch planner)
+
+Before dispatching, append `[HH:MM:SS] 📋 Planner started`.
 
 Dispatch `@agentow-copilot:planner` with:
 
@@ -65,10 +94,16 @@ Using the planner's findings, write a short plan:
 
 Save it locally to `/workspaces/odsp-web/.aero/<session>/plan.md` (a local working doc, not committed).
 
+Append `[HH:MM:SS] 📋 Plan ready — <N> tasks` after writing the plan.
+
 **Interactive:** show the plan to the user. Get approval or revise. Loop until approved.
 **Auto:** proceed.
 
+Append `[HH:MM:SS] ✅ Plan approved (auto|user)` before implementation starts.
+
 ## Step 4: Implement (you write the code)
+
+Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 
 1. **Branch.** If on `main`, create `user/<alias>/<feature>` from `origin/main` (use `ow-git`). `<alias>` from `whoami`.
 2. **Write the code** yourself, following the planner's "patterns to follow". Surgical changes only — every line traces to the request.
@@ -78,6 +113,8 @@ Save it locally to `/workspaces/odsp-web/.aero/<session>/plan.md` (a local worki
 5. **Test:** `ow-test` scoped to the changed modules (not the full suite). If no tests exist for the modules, note it; don't run 600 unrelated tests.
 6. **Dev server:** `ow-start` on the project; poll `ow-session-capture` on `agentow:rush` until `[WATCHING]`. Extract the debug link with `ow-debuglink`.
 7. **Commit** (don't push yet).
+
+Write progress events for branch/build/test/dev-server/debug-link/commit using the exact event contract. If any step fails, log the failure before attempting recovery.
 
 Write `/workspaces/odsp-web/.aero/<session>/implementation/iter<N>.md` after each implementation/fix cycle with:
 - summary
@@ -92,6 +129,8 @@ Append a generator/implementation NDJSON line to `report.json`.
 
 ## Step 5: Verify (dispatch evaluator)
 
+Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
+
 Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, cycle number, debug link, `sessionDir`, `reportFile`, `progressLog`, and `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for PASS/FAIL + blockers.
 
 For UI-visible changes, visual validation is mandatory:
@@ -104,6 +143,8 @@ For UI-visible changes, visual validation is mandatory:
 
 **FAIL and cycle < 5:** YOU fix the blockers (you still have full context — no re-investigation needed). Re-build, re-test, re-dispatch `@agentow-copilot:evaluator`. Increment cycle.
 
+Before starting each fix cycle, append `[HH:MM:SS] 🔁 Fix cycle N+1 — <reason>`.
+
 **FAIL and cycle ≥ 5:**
 - Interactive: show the remaining blockers, ask the user how to proceed.
 - Auto: proceed to ship anyway (the PR is draft; a human reviews).
@@ -111,6 +152,8 @@ For UI-visible changes, visual validation is mandatory:
 **PASS:** continue to Step 7.
 
 ## Step 7: Review (dispatch reviewer)
+
+Append `[HH:MM:SS] 📝 Reviewer started` before dispatching.
 
 Dispatch `@agentow-copilot:reviewer` with:
 
@@ -139,6 +182,8 @@ Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat r
 3. **Report** the PR URL to the user.
 
 Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status, PR URL if any, screenshot paths if captured, and any remaining blockers.
+
+Append `[HH:MM:SS] ✅ Workflow complete` after `final.md` is written.
 
 ## Notes
 

@@ -22,7 +22,7 @@
       "name": "agentow-copilot",
       "source": "./copilot",
       "description": "Copilot CLI port of agentOW. Main-session implementer plus stateless research, verify, and review subagents.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": {
         "name": "kaixun"
       },

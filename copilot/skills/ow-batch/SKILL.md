@@ -54,7 +54,13 @@ Started: <ISO timestamp>
 |---|------|--------|----|-------|
 ```
 
-Append to `batch.log` before every state transition.
+Append to `batch.log` before every state transition. Use the same first-class progress style as `/agentow`: `[HH:MM:SS] <emoji> <short state>`.
+
+After initialization, append:
+
+```text
+[HH:MM:SS] 🌙 Batch started — <N> tasks
+```
 
 ## Step 3: Preflight
 
@@ -104,6 +110,12 @@ Redirect stdout/stderr to the per-task log:
 
 If `--allow-all` is not supported by the installed Copilot CLI, retry with `--yolo`. If `--autopilot` is not supported, retry with plain `copilot -p`, but record the degraded mode in `batch.log`.
 
+Before launching, append:
+
+```text
+[HH:MM:SS] ▶️ Task <i>/<N> started — <task>
+```
+
 ### 4c. Parse result
 
 After the process exits:
@@ -130,6 +142,14 @@ Append one row to `summary.md`:
 
 Do not stop the batch on failure. Continue to task `i+1`.
 
+Append exactly one task result line:
+
+```text
+[HH:MM:SS] ✅ Task <i>/<N> success — <PR>
+[HH:MM:SS] ⚠️ Task <i>/<N> completed without PR
+[HH:MM:SS] ❌ Task <i>/<N> failed — <reason>
+```
+
 ## Step 5: Final summary
 
 After all tasks finish, append:
@@ -151,6 +171,12 @@ Tell the user:
 Batch complete.
 Summary: /workspaces/odsp-web/.aero/batch-<timestamp>/summary.md
 Logs:    /workspaces/odsp-web/.aero/batch-<timestamp>/task*.log
+```
+
+Append:
+
+```text
+[HH:MM:SS] 🌅 Batch complete — success <S>, no-pr <P>, failed <F>
 ```
 
 ## Rules

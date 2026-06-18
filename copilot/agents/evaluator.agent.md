@@ -58,9 +58,11 @@ If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You
 3. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
 4. `browser_screenshot` → save BEFORE to `<sessionDir>/evaluation/iter<N>/before-<component>.png`.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `before-screenshot-missing`.
+   - Append progress: `[HH:MM:SS] 📸 BEFORE captured — <path>`.
 5. `browser_navigate` to `fullTestUrl` (debug params) → AFTER. Same setup + click. Verify discriminator again.
 6. `browser_screenshot` → save AFTER to `<sessionDir>/evaluation/iter<N>/after-<component>.png`.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
+   - Append progress: `[HH:MM:SS] 📸 AFTER captured — <path>`.
 7. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
 
 If the surface needs tenant state mutation (created pages, seeded data), clean it up before returning — the synthetic tenant is shared.
@@ -95,3 +97,8 @@ Write `artifactPath` with the full report. Append exactly one JSON line to `repo
 ```
 
 For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured` and both `beforePath` and `afterPath` are populated.
+
+Append the final progress line before returning:
+
+- PASS: `[HH:MM:SS] ✅ Evaluation PASS`
+- FAIL: `[HH:MM:SS] ❌ Evaluation FAIL — <primary reason>`

@@ -81,7 +81,7 @@ Be honest about gaps. "I could not locate X" is a valid and useful finding — f
 Before returning:
 
 1. Write the full report to `artifactPath`.
-2. Append progress: `[HH:MM:SS] ✅ Planner completed`.
+2. Append progress: `[HH:MM:SS] ✅ Planner completed — <classification>, <N> files, visual <pattern>`.
 3. Append exactly one JSON line to `reportFile`:
 
 ```json

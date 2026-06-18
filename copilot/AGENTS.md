@@ -40,9 +40,44 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 └── final.md
 ```
 
-- `progress.log` is mandatory and user-visible. Append a timestamped line before every state transition.
+- `progress.log` is mandatory and user-visible. Append a timestamped line before every state transition. Treat it as a first-class product surface, not debug noise.
 - `report.json` is NDJSON. Append one JSON object for planner, each implementation cycle, evaluator, reviewer, and final status.
 - `planning/planner-report.md`, `implementation/iter<N>.md`, `evaluation/iter<N>/evaluator-report.md`, `review.md`, and `final.md` are mandatory unless the run stops before that phase.
+
+## Progress log event contract
+
+Use this exact style. Each line starts with `[HH:MM:SS]`, one emoji, and a short human-readable state. The main session writes orchestration lines; planner/evaluator/reviewer write their own completion lines.
+
+```text
+[HH:MM:SS] 🚀 Session started: <session>
+[HH:MM:SS] 💬 USER PROMPT: <one-line or heredoc marker>
+[HH:MM:SS] 🤖 Mode: AUTO|INTERACTIVE
+[HH:MM:SS] 📋 Planner started
+[HH:MM:SS] ✅ Planner completed — <classification>, <N> files, visual <pattern>
+[HH:MM:SS] 📋 Plan ready — <N> tasks
+[HH:MM:SS] ✅ Plan approved (auto|user)
+[HH:MM:SS] 🌿 Branch ready — <branch>
+[HH:MM:SS] 🔨 Implementation started (cycle N)
+[HH:MM:SS] ✅ Build passed — <duration or raw log>
+[HH:MM:SS] 🧪 Tests passed|skipped|failed — <scope>
+[HH:MM:SS] 🖥️ Dev server ready — agentow:rush
+[HH:MM:SS] 🔗 Debug link ready
+[HH:MM:SS] 💾 Commit created — <sha>
+[HH:MM:SS] 🔍 Evaluator started (cycle N)
+[HH:MM:SS] 📸 BEFORE captured — <path>
+[HH:MM:SS] 📸 AFTER captured — <path>
+[HH:MM:SS] ✅ Evaluation PASS
+[HH:MM:SS] ❌ Evaluation FAIL — <reason>
+[HH:MM:SS] 📝 Reviewer started
+[HH:MM:SS] ✅ Review APPROVE
+[HH:MM:SS] ⚠️ Review REQUEST_CHANGES — <count> critical
+[HH:MM:SS] 🔁 Fix cycle N+1 — <reason>
+[HH:MM:SS] 🚀 Creating PR...
+[HH:MM:SS] ✅ PR created — <url>
+[HH:MM:SS] ✅ Workflow complete
+```
+
+If a phase fails, write the failure line immediately with the concrete reason. Do not leave the log idle for more than a few minutes without a state line while work is active.
 
 ## Visual validation is a hard gate
 
@@ -81,6 +116,7 @@ The `agentow` skill walks you through this in detail. It auto-loads when the use
 - **Evidence before claims** — run `ow-build` / `ow-test` and read the output before saying it works. "Should work" / "seems fine" = unverified assumption.
 - **Verifiers verify independently** — subagents read the actual code, not your self-report.
 - **Surface, don't hide** — state assumptions explicitly. In interactive mode, ask when uncertain. In auto mode, record the assumption in the plan so the user can audit it after.
+- **Progress before action** — before each major tool/action, write the matching `progress.log` event so the user can follow the run from the file alone.
 
 ## odsp-web specifics
 

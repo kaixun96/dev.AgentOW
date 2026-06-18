@@ -85,7 +85,10 @@ Be specific — every finding cites `file:line`. If the code is clean, say so; d
 Before returning:
 
 1. Write the full review to `artifactPath`.
-2. Append progress: `[HH:MM:SS] ✅ Reviewer completed: <verdict>`.
+2. Append progress:
+   - `APPROVE`: `[HH:MM:SS] ✅ Review APPROVE`
+   - `COMMENT`: `[HH:MM:SS] ✅ Review COMMENT — <summary>`
+   - `REQUEST_CHANGES`: `[HH:MM:SS] ⚠️ Review REQUEST_CHANGES — <criticalCount> critical`
 3. Append exactly one JSON line to `reportFile`:
 
 ```json

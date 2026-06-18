@@ -1,7 +1,7 @@
 {
   "name": "agentow-copilot",
   "description": "Copilot CLI port of agentOW: feature description → draft PR for odsp-web. Main-session implementer + stateless research/verify/review subagents.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": {
     "name": "kaixun"
   },
