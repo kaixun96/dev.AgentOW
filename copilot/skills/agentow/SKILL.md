@@ -17,6 +17,19 @@ Announce the mode in one line before starting, so the user knows what to expect.
 
 Call `ow-status` (MCP) to confirm the git branch, node, and rush state. Note whether you're on `main` (you'll branch later) or already on a feature branch.
 
+Create a durable session folder:
+
+```text
+/workspaces/odsp-web/.aero/<session>/
+├── planning/
+├── implementation/
+├── evaluation/
+├── progress.log
+└── report.json
+```
+
+Append timestamped progress lines before each major state transition. `progress.log` is the user's real-time view when Copilot CLI does not show agent state. Append NDJSON records to `report.json` for planner, each implementation cycle, evaluator, reviewer, and final result.
+
 ## Step 1: Understand the request
 
 **Interactive:** if the request is ambiguous or complex, ask the user 1-3 clarifying questions, one at a time, multiple-choice when possible. Stop when you can state clearly what to build and how to verify it. Skip this for trivial unambiguous requests.
@@ -27,7 +40,18 @@ Compose a refined one-paragraph statement of what to build.
 
 ## Step 2: Research (dispatch planner)
 
-Dispatch `@agentow-copilot:planner` with the refined request and `repoRoot=/workspaces/odsp-web`. Wait for its findings report (classification, root cause, files to change, patterns, tests, visual surface trace).
+Dispatch `@agentow-copilot:planner` with:
+
+```yaml
+request: <refined request>
+repoRoot: /workspaces/odsp-web
+sessionDir: /workspaces/odsp-web/.aero/<session>
+reportFile: /workspaces/odsp-web/.aero/<session>/report.json
+progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
+artifactPath: /workspaces/odsp-web/.aero/<session>/planning/planner-report.md
+```
+
+Wait for its findings report (classification, root cause, files to change, patterns, tests, visual surface trace). If `planning/planner-report.md` or the planner NDJSON line is missing, treat planner as failed.
 
 Read the findings. If the planner reports it could not locate the root cause or surface, decide: ask the user for a pointer (interactive), or proceed with its best understanding and record the gap (auto).
 
@@ -55,9 +79,26 @@ Save it locally to `/workspaces/odsp-web/.aero/<session>/plan.md` (a local worki
 6. **Dev server:** `ow-start` on the project; poll `ow-session-capture` on `agentow:rush` until `[WATCHING]`. Extract the debug link with `ow-debuglink`.
 7. **Commit** (don't push yet).
 
+Write `/workspaces/odsp-web/.aero/<session>/implementation/iter<N>.md` after each implementation/fix cycle with:
+- summary
+- files changed
+- build result and evidence
+- test result and evidence
+- dev server/debug link
+- commit SHA
+- remaining blockers, if any
+
+Append a generator/implementation NDJSON line to `report.json`.
+
 ## Step 5: Verify (dispatch evaluator)
 
-Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, and cycle number. Wait for PASS/FAIL + blockers.
+Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, cycle number, debug link, `sessionDir`, `reportFile`, `progressLog`, and `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for PASS/FAIL + blockers.
+
+For UI-visible changes, visual validation is mandatory:
+- BEFORE and AFTER screenshot paths must be present in the evaluator result.
+- If screenshots are missing, visual validation failed, or the evaluator says Playwright/browser tools were unavailable, treat the evaluator result as **FAIL** even if code inspection passed.
+- Surface the exact failure reason to the user and record it in `progress.log`, `report.json`, and `final.md` if the run stops.
+- Do not claim the UI was verified without screenshot evidence.
 
 ## Step 6: Fix loop
 
@@ -71,7 +112,18 @@ Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, sur
 
 ## Step 7: Review (dispatch reviewer)
 
-Dispatch `@agentow-copilot:reviewer` with the branch and changed files. Read the verdict.
+Dispatch `@agentow-copilot:reviewer` with:
+
+```yaml
+branch: <branch>
+changedFiles: <changed files>
+sessionDir: /workspaces/odsp-web/.aero/<session>
+reportFile: /workspaces/odsp-web/.aero/<session>/report.json
+progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
+artifactPath: /workspaces/odsp-web/.aero/<session>/review.md
+```
+
+Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat reviewer as failed.
 
 **REQUEST_CHANGES with Critical issues:**
 - Within the cycle limit, treat critical review findings like evaluator blockers — go back to Step 6 and fix them (they catch things UI verification misses: killswitch direction, type weakening, security).
@@ -83,8 +135,10 @@ Dispatch `@agentow-copilot:reviewer` with the branch and changed files. Read the
 ## Step 8: Ship
 
 1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no auto-generated "Testing" section).
-2. **Attach screenshots** if the evaluator captured BEFORE/AFTER: `ow-pr-attach` to append a Visual Validation section to the PR description, or post it as a comment.
+2. **Attach screenshots** for UI changes. If the evaluator did not capture BEFORE/AFTER screenshots, do not present the run as visually verified; include the visual-validation failure reason in the PR description only if the user explicitly chooses to ship a draft anyway.
 3. **Report** the PR URL to the user.
+
+Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status, PR URL if any, screenshot paths if captured, and any remaining blockers.
 
 ## Notes
 

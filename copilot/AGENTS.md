@@ -18,6 +18,38 @@ Subagents are **stateless verifiers** you dispatch as tools. They look, they rep
 
 You keep the work that needs continuity and user interaction: talking to the user, writing the plan, writing the code, driving the fix loop, creating the PR. Subagents do the bounded, context-heavy "look at a lot of code and report" work — which also keeps your own context lean.
 
+## Session artifacts
+
+Keep the Copilot run artifact-compatible with the Claude pipeline wherever practical:
+
+```text
+/workspaces/odsp-web/.aero/<session>/
+├── plan.md
+├── progress.log
+├── report.json
+├── planning/
+│   └── planner-report.md
+├── implementation/
+│   └── iter<N>.md
+├── evaluation/
+│   └── iter<N>/
+│       ├── evaluator-report.md
+│       ├── before-*.png
+│       └── after-*.png
+├── review.md
+└── final.md
+```
+
+- `progress.log` is mandatory and user-visible. Append a timestamped line before every state transition.
+- `report.json` is NDJSON. Append one JSON object for planner, each implementation cycle, evaluator, reviewer, and final status.
+- `planning/planner-report.md`, `implementation/iter<N>.md`, `evaluation/iter<N>/evaluator-report.md`, `review.md`, and `final.md` are mandatory unless the run stops before that phase.
+
+## Visual validation is a hard gate
+
+For any visible UI change, Playwright screenshots are mandatory. The evaluator must capture BEFORE and AFTER screenshots unless the plan explicitly proves there is no UI surface (`Pattern: skip`) or a Pattern D dependency is probed and confirmed unreachable.
+
+If Playwright/browser tools are unavailable, authentication blocks the page, the debug link cannot be built, the selector cannot be found, the discriminator does not match, or `browser_screenshot` does not produce files, the evaluator must return `FAIL` with a specific reason. Do not claim visual verification passed without screenshot paths.
+
 ## The pipeline
 
 ```
@@ -25,7 +57,7 @@ You keep the work that needs continuity and user interaction: talking to the use
 2. Research     → dispatch @planner → get findings
 3. Plan         → you write the plan; (interactive) get user approval; (auto) proceed
 4. Implement    → YOU write the code, run ow-build, run ow-test
-5. Verify       → dispatch @evaluator → get verdict
+5. Verify       → dispatch @evaluator → mandatory screenshots for UI changes
 6. Fix loop     → verdict FAIL? YOU fix (context retained) → re-dispatch @evaluator. Max 5 cycles.
 7. Review       → dispatch @reviewer → surface findings
 8. Ship         → ow-pr-create (draft PR), then ow-pr-attach for screenshots if captured
@@ -33,10 +65,13 @@ You keep the work that needs continuity and user interaction: talking to the use
 
 The `agentow` skill walks you through this in detail. It auto-loads when the user asks to implement a feature or fix a bug in odsp-web.
 
+`ow-batch` is the Copilot batch entry point. It runs multiple tasks serially, launching a fresh headless `copilot -p "/agentow --auto <task>"` process for each task and writing a batch `summary.md`. It does not use parallel worktrees because the shared `ow` MCP server is rooted at `/workspaces/odsp-web`.
+
 ## Modes
 
 - **Interactive** (default) — clarify intent, approve the plan, confirm before shipping with critical review issues. ~3-5 user touches.
 - **Auto** (`--auto` in the prompt) — skip all gates: no intent questions, auto-approve the plan, ship even with critical issues (PR is draft, a human reviews before publishing). Zero user touches.
+- **Batch** (`/ow-batch`) — serial unattended loop over multiple `/agentow --auto` runs. Each task gets a fresh Copilot process and one summary row.
 
 ## Core principles
 

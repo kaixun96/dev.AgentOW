@@ -2,7 +2,7 @@
 
 A port of [agentOW](../README.md) to GitHub Copilot CLI. Same goal — odsp-web feature description → draft PR — but re-architected around Copilot CLI's grain instead of Claude Code's Agent Teams.
 
-> **Status: thin slice / proof of concept.** Covers the core pipeline (research → plan → implement → verify → fix loop → review → PR). Batch mode, standalone screenshots, and the adversarial dual-evaluator are NOT ported yet. Several Copilot-specific integration points need verification — see [Needs verification](#needs-verification).
+> **Status: thin slice / proof of concept.** Covers the core pipeline (research → plan → implement → verify → fix loop → review → PR) plus serial batch mode. Standalone screenshots and the adversarial dual-evaluator are NOT ported yet. Several Copilot-specific integration points need verification — see [Needs verification](#needs-verification).
 
 ## Why it's structured differently from the Claude version
 
@@ -18,6 +18,26 @@ So the architecture collapses:
 | Batch = spawn a team per task | Batch = `copilot -p "/agentow <task>"` headless loop (cleaner isolation) |
 
 The key insight: the generator needs context continuity across fix cycles, and the main session already has it. Make the main session the implementer; keep subagents for bounded "look and report" work (which also offloads context-heavy reading from the main session). This mirrors the [ironflow-copilot](https://github.com/gim-home/TeamsPluginMarket) plugin's proven main-session-implementer pattern.
+
+## Session artifacts and visual gate
+
+Copilot runs should keep the same baseline observability as the Claude pipeline:
+
+```text
+/workspaces/odsp-web/.aero/<session>/
+├── plan.md
+├── progress.log
+├── report.json
+├── planning/planner-report.md
+├── implementation/iter<N>.md
+├── evaluation/iter<N>/evaluator-report.md
+├── evaluation/iter<N>/before-*.png
+├── evaluation/iter<N>/after-*.png
+├── review.md
+└── final.md
+```
+
+For visible UI changes, BEFORE/AFTER Playwright screenshots are mandatory. If the evaluator cannot capture real screenshots, it must return `FAIL` with the exact reason (missing browser tools, auth prompt, missing debug link, selector mismatch, screenshot failure, etc.). The run must not claim visual verification passed without screenshot paths.
 
 ## Shared MCP server
 
@@ -36,8 +56,10 @@ Then:
 
 ```bash
 copilot -p "/agentow fix the elevation background on mobile"          # auto-ish, one shot
+copilot -p "/ow-batch 1. Fix bug A 2. Add feature B"                  # serial batch
 copilot                                                               # interactive session
 > /agentow add a loading spinner to PhotoGrid
+> /ow-batch tasks.md
 ```
 
 ## Needs verification (the spike)
@@ -48,13 +70,12 @@ These are written per the conventions of working Copilot CLI plugins (ironflow-c
 2. **Plugin-bundled MCP auto-load** — confirm Copilot loads `mcpServers` from `.claude-plugin/plugin.json` or `.mcp.json`; otherwise users must merge the same `ow` config into `~/.copilot/mcp-config.json`.
 3. **Subagent tool names** — agents declare `tools: [view, grep, glob, shell]` (from ironflow's read-only reviewers + an assumed `shell`). Confirm `shell` is the Copilot name for running commands, and confirm the main session's write/edit tool names.
 4. **`@agentow-copilot:<name>` dispatch + parallelism** — ironflow confirms the `@plugin:agent` syntax and single-message parallel dispatch; confirm it works with this plugin's agent names.
-5. **Headless `--allow-all-tools`** — for the batch loop and unattended runs, confirm headless mode runs the full pipeline (including subagent dispatch) without interactive prompts. ironflow's AGENTS.md flags this as an open adaptation point.
+5. **Headless permission flags** — `ow-batch` uses `copilot --autopilot --allow-all --max-autopilot-continues 20 -p`. Confirm these flags work in the target Copilot CLI version; fallback is `--yolo`, then plain `copilot -p`.
 
 ## Not ported yet
 
-- **Batch mode** — will be a `copilot -p` headless loop, not a team-spawn dispatcher.
 - **Standalone `/ow-screenshot`** — screenshot existing PRs.
-- **Dual adversarial evaluator** (rule + vision ensemble) — the thin slice uses a single evaluator.
+- **Dual adversarial evaluator** (rule + vision ensemble) — the thin slice uses a single evaluator, but Playwright BEFORE/AFTER screenshots are still mandatory for visible UI changes.
 - **Brainstorming via superpowers** — Step 1 does lightweight clarification inline.
 
 ## File structure
@@ -69,5 +90,7 @@ copilot/
 │   ├── planner.agent.md         stateless: research → findings
 │   ├── evaluator.agent.md       stateless: verify → PASS/FAIL
 │   └── reviewer.agent.md        stateless: review → verdict
-└── skills/agentow/SKILL.md      main-session orchestration
+└── skills/
+    ├── agentow/SKILL.md         main-session orchestration
+    └── ow-batch/SKILL.md        serial headless /agentow --auto batch loop
 ```
