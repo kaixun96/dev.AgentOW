@@ -55,19 +55,23 @@ If INTERACTIVE MODE:
 
 ## Step 1: Capture User Request and Setup Session
 
-Record the user's exact request as `userPrompt`. Derive a kebab-case session name (under 30 chars).
+Record the user's exact request as `userPrompt`. Derive a kebab-case slug (under 24 chars) from the request, then **append a timestamp suffix to guarantee a unique folder** — without it, two Claude sessions working the same bug derive the same slug and clobber each other's `report.json` / `progress.log`.
 
 ```bash
-mkdir -p /workspaces/odsp-web/.aero/<session-name>/plans
-touch /workspaces/odsp-web/.aero/<session-name>/report.json
-touch /workspaces/odsp-web/.aero/<session-name>/progress.log
+slug=<kebab-case-of-request>          # e.g. add-loading-spinner
+sessionName=${slug}-$(date +%H%M%S)   # e.g. add-loading-spinner-143022
+mkdir -p /workspaces/odsp-web/.aero/${sessionName}/plans
+touch /workspaces/odsp-web/.aero/${sessionName}/report.json
+touch /workspaces/odsp-web/.aero/${sessionName}/progress.log
 ```
+
+> The `-$(date +%H%M%S)` suffix is mandatory. The folder MUST be unique per run. Never reuse or hardcode a bare slug.
 
 Record variables:
 
 | Variable | Value |
 |----------|-------|
-| `{sessionName}` | kebab-case name |
+| `{sessionName}` | `<slug>-<HHMMSS>` (unique per run) |
 | `{sessionDir}` | `/workspaces/odsp-web/.aero/{sessionName}/` |
 | `{reportFile}` | `{sessionDir}/report.json` |
 | `{progressLog}` | `{sessionDir}/progress.log` |

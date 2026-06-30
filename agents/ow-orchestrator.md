@@ -73,12 +73,15 @@ After the generator commits code (`code_done`), the evaluator and review-agent s
 
 ### Step 0: Create Session
 
-Derive a short kebab-case session name from the user's feature description (e.g. "add loading spinner to photo grid" → `add-loading-spinner`). Keep it under 30 chars, lowercase, hyphens only.
+Derive a short kebab-case slug from the user's feature description (e.g. "add loading spinner to photo grid" → `add-loading-spinner`, under 24 chars, lowercase, hyphens only), then **append a timestamp suffix so the folder is unique per run**. Without it, two Claude sessions on the same bug derive the same name and clobber each other's `report.json` / `progress.log`.
 
 ```bash
-mkdir -p /workspaces/odsp-web/.aero/<session-name>/plans
-touch /workspaces/odsp-web/.aero/<session-name>/report.json
+sessionName=<slug>-$(date +%H%M%S)    # e.g. add-loading-spinner-143022
+mkdir -p /workspaces/odsp-web/.aero/${sessionName}/plans
+touch /workspaces/odsp-web/.aero/${sessionName}/report.json
 ```
+
+The `-$(date +%H%M%S)` suffix is mandatory — never use a bare slug.
 
 Set variables:
 - `sessionDir` = `/workspaces/odsp-web/.aero/<session-name>/`
