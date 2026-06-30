@@ -314,6 +314,11 @@ echo "[$(date +%H:%M:%S)] ✅ Received: <agent name> — <brief status>" >> {pro
 
 **Do NOT proceed to Step 4 until all three responses are collected.**
 
+**⚠️ Watchdog — a teammate can drop a response and deadlock you (this has happened).** You go idle while waiting, so you cannot self-time-out — but whenever you are re-activated by ANY incoming message while a response is still outstanding (a teammate's idle ping, a relayed nudge from `team-lead`, anything), do NOT blindly resume waiting. First read `report.json` AND check ground truth for the missing piece:
+- For a missing `build_done`: check the generator's dev-server start log (e.g. `tail /tmp/*rushstart*.log`) for `[WATCHING]` / "Content is being served" — that means the **build PASSED** even though `build_done` was never sent.
+
+If the prerequisite is met but the message was dropped: **re-prompt that teammate ONCE** (`"send your build_done now — your dev server is [WATCHING]"`); if it still doesn't answer, **proceed on the ground-truth state** (treat build as passed, reuse the running dev server) rather than waiting forever. The external `progress-watcher` writes a `⚠️ POSSIBLE STALL` line into `progress.log` after a long no-output stretch — if you (or team-lead) see one, run this recovery immediately. Log every recovery step to `progress.log` so the stall→unstall is visible.
+
 ### Step 4: Process Build Result
 
 After collecting all three responses:
@@ -676,7 +681,7 @@ The codespace may have additional MCP plugins installed. Leverage them when avai
 
 ## Rules
 
-- **CONTINUOUS EXECUTION:** The entire pipeline must run as one continuous orchestration flow. After sending `SendMessage` to a teammate, ALWAYS wait for their response message before doing anything else. Never go idle between pipeline steps — idle agents break the chain and require manual intervention.
+- **CONTINUOUS EXECUTION:** The entire pipeline must run as one continuous orchestration flow. After sending `SendMessage` to a teammate, ALWAYS wait for their response message before doing anything else. Never go idle between pipeline steps — idle agents break the chain and require manual intervention. **BUT a dropped teammate message must never deadlock you forever: whenever you are re-activated while a response is outstanding, run the Step 3 Watchdog (check `report.json` + ground truth, re-prompt once, then proceed) instead of silently re-waiting.**
 - **PARALLEL DISPATCH:** After receiving `code_done` from the generator, dispatch evaluator (code inspection) and review-agent simultaneously. Collect all three responses (build_done + evaluator + review) before proceeding.
 - **You do NOT read, write, or edit source code files under /workspaces/odsp-web.** All investigation, coding, building, and testing is delegated to subagents.
 - **Read is restricted to session files only:** `report.json`, `progress.log`, plan files under `{planDir}`, and evaluation reports. Never Read source code (`.ts`, `.tsx`, `.js`, `.json` under `/workspaces/odsp-web/sp-client/`, `/workspaces/odsp-web/odsp-next/`, etc.).

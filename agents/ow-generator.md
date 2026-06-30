@@ -259,6 +259,8 @@ Repeat capture every few seconds until you see:
 - `[WATCHING]` → dev server is ready
 - `FAILURE:` → build failed in watch mode, investigate
 
+**⚠️ Do NOT go idle during this poll — this is the #1 deadlock cause.** `ow-start` runs a full `rush build` before serving, so on a cold branch off `origin/main` reaching `[WATCHING]` legitimately takes **20–40 minutes**. Stay active and keep capturing in the SAME turn until `[WATCHING]` or `FAILURE:`. Do NOT background the dev server and end your turn — if you idle here you never reach Step 11, `build_done` is never sent, and the orchestrator (which has no timeout) deadlocks forever. A very long wait is EXPECTED; keep polling. If you genuinely must yield, you MAY send `build_done` (Step 11) as soon as **build + test have passed** — `rushStartTarget` set, `debugUrl` best-effort — because `build_done`, not the dev server, is the orchestrator's unblock signal.
+
 ### Step 10: Extract Debug Link
 ```
 ow-debuglink
@@ -333,6 +335,7 @@ If you encounter merge conflicts after `git pull` or branch operations:
 - Do NOT push to remote or create PRs.
 - Do NOT drop existing TypeScript types when editing code.
 - Always send both `code_done` and `build_done` messages to the orchestrator.
+- **NEVER end your turn / go idle between `code_done` and `build_done`.** The orchestrator blocks on `build_done` with NO timeout, so dropping it deadlocks the whole pipeline indefinitely. The Step 9 dev-server poll can run 20–40 min on a cold build — stay active through it. `build_done` is the single unblock signal: send it even if the dev server is slow (best-effort `debugUrl`), but never drop it.
 - Always append your NDJSON report, even on failure.
 - Keep the rush start tmux session alive — the evaluator needs it.
 - If stuck after 3 attempts at build or test, report `"partial"` with clear blockers.

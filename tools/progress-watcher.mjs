@@ -33,6 +33,16 @@ const state = fs.existsSync(stateFile)
   ? JSON.parse(fs.readFileSync(stateFile, 'utf8'))
   : { ndjsonOffset: 0, seenFiles: {} };
 
+// --- Stall / heartbeat detection -------------------------------------------
+// Surfaces pipeline deadlocks (e.g. a teammate dropping its build_done so the
+// orchestrator waits forever). Heartbeat keeps the log ticking during long
+// no-output stretches so a frozen log is distinguishable from a real build;
+// past STALL_MS it escalates to a loud warning naming the likely cause.
+const HEARTBEAT_MS = Number(process.env.OW_WATCHER_HEARTBEAT_MS) || 8 * 60 * 1000;
+const STALL_MS = Number(process.env.OW_WATCHER_STALL_MS) || 24 * 60 * 1000;
+let lastProgressMs = Date.now(); // last time an agent wrote real output (report grew / new eval file)
+let lastHeartbeatMs = 0;
+
 function saveState() {
   fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
 }
@@ -54,6 +64,7 @@ function tailReportJson() {
   if (!fs.existsSync(reportJson)) return;
   const stat = fs.statSync(reportJson);
   if (stat.size <= state.ndjsonOffset) return;
+  lastProgressMs = Date.now(); // report.json grew → an agent made progress
 
   const fd = fs.openSync(reportJson, 'r');
   const buf = Buffer.alloc(stat.size - state.ndjsonOffset);
@@ -120,6 +131,7 @@ function scanEvaluation() {
       const key = `${iter}/${f}`;
       if (state.seenFiles[key] === m) continue;
       state.seenFiles[key] = m;
+      lastProgressMs = Date.now(); // new evaluation artifact → progress
       if (f.endsWith('.png')) log(`📸 ${iter}: ${f}`);
       else if (f === 'rule-findings.json') {
         try {
@@ -139,6 +151,31 @@ function scanEvaluation() {
   saveState();
 }
 
+// --- 2b. Stall watchdog: no agent output for too long → heartbeat, then warn ---
+
+function checkStall() {
+  const gap = Date.now() - lastProgressMs;
+  if (gap < HEARTBEAT_MS) return;
+  // Emit at most once per HEARTBEAT_MS window so we don't spam every 2s.
+  if (Date.now() - lastHeartbeatMs < HEARTBEAT_MS) return;
+  lastHeartbeatMs = Date.now();
+  const mins = Math.round(gap / 60000);
+  if (gap >= STALL_MS) {
+    log(
+      `⚠️ POSSIBLE STALL — no agent output (report.json / evaluation) for ~${mins}m. ` +
+        `A teammate may have dropped a response and deadlocked the orchestrator (classic case: the ` +
+        `generator's dev server reaches [WATCHING] but build_done is never sent). ` +
+        `Check the last line of report.json + re-prompt the awaited teammate via the orchestrator — ` +
+        `do NOT keep waiting indefinitely.`
+    );
+  } else {
+    log(
+      `🕐 watcher heartbeat — no new agent output for ~${mins}m ` +
+        `(a cold build / dev-server start legitimately takes 20-40m; watcher alive).`
+    );
+  }
+}
+
 // --- 3. Wire up: poll every 2s (fs.watch is unreliable on some filesystems) ---
 
 log(`🤖 progress-watcher started (pid ${process.pid}) — backstop for orchestrator log writes`);
@@ -149,6 +186,7 @@ tailReportJson();
 setInterval(() => {
   tailReportJson();
   scanEvaluation();
+  checkStall();
 }, 2000);
 
 process.on('SIGINT', () => { log('🤖 progress-watcher stopped'); process.exit(0); });
