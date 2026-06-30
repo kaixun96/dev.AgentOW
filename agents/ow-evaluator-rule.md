@@ -167,6 +167,19 @@ Recipe: read the plan's affected files; if any path matches the table, the spec 
 
 If you find yourself writing any of the above strings, STOP and run the probe in step 4 first.
 
+### Step R-2.5b: Flight-/elevation-gated surface? FORCE the gating flights BEFORE you ever write `skip` / `un-reproducible` (MANDATORY)
+
+A surface that does not render in the **default** tenant state is NOT "un-reproducible" — it is "not-yet-forced". `skip` is a last resort, allowed ONLY after you have genuinely exhausted capture. Before ANY `skip` / `un-reproducible host` / `non-elevated standalone` verdict you MUST:
+1. Read the surface's gate function(s) and list EVERY flight / opt-in / cookie it depends on (follow the gate transitively — most gates are an `&&` chain).
+2. Add ALL of those flights to `debugFlights` in BOTH the BEFORE and AFTER navigations, and re-run.
+3. Only if the surface STILL does not render — with the page-render evidence logged — may you skip, and the skip MUST name the specific irreducible blocker (e.g. a real server-side data dependency), NOT "the default tenant doesn't show it".
+
+Most gates that LOOK server-side are short-circuited by a flight: a client `FeatureOverrides` / `_SPFlight` check listed FIRST in the function returns early. Verify in source — never assume "server opt-in, can't force".
+
+**Concrete precedent — site elevation / NextGen chrome (where the V↔E Motion / FAW overlay lives):** the overlay only renders under elevated chrome = `isSPSiteElevationEnabled()` (`sp-pages-core/.../utilities/Flights.ts`), which needs flight **62764** (SPSiteElevationEnabled) **OR 62874** (Visual Refresh) AND `isNextGenSharePointExperienceOptedIn()`. That last gate LOOKS server-side (`_spPageContextInfo.IsNextGenSharePointExperienceOptedIn`) but its FIRST condition is flight **61636** (NextGenSharePoint), which short-circuits the server check. `_renderConfig.chromeElevated` is client-side & path-based (true for normal SitePages); `isEAPVisualRefreshEnabled()` is cookie-default-ON. So `debugFlights=62874,61636,<feature-flight>` makes even the non-elevated synthetic prod tenant render the full elevated chrome + left nav + overlay — the surface IS reproducible. This is exactly the SKIP wrongly taken on Bug 3127385: only the feature flight 63053 was forced, the elevation chain (62764/62874 + 61636) never was.
+
+**Forbidden (add to the list above):** `"un-reproducible / non-elevated host"` (or any `skip`) is forbidden unless `rule-findings.json` records the exact `debugFlights` you forced — including the elevation/NextGen chain for any elevated-chrome surface — AND the page still did not render. Skipping by absence-of-default-state is a hard procedural FAIL: exhaust the flights first.
+
 ### Step R-2.6: Hover-gated UI? Decide headless vs xvfb-headed runner (MANDATORY before R-4)
 
 Some Fluent v9 components conditionally render UI on real CSS `:hover` state — e.g. PageActionsMenu kebab in SmartWiki tree, ContextualMenu trigger buttons in some Panel headers, hover-revealed action toolbars in DocumentCard. In **headless** Playwright these elements **never render into the DOM** because Playwright's `hover()` dispatches DOM events but does not flip the browser's `:hover` pseudo-class (no real pointer). React's `useHover` / `useIsOverflowed` / `useFocusable` hooks then `return null` for the action slot.
