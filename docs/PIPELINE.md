@@ -39,7 +39,7 @@ team-lead (skill: /ow-team)
    │      for new screenshots / findings, appends human-readable lines
    │      to progress.log when orchestrator forgets)
    ├─ brainstorm (interactive only) or skip (--auto)
-   └─ TeamCreate → spawn 6 idle agents → spawn ow-orchestrator
+   └─ spawn 6 idle agents → spawn ow-orchestrator (implicit team; no TeamCreate)
 ```
 
 ---

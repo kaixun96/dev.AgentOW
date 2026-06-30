@@ -62,6 +62,19 @@ You can run it in two modes — see [Quick Start](#quick-start).
 - `tmux` installed in the Codespace
 - Playwright MCP server (for evaluator browser verification)
 - superpowers plugin (recommended, for brainstorming + deep review)
+- **Agent Teams enabled** — `/ow-team` and `/ow-batch` spawn a team of agents, which requires the experimental flag. Add to `~/.claude/settings.json`, then **restart Claude Code**:
+
+  ```json
+  {
+    "env": {
+      "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    }
+  }
+  ```
+
+  > As of Claude Code 2.1.x the old `TeamCreate` tool was removed — with this flag set, every session has an implicit team and agentOW spawns teammates directly. Without the flag, `/ow-team` cannot spawn its agents.
+
+- **Auto-accept mode on** — the orchestrator and teammates run unattended; if Claude Code stops to ask permission for every tool, the pipeline stalls. Turn on auto-accept mode (cycle permission modes with **Shift+Tab** until it shows auto-accept) before starting a run, especially for `--auto` and `/ow-batch`.
 
 ---
 

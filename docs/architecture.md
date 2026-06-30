@@ -20,13 +20,13 @@
 │  ② 调用 superpowers:brainstorming  ←──── 直接和用户交互               │
 │       └─ 一问一答 → 提方案 → 用户确认 → refinedRequest                │
 │                                                                      │
-│  ③ TeamCreate + Spawn 5 agents (idle 先, orchestrator 最后)          │
+│  ③ Spawn 5 agents (idle 先, orchestrator 最后) — 隐式 team,无需 TeamCreate │
 │                                                                      │
 │  ④ Monitor: tail -f progress.log  ←──── 用户看到实时进度              │
 │                                                                      │
 │  ⑤ 进入 user-relay 模式  ←──── 转发 orchestrator ↔ 用户的消息         │
 └──────────────────────┬──────────────────────────────────────────────┘
-                       │ TeamCreate
+                       │ Agent(name=...)
                        ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       AGENT TEAM (常驻)                              │

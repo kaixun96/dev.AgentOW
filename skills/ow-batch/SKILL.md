@@ -110,15 +110,9 @@ echo "[$(date +%H:%M:%S)] ▶️  Task ${i}/${N} starting: ${taskDescription}" >
 | `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
 | `{behaviorGuidelines}` | `${CLAUDE_PLUGIN_ROOT}/docs/BEHAVIORAL-GUIDELINES.md` |
 
-### 2d. Create team
+### 2d. (no team setup needed)
 
-```json
-TeamCreate({
-  "team_name": "{teamName}",
-  "description": "Batch task ${i}/${N}: ${taskDescription}",
-  "agent_type": "coordinator"
-})
-```
+There is no `TeamCreate` step. As of Claude Code 2.1.x the `TeamCreate`/`TeamDelete` tools were removed — with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` set, every session already has one implicit team. Spawn teammates directly with the `Agent` tool's `name` parameter (Step 2e). If spawning fails, the env flag is missing — confirm it is in `~/.claude/settings.json` and Claude Code was restarted.
 
 ### 2e. Spawn agents (idle first, orchestrator last)
 

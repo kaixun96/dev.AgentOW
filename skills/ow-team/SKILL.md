@@ -143,17 +143,11 @@ Read all 8 in parallel. Do not proceed until all reads are complete. `{behaviorG
 
 ---
 
-## Step 3: Create the Team
+## Step 3: Confirm the implicit team
 
-Call `TeamCreate`:
+There is **no setup step** to create a team. As of Claude Code 2.1.x the `TeamCreate`/`TeamDelete` tools were removed: with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` set, every session already has one implicit team. You spawn teammates directly with the `Agent` tool's `name` parameter (Step 4).
 
-```json
-{
-  "team_name": "{teamName}",
-  "description": "odsp-web full development cycle — planner → generator → evaluator loop",
-  "agent_type": "coordinator"
-}
-```
+> If teammate spawning fails, the env flag is almost certainly missing — confirm `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is in `~/.claude/settings.json` and Claude Code was restarted after adding it.
 
 ---
 
@@ -322,7 +316,7 @@ If the message is a status/progress update (not a question): optionally summariz
 
 - **You are a launcher + user-relay, never the orchestrator.** Never plan, build, coordinate, or read the report file yourself.
 - **Do not use the `Agent` tool after Step 4.**
-- Read all agent MD files (Step 2) before calling TeamCreate or spawning any agent.
+- Read all agent MD files (Step 2) before spawning any agent.
 - Spawn the orchestrator **first** so it is running before the idle agents join.
 - If the user asks for a status update, use `SendMessage` to query `ow-orchestrator` by name — the orchestrator is the single source of truth.
 - If the user asks to shut down, send `{"type": "shutdown_request"}` via `SendMessage` to `ow-orchestrator` first; it will relay the shutdown to its team members.
