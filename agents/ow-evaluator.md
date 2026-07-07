@@ -222,7 +222,8 @@ Read the plan file. If it contains a `## Visual Validation` section with `Patter
 4. Click the `DOM selector`
 5. Wait for the expected container to appear in `browser_snapshot()`
 6. **Verify discriminator** — confirm the expected element (text/attribute) is inside the container. If not, this is the wrong surface — STOP, mark visual validation as FAILED.
-7. `browser_screenshot()` — save to `<sessionDir>/evaluation/iter<N>/before-<component>.png`
+7. If the container hosts an iframe or async shell, wait for the inner content discriminator (e.g. iframe load + non-empty body or a readiness postMessage) before screenshotting. Blank hosted content is a failed capture, not acceptable evidence.
+8. `browser_screenshot()` — save to `<sessionDir>/evaluation/iter<N>/before-<component>.png`
 
 **AFTER** (renders local PR build via generator's debug link):
 1. Get `fullTestUrl` from `ow-debuglink(sharePointPageUrl=<testPage>)` — this prepends the localhost debug query string to the test page URL
@@ -230,7 +231,8 @@ Read the plan file. If it contains a `## Visual Validation` section with `Patter
 3. Allow the debug bundle prompt if it appears
 4. Same setup + click as BEFORE
 5. Verify discriminator again
-6. `browser_screenshot()` — save to `<sessionDir>/evaluation/iter<N>/after-<component>.png`
+6. If the surface hosts an iframe or async shell, wait for inner content readiness again.
+7. `browser_screenshot()` — save to `<sessionDir>/evaluation/iter<N>/after-<component>.png`
 
 ⚠️ **Do NOT add `market=qps-ploc`** to the AFTER URL. It renders pseudo-localized text (Ĺōàď ďēb...) that pollutes the screenshots. The technical proof that the PR build loaded should come from the `prBuildCount > 0` console assertion in your verification (read it from `window`), not from visual pseudo-localization.
 

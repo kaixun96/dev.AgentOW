@@ -56,6 +56,7 @@ If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You
    - If browser tools are unavailable, do **not** stop at `playwright-tools-unavailable`. Use the FIC fallback below first.
    - If an AAD/login/consent page blocks access, return `FAIL` with blocker `playwright-auth-required` and tell the user exactly what page/prompt was seen.
 3. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
+   - If the surface hosts an iframe or another async shell, the outer Drawer/Dialog/Modal is not enough. Wait for the inner discriminator or iframe content to be visible before taking screenshots.
 4. `browser_screenshot` → save BEFORE to `<sessionDir>/evaluation/iter<N>/before-<component>.png`.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `before-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 BEFORE captured — <path>`.
@@ -80,6 +81,7 @@ Rules for this fallback:
 - Use a real SharePoint page URL, usually `.../SitePages/Home.aspx`, not just the site root.
 - If the surface is flight-gated, force **all** prerequisite flights in both BEFORE and AFTER URLs. Example: Create group panel needs `1075` for the Create Site button; AFTER additionally enables `1535`.
 - `SPPageProvider.loadPageAsync()` may finish authentication on `/_api/SP.Directory.DirectorySession/me` because its login check compares origin. After `loadPageAsync(targetUrl, { user })`, explicitly call `page.goto(targetUrl)` before looking for the UI.
+- For iframe-backed surfaces, wait for the iframe content, not just the chrome. Example: CreateGroupPanel opens the Drawer/Modal before `CreateGroup.aspx` finishes; if the screenshot is mostly blank white, the probe is too early. Wait for `iframe[src*="CreateGroup.aspx"]`, then its frame `load` state and non-empty body text, or a surface-specific readiness signal such as `CreateSiteReady`.
 - Save screenshots under `<sessionDir>/evaluation/iter<N>/` and report the same `visualValidation.beforePath` / `afterPath` fields as the MCP path.
 
 Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed. A missing Playwright MCP plugin is not a FIC failure.

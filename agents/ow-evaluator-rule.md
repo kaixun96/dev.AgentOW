@@ -183,6 +183,19 @@ Do not report any of these as final blockers until the FIC fallback has tried th
 - target button hidden in default tenant state
 - page snapshot points at `/_api/SP.Directory.DirectorySession/me`
 
+**Iframe/async shell readiness is part of visual validation, not optional polish.** A Drawer/Dialog/Modal container can be visible while its hosted content is still blank. Do not screenshot the outer chrome alone unless the changed surface is the chrome itself and the plan explicitly says inner content is irrelevant.
+
+CreateGroupPanel precedent (PR 2282732):
+- The first real FIC screenshots were invalid because the modal/drawer opened but `CreateGroup.aspx` was still blank white.
+- Correct probes must wait for `iframe[src*="CreateGroup.aspx"]` and then wait for iframe load/body content or the surface-specific `CreateSiteReady` readiness signal before screenshotting.
+- A mostly white iframe with no title/body controls is `visualValidation.status="failed"` with reason `iframe-content-not-ready`, not a valid BEFORE/AFTER.
+
+General rule for iframe-backed surfaces:
+1. Wait for the outer container.
+2. Locate the target iframe by a collision-proof `src` discriminator.
+3. Wait for frame load state and a non-empty content discriminator (body text, known title/control, or postMessage readiness signal).
+4. Only then capture BEFORE/AFTER.
+
 ### Step R-2.5b: Flight-/elevation-gated surface? FORCE the gating flights BEFORE you ever write `skip` / `un-reproducible` (MANDATORY)
 
 A surface that does not render in the **default** tenant state is NOT "un-reproducible" — it is "not-yet-forced". `skip` is a last resort, allowed ONLY after you have genuinely exhausted capture. Before ANY `skip` / `un-reproducible host` / `non-elevated standalone` verdict you MUST:
