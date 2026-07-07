@@ -98,7 +98,7 @@ If checkout fails because the previous task left uncommitted changes:
 Run a fresh Copilot CLI process from `/workspaces/odsp-web`:
 
 ```bash
-copilot --autopilot --allow-all --max-autopilot-continues 20 \
+copilot --autopilot --allow-all --no-ask-user --enable-memory --max-autopilot-continues 20 \
   -p "/agentow --auto <task text>"
 ```
 
@@ -108,7 +108,16 @@ Redirect stdout/stderr to the per-task log:
 /workspaces/odsp-web/.aero/batch-<timestamp>/task<i>.log
 ```
 
-If `--allow-all` is not supported by the installed Copilot CLI, retry with `--yolo`. If `--autopilot` is not supported, retry with plain `copilot -p`, but record the degraded mode in `batch.log`.
+Compatibility confirmed on Copilot CLI 1.0.69-2: `--autopilot`, `--allow-all`, `--no-ask-user`, `--enable-memory`, and `--max-autopilot-continues` are supported. Still keep fallbacks for older clients: if `--allow-all` is not supported, retry with `--yolo`; if `--autopilot` is not supported, retry with plain `copilot -p`, but record the degraded mode in `batch.log`.
+
+Before the first real task, run a one-line smoke check of the exact headless shell shape without `/agentow`:
+
+```bash
+copilot --autopilot --allow-all --no-ask-user --enable-memory --max-autopilot-continues 1 \
+  -p "Reply exactly: BATCH_SMOKE_OK"
+```
+
+If the output does not contain `BATCH_SMOKE_OK`, stop before mutating git and report the headless-launch failure.
 
 Before launching, append:
 
@@ -126,6 +135,7 @@ After the process exits:
    https://dev\.azure\.com/onedrive/ODSP-Web/_git/odsp-web/pullrequest/[0-9]+
    ```
 3. Also search recent `.aero/*/final.md` and `progress.log` if the URL is not in stdout.
+   - Limit this fallback search to `.aero` entries newer than the task start timestamp to avoid picking up a PR URL from a previous task.
 4. Record:
    - `success` if exit code is 0 and PR URL found
    - `completed-no-pr` if exit code is 0 but no PR URL found
@@ -182,6 +192,7 @@ Append:
 ## Rules
 
 - Run tasks serially. Do not run multiple `/agentow` tasks concurrently against the same `/workspaces/odsp-web` checkout.
+- Full batch mode is a mutating workflow: each real task may create branches and draft PRs. For testing ow-batch itself, use the smoke command above rather than a real `/agentow` prompt.
 - Never discard uncommitted changes. Stash task leftovers with a descriptive `agentow-batch-task<N>-failed` message.
 - Do not auto-stash changes that existed before the batch started; ask the user to resolve them.
 - Every task gets a fresh `copilot -p` process.

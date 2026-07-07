@@ -70,7 +70,7 @@ These are written per the conventions of working Copilot CLI plugins (ironflow-c
 2. **Plugin-bundled MCP auto-load** — confirm Copilot loads `mcpServers` from `.claude-plugin/plugin.json` or `.mcp.json`; otherwise users must merge the same `ow` config into `~/.copilot/mcp-config.json`.
 3. **Subagent tool names** — agents declare `tools: [view, grep, glob, shell]` (from ironflow's read-only reviewers + an assumed `shell`). Confirm `shell` is the Copilot name for running commands, and confirm the main session's write/edit tool names.
 4. **`@agentow-copilot:<name>` dispatch + parallelism** — ironflow confirms the `@plugin:agent` syntax and single-message parallel dispatch; confirm it works with this plugin's agent names.
-5. **Headless permission flags** — `ow-batch` uses `copilot --autopilot --allow-all --max-autopilot-continues 20 -p`. Confirm these flags work in the target Copilot CLI version; fallback is `--yolo`, then plain `copilot -p`.
+5. **Headless permission flags** — `ow-batch` uses `copilot --autopilot --allow-all --no-ask-user --enable-memory --max-autopilot-continues 20 -p`. Confirmed on Copilot CLI 1.0.69-2; fallback is `--yolo`, then plain `copilot -p`.
 
 ## Not ported yet
 
