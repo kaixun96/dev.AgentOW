@@ -389,21 +389,19 @@ export function registerOwTools(
 
   // ── 16. ow-pr-attach ─────────────────────────────────────────────────────
   registerMcpTool(server, "ow-pr-attach", {
-    description: "Upload files (typically PNG screenshots) as attachments to an existing PR on Azure DevOps, then optionally append a comment or extend the PR description. Use {{name}} placeholders in commentMarkdown / appendToDescription to reference uploaded attachment URLs.",
+    description: "Upload files (typically PNG screenshots) as attachments to an existing PR on Azure DevOps, then append them to the PR description. Never posts PR comments. Use {{name}} placeholders in appendToDescription to reference uploaded attachment URLs.",
     inputSchema: {
       prId: z.number().describe("Pull request ID to attach files to"),
       attachments: z.array(z.object({
         name: z.string().describe("Filename used on ADO, e.g. 'before-pr2219557.png'"),
         localPath: z.string().describe("Absolute path to the local file to upload"),
       })).describe("Files to upload as PR attachments"),
-      commentMarkdown: z.string().optional().describe("Markdown for a new PR comment thread. Use {{name}} (matching attachment.name) to embed attachment URLs."),
-      appendToDescription: z.string().optional().describe("Markdown to append to the PR's existing description. Use {{name}} placeholders for attachment URLs."),
+      appendToDescription: z.string().optional().describe("Markdown to append to the PR's existing description. Use {{name}} placeholders for attachment URLs. If omitted, a simple attachment section is appended."),
     },
   }, async (input, extras) => {
     const result = await prAttach.attach({
       prId: input.prId,
       attachments: input.attachments,
-      commentMarkdown: input.commentMarkdown,
       appendToDescription: input.appendToDescription,
     }, extras.signal);
     return successResultWithDebug(logger, "ow-pr-attach", result);

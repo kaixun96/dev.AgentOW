@@ -53,7 +53,7 @@ If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You
 1. Get the debug link: call the `ow-debuglink` MCP tool with the test page URL → `fullTestUrl` (local PR build via the running `rush start`).
    - If `ow-debuglink` is unavailable, returns no `fullTestUrl`, or the dev server is not ready, return `FAIL` with blocker `visual-validation-debug-link-missing`.
 2. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
-   - If browser tools are unavailable, return `FAIL` with blocker `playwright-tools-unavailable`.
+   - If browser tools are unavailable, do **not** stop at `playwright-tools-unavailable`. Use the FIC fallback below first.
    - If an AAD/login/consent page blocks access, return `FAIL` with blocker `playwright-auth-required` and tell the user exactly what page/prompt was seen.
 3. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
 4. `browser_screenshot` → save BEFORE to `<sessionDir>/evaluation/iter<N>/before-<component>.png`.
@@ -64,6 +64,25 @@ If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 AFTER captured — <path>`.
 7. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
+
+### FIC fallback when Playwright MCP/browser tools are unavailable
+
+Playwright MCP is convenient, but it is not the only screenshot path. If `browser_*` / `sp_navigate` tools are missing or the MCP server is not loaded, run a temporary repo Playwright spec through Heft so FIC auth is initialized:
+
+```bash
+cd <playwright project>
+PLAYWRIGHT_FIC_AUTH_MODE=required rushx playwright --grep "<unique probe title>" --project chrome
+```
+
+Rules for this fallback:
+- Use the PR's **SP-Client Validation CDN debug query** from the PR thread when a PR exists. Do not prefer localhost debug query for final PR screenshots; localhost often requires extra TLS / assembly consent and can fail in a fresh codespace.
+- If using a debug query, accept the SharePoint debug consent dialog before probing. Match both resource-key and English names: `/debugManifestLoadingConfirm|Allow|Load debug|Load/i`.
+- Use a real SharePoint page URL, usually `.../SitePages/Home.aspx`, not just the site root.
+- If the surface is flight-gated, force **all** prerequisite flights in both BEFORE and AFTER URLs. Example: Create group panel needs `1075` for the Create Site button; AFTER additionally enables `1535`.
+- `SPPageProvider.loadPageAsync()` may finish authentication on `/_api/SP.Directory.DirectorySession/me` because its login check compares origin. After `loadPageAsync(targetUrl, { user })`, explicitly call `page.goto(targetUrl)` before looking for the UI.
+- Save screenshots under `<sessionDir>/evaluation/iter<N>/` and report the same `visualValidation.beforePath` / `afterPath` fields as the MCP path.
+
+Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed. A missing Playwright MCP plugin is not a FIC failure.
 
 If the surface needs tenant state mutation (created pages, seeded data), clean it up before returning — the synthetic tenant is shared.
 

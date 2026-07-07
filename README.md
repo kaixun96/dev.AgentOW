@@ -204,7 +204,7 @@ Three-layer harness:
 | `ow-git` | Run git commands with structured output |
 | `ow-session-{open,send,capture,list,kill,interrupt}` | tmux pane control |
 | `ow-pr-create` | Push branch + create draft PR on Azure DevOps |
-| `ow-pr-attach` | Upload screenshots to a PR; append to description or post a comment |
+| `ow-pr-attach` | Upload screenshots to a PR and append them to the PR description; never posts comments |
 | `ow-recipe-lint` | Run deterministic Tier 1 SPDS / ReplaceComponent recipe checks on a PR or local files |
 | `ow-version` | Check plugin version and update availability |
 

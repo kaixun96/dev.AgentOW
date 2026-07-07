@@ -30495,19 +30495,45 @@ function execCmd2(cmd, cwd, signal) {
     });
   });
 }
-async function getAdoToken(signal) {
+async function getAdoAuthorizationHeader(cwd, signal) {
   const result = await execCmd2(
     "az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv",
-    process.cwd(),
+    cwd,
     signal
   );
-  if (result.exitCode !== 0 || !result.stdout.trim()) {
-    throw new Error(
-      `Failed to get ADO access token via 'az account get-access-token'. Ensure you have run 'az login' for the Microsoft tenant.
-${result.stderr}`
-    );
+  if (result.exitCode === 0 && result.stdout.trim()) {
+    return `Bearer ${result.stdout.trim()}`;
   }
-  return result.stdout.trim();
+  const credentialResult = await execCmd2(
+    "printf 'protocol=https\\nhost=onedrive.visualstudio.com\\n\\n' | git credential fill",
+    cwd,
+    signal
+  );
+  const credentialPassword = extractCredentialPassword(credentialResult.stdout);
+  if (credentialResult.exitCode === 0 && credentialPassword) {
+    return `Basic ${Buffer.from(`:${credentialPassword}`).toString("base64")}`;
+  }
+  throw new Error(
+    `Failed to authenticate to Azure DevOps. Tried 'az account get-access-token' and git credential fill for onedrive.visualstudio.com.
+az stderr:
+${result.stderr}
+
+git credential stderr:
+${credentialResult.stderr}`
+  );
+}
+function extractCredentialPassword(credentialOutput) {
+  let position = 0;
+  while (position < credentialOutput.length) {
+    const nextNewline = credentialOutput.indexOf("\n", position);
+    const end = nextNewline === -1 ? credentialOutput.length : nextNewline;
+    const line = credentialOutput.slice(position, end);
+    if (line.startsWith("password=")) {
+      return line.slice("password=".length);
+    }
+    position = end + 1;
+  }
+  return void 0;
 }
 function replacePlaceholders(text, uploaded) {
   let out = text;
@@ -30524,7 +30550,7 @@ var PrAttach = class {
   cwd;
   logger;
   async attach(input, signal) {
-    const token = await getAdoToken(signal);
+    const authorizationHeader = await getAdoAuthorizationHeader(this.cwd, signal);
     const baseUrl = `${ADO_ORG2}/${ADO_PROJECT2}/_apis/git/repositories/${ODSP_WEB_REPO_ID2}/pullRequests/${input.prId}`;
     const uploaded = [];
     for (const att of input.attachments) {
@@ -30534,7 +30560,7 @@ var PrAttach = class {
       const resp = await fetch(uploadUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "Authorization": authorizationHeader,
           "Content-Type": "application/octet-stream"
         },
         body: new Uint8Array(fileData),
@@ -30553,34 +30579,12 @@ var PrAttach = class {
       this.logger?.info("pr-attach", `uploaded ${att.name} -> ${url3}`);
     }
     let commentPosted = false;
-    if (input.commentMarkdown) {
-      const content = replacePlaceholders(input.commentMarkdown, uploaded);
-      const threadUrl = `${baseUrl}/threads?api-version=${API_VERSION}`;
-      const resp = await fetch(threadUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          comments: [{ parentCommentId: 0, content, commentType: 1 }],
-          status: 1
-          // active
-        }),
-        signal
-      });
-      if (!resp.ok) {
-        const errBody = await resp.text();
-        throw new Error(`Failed to post PR comment (HTTP ${resp.status}): ${errBody}`);
-      }
-      commentPosted = true;
-      this.logger?.info("pr-attach", `comment posted on PR #${input.prId}`);
-    }
     let descriptionUpdated = false;
-    if (input.appendToDescription) {
+    const descriptionAppend = buildDescriptionAppend(input, uploaded);
+    if (descriptionAppend) {
       const getUrl = `${baseUrl}?api-version=${API_VERSION}`;
       const getResp = await fetch(getUrl, {
-        headers: { "Authorization": `Bearer ${token}` },
+        headers: { "Authorization": authorizationHeader },
         signal
       });
       if (!getResp.ok) {
@@ -30589,12 +30593,14 @@ var PrAttach = class {
       }
       const pr = await getResp.json();
       const existing = pr.description ?? "";
-      const append = replacePlaceholders(input.appendToDescription, uploaded);
-      const newDescription = existing.trim() + "\n\n" + append;
+      const append = replacePlaceholders(descriptionAppend, uploaded);
+      const newDescription = existing.trim() ? `${existing.trim()}
+
+${append}` : append;
       const patchResp = await fetch(getUrl, {
         method: "PATCH",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "Authorization": authorizationHeader,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ description: newDescription }),
@@ -30615,6 +30621,26 @@ var PrAttach = class {
     };
   }
 };
+function buildDescriptionAppend(input, uploaded) {
+  const sections = [];
+  if (input.appendToDescription?.trim()) {
+    sections.push(input.appendToDescription.trim());
+  }
+  if (input.commentMarkdown?.trim()) {
+    sections.push(input.commentMarkdown.trim());
+  }
+  if (sections.length > 0) {
+    return sections.join("\n\n");
+  }
+  if (uploaded.length === 0) {
+    return void 0;
+  }
+  const lines = ["## Visual Validation Attachments", ""];
+  for (const { name } of uploaded) {
+    lines.push(`- [${name}]({{${name}}})`);
+  }
+  return lines.join("\n");
+}
 
 // src/ow/tools/debugLink.ts
 function extractDebugLinks(rushOutput) {
@@ -31026,21 +31052,19 @@ function registerOwTools(server2, logger2, logDir) {
     return successResultWithDebug(logger2, "ow-pr-create", result);
   });
   registerMcpTool(server2, "ow-pr-attach", {
-    description: "Upload files (typically PNG screenshots) as attachments to an existing PR on Azure DevOps, then optionally append a comment or extend the PR description. Use {{name}} placeholders in commentMarkdown / appendToDescription to reference uploaded attachment URLs.",
+    description: "Upload files (typically PNG screenshots) as attachments to an existing PR on Azure DevOps, then append them to the PR description. Never posts PR comments. Use {{name}} placeholders in appendToDescription to reference uploaded attachment URLs.",
     inputSchema: {
       prId: external_exports3.number().describe("Pull request ID to attach files to"),
       attachments: external_exports3.array(external_exports3.object({
         name: external_exports3.string().describe("Filename used on ADO, e.g. 'before-pr2219557.png'"),
         localPath: external_exports3.string().describe("Absolute path to the local file to upload")
       })).describe("Files to upload as PR attachments"),
-      commentMarkdown: external_exports3.string().optional().describe("Markdown for a new PR comment thread. Use {{name}} (matching attachment.name) to embed attachment URLs."),
-      appendToDescription: external_exports3.string().optional().describe("Markdown to append to the PR's existing description. Use {{name}} placeholders for attachment URLs.")
+      appendToDescription: external_exports3.string().optional().describe("Markdown to append to the PR's existing description. Use {{name}} placeholders for attachment URLs. If omitted, a simple attachment section is appended.")
     }
   }, async (input, extras) => {
     const result = await prAttach.attach({
       prId: input.prId,
       attachments: input.attachments,
-      commentMarkdown: input.commentMarkdown,
       appendToDescription: input.appendToDescription
     }, extras.signal);
     return successResultWithDebug(logger2, "ow-pr-attach", result);
@@ -31079,7 +31103,7 @@ You are connected to the ow MCP server \u2014 a dev toolkit for odsp-web develop
 
 ### PR Creation
 - ow-pr-create       \u2014 Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
-- ow-pr-attach       \u2014 Upload screenshots/files as attachments to an existing PR; optionally append to description or post a comment with the attachment URLs.
+- ow-pr-attach       \u2014 Upload screenshots/files as attachments to an existing PR and append them to the PR description. It never posts PR comments.
 
 ## Development Loop
 

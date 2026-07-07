@@ -555,6 +555,8 @@ Capture the returned `prId` and `prUrl`.
 
 Comments are second-class — reviewers scanning the PR list see the description, not buried comment threads. If you find yourself drafting a `commentMarkdown` payload, stop and put it in `appendToDescription` instead. There is no scenario in which `commentMarkdown` is correct for this pipeline. The previous behavior of posting findings summaries to a comment thread (PR 2242096 / earlier sessions) was wrong and is no longer permitted.
 
+The `ow-pr-attach` tool enforces this at runtime: legacy `commentMarkdown` input is folded into the PR description and no comment is posted. Still, orchestrator prompts must not pass `commentMarkdown`; use one `appendToDescription` payload.
+
 **One single `ow-pr-attach` call per PR.** Bundle ALL screenshots into the `attachments` array and ALL evaluator output (screenshots table + rule findings + vision findings + runner cmd) into one `appendToDescription` payload. Do NOT make two ow-pr-attach calls (one for screenshots, one for findings) — that produces a fragmented PR and tempts the second call to drop into `commentMarkdown`.
 
 Read the evaluator's last NDJSON line. If `visualValidation.status == "captured"`, attach the BEFORE/AFTER screenshots AND both rule + vision findings summaries to the PR description in ONE call:

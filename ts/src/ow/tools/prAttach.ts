@@ -9,7 +9,7 @@ export interface PrAttachInput {
     name: string;        // filename used on ADO, e.g. "before-pr2219557.png"
     localPath: string;   // absolute path to the local PNG
   }>;
-  commentMarkdown?: string;     // post as a new PR comment; use {{name}} placeholders for attachments
+  commentMarkdown?: string;     // legacy input: folded into the PR description; never posted as a comment
   appendToDescription?: string; // append to existing PR description (also supports {{name}} placeholders)
 }
 
@@ -33,18 +33,45 @@ function execCmd(cmd: string, cwd: string, signal?: AbortSignal): Promise<{ exit
   });
 }
 
-async function getAdoToken(signal?: AbortSignal): Promise<string> {
+async function getAdoAuthorizationHeader(cwd: string, signal?: AbortSignal): Promise<string> {
   const result = await execCmd(
     "az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv",
-    process.cwd(),
+    cwd,
     signal,
   );
-  if (result.exitCode !== 0 || !result.stdout.trim()) {
-    throw new Error(
-      `Failed to get ADO access token via 'az account get-access-token'. Ensure you have run 'az login' for the Microsoft tenant.\n${result.stderr}`,
-    );
+  if (result.exitCode === 0 && result.stdout.trim()) {
+    return `Bearer ${result.stdout.trim()}`;
   }
-  return result.stdout.trim();
+
+  const credentialResult = await execCmd(
+    "printf 'protocol=https\\nhost=onedrive.visualstudio.com\\n\\n' | git credential fill",
+    cwd,
+    signal,
+  );
+  const credentialPassword: string | undefined = extractCredentialPassword(credentialResult.stdout);
+  if (credentialResult.exitCode === 0 && credentialPassword) {
+    return `Basic ${Buffer.from(`:${credentialPassword}`).toString("base64")}`;
+  }
+
+  throw new Error(
+    `Failed to authenticate to Azure DevOps. Tried 'az account get-access-token' and git credential fill for onedrive.visualstudio.com.\n` +
+    `az stderr:\n${result.stderr}\n\n` +
+    `git credential stderr:\n${credentialResult.stderr}`,
+  );
+}
+
+function extractCredentialPassword(credentialOutput: string): string | undefined {
+  let position = 0;
+  while (position < credentialOutput.length) {
+    const nextNewline = credentialOutput.indexOf("\n", position);
+    const end = nextNewline === -1 ? credentialOutput.length : nextNewline;
+    const line = credentialOutput.slice(position, end);
+    if (line.startsWith("password=")) {
+      return line.slice("password=".length);
+    }
+    position = end + 1;
+  }
+  return undefined;
 }
 
 function replacePlaceholders(text: string, uploaded: Array<{ name: string; url: string }>): string {
@@ -62,7 +89,7 @@ export class PrAttach {
   ) {}
 
   async attach(input: PrAttachInput, signal?: AbortSignal): Promise<PrAttachResult> {
-    const token = await getAdoToken(signal);
+    const authorizationHeader = await getAdoAuthorizationHeader(this.cwd, signal);
     const baseUrl = `${ADO_ORG}/${ADO_PROJECT}/_apis/git/repositories/${ODSP_WEB_REPO_ID}/pullRequests/${input.prId}`;
 
     // 1. Upload each attachment
@@ -75,7 +102,7 @@ export class PrAttach {
       const resp = await fetch(uploadUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "Authorization": authorizationHeader,
           "Content-Type": "application/octet-stream",
         },
         body: new Uint8Array(fileData),
@@ -96,38 +123,18 @@ export class PrAttach {
       this.logger?.info("pr-attach", `uploaded ${att.name} -> ${url}`);
     }
 
-    // 2. Optionally post a comment thread
+    // 2. Never post comments from this tool. Legacy callers that still pass
+    // commentMarkdown are folded into the description instead.
     let commentPosted = false;
-    if (input.commentMarkdown) {
-      const content = replacePlaceholders(input.commentMarkdown, uploaded);
-      const threadUrl = `${baseUrl}/threads?api-version=${API_VERSION}`;
-      const resp = await fetch(threadUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          comments: [{ parentCommentId: 0, content, commentType: 1 }],
-          status: 1, // active
-        }),
-        signal,
-      });
-      if (!resp.ok) {
-        const errBody = await resp.text();
-        throw new Error(`Failed to post PR comment (HTTP ${resp.status}): ${errBody}`);
-      }
-      commentPosted = true;
-      this.logger?.info("pr-attach", `comment posted on PR #${input.prId}`);
-    }
 
-    // 3. Optionally update description
+    // 3. Always update the description for screenshots/attachments.
     let descriptionUpdated = false;
-    if (input.appendToDescription) {
+    const descriptionAppend = buildDescriptionAppend(input, uploaded);
+    if (descriptionAppend) {
       // Fetch current PR to get existing description
       const getUrl = `${baseUrl}?api-version=${API_VERSION}`;
       const getResp = await fetch(getUrl, {
-        headers: { "Authorization": `Bearer ${token}` },
+        headers: { "Authorization": authorizationHeader },
         signal,
       });
       if (!getResp.ok) {
@@ -137,13 +144,13 @@ export class PrAttach {
       const pr = await getResp.json() as { description?: string };
       const existing = pr.description ?? "";
 
-      const append = replacePlaceholders(input.appendToDescription, uploaded);
-      const newDescription = existing.trim() + "\n\n" + append;
+      const append = replacePlaceholders(descriptionAppend, uploaded);
+      const newDescription = existing.trim() ? `${existing.trim()}\n\n${append}` : append;
 
       const patchResp = await fetch(getUrl, {
         method: "PATCH",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "Authorization": authorizationHeader,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ description: newDescription }),
@@ -164,4 +171,29 @@ export class PrAttach {
       descriptionUpdated,
     };
   }
+}
+
+function buildDescriptionAppend(
+  input: PrAttachInput,
+  uploaded: Array<{ name: string; url: string }>,
+): string | undefined {
+  const sections: string[] = [];
+  if (input.appendToDescription?.trim()) {
+    sections.push(input.appendToDescription.trim());
+  }
+  if (input.commentMarkdown?.trim()) {
+    sections.push(input.commentMarkdown.trim());
+  }
+  if (sections.length > 0) {
+    return sections.join("\n\n");
+  }
+  if (uploaded.length === 0) {
+    return undefined;
+  }
+
+  const lines: string[] = ["## Visual Validation Attachments", ""];
+  for (const { name } of uploaded) {
+    lines.push(`- [${name}]({{${name}}})`);
+  }
+  return lines.join("\n");
 }

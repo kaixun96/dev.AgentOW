@@ -83,7 +83,7 @@ If a phase fails, write the failure line immediately with the concrete reason. D
 
 For any visible UI change, Playwright screenshots are mandatory. The evaluator must capture BEFORE and AFTER screenshots unless the plan explicitly proves there is no UI surface (`Pattern: skip`) or a Pattern D dependency is probed and confirmed unreachable.
 
-If Playwright/browser tools are unavailable, authentication blocks the page, the debug link cannot be built, the selector cannot be found, the discriminator does not match, or `browser_screenshot` does not produce files, the evaluator must return `FAIL` with a specific reason. Do not claim visual verification passed without screenshot paths.
+If Playwright MCP/browser tools are unavailable, the evaluator must first try the FIC Playwright fallback (`rushx playwright` / Heft) before returning a tooling failure. If authentication blocks the page, the debug link cannot be built, the selector cannot be found after all prerequisite flights are forced, the discriminator does not match, or no screenshot path is produced, the evaluator must return `FAIL` with a specific reason. Do not claim visual verification passed without screenshot paths.
 
 ## The pipeline
 

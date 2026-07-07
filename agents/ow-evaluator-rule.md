@@ -167,6 +167,22 @@ Recipe: read the plan's affected files; if any path matches the table, the spec 
 
 If you find yourself writing any of the above strings, STOP and run the probe in step 4 first.
 
+**FIC fallback is mandatory when Playwright MCP is missing.** Browser MCP availability is a session/plugin detail; FIC is the repo's stable non-interactive screenshot path. If `browser_*` or `sp_navigate` tools are unavailable, write and run a temporary Playwright spec via `rushx playwright` / `heft playwright` before returning `playwright-tools-unavailable`.
+
+Precedent from PR 2282732 (CreateGroupPanel, 2026-07-07):
+- `playwright-mcp-servers` was not loaded, but `~/.rush-user/credentials.json` existed and FIC worked.
+- A direct smoke run with `PLAYWRIGHT_FIC_AUTH_MODE=required rushx playwright --project chrome` authenticated and loaded real SharePoint pages.
+- The first CreateGroupPanel probes failed for procedural reasons, not auth: using localhost debug query caused debug consent / assembly-load friction; using the site root did not render the target; and the Create Site button was hidden until prerequisite flight **1075** was forced.
+- The successful capture used the PR's SP-Client Validation CDN query, loaded `.../SitePages/Home.aspx`, accepted the debug-consent button matching `/debugManifestLoadingConfirm|Allow|Load debug|Load/i`, forced `debugFlights=1075` for BEFORE and `debugFlights=1075,1535` for AFTER, then clicked `[data-automationid="CreateSiteSiteButton"]`.
+- `SPPageProvider.loadPageAsync()` can leave the page on `/_api/SP.Directory.DirectorySession/me` after FIC auth because its SharePoint login check compares origin only. Always call `page.goto(targetUrl)` after `loadPageAsync(targetUrl, { user })` before probing selectors.
+
+Do not report any of these as final blockers until the FIC fallback has tried the corrective step above:
+- missing Playwright MCP/browser tools
+- debug consent dialog present
+- site root shows blank app shell
+- target button hidden in default tenant state
+- page snapshot points at `/_api/SP.Directory.DirectorySession/me`
+
 ### Step R-2.5b: Flight-/elevation-gated surface? FORCE the gating flights BEFORE you ever write `skip` / `un-reproducible` (MANDATORY)
 
 A surface that does not render in the **default** tenant state is NOT "un-reproducible" — it is "not-yet-forced". `skip` is a last resort, allowed ONLY after you have genuinely exhausted capture. Before ANY `skip` / `un-reproducible host` / `non-elevated standalone` verdict you MUST:
