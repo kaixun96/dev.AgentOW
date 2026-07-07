@@ -208,6 +208,10 @@ Three-layer harness:
 | `ow-recipe-lint` | Run deterministic Tier 1 SPDS / ReplaceComponent recipe checks on a PR or local files |
 | `ow-version` | Check plugin version and update availability |
 
+Operational notes:
+- MCP tool timeout is not automatically a Rush failure. Long `rush build -t @msinternal/sp-pages` / `rush start` runs can outlive the MCP request; agents should track the underlying process and read Rush summaries before deciding.
+- Local `rush start` debug links are implementation-smoke evidence. Final PR screenshots should use the PR's SP-Client Validation CDN debug query through the evaluator/FIC path when available.
+
 ### Agents
 
 | Agent | Role |

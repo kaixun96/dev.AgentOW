@@ -579,6 +579,7 @@ ow-pr-attach({
 - **Pattern**: <visualValidation.pattern>
 - **Component**: <visualValidation.component>
 - **Trigger selector**: \`<visualValidation.selector>\`
+- **Screenshot source**: \`<visualValidation.source>\`
 
 ### Rule evaluator findings
 - Verdict: **<rule.verdict>** (<rule.blockers> blockers, <rule.warnings> warnings)
@@ -626,6 +627,8 @@ Manual screenshot recommended.
 `
 })
 ```
+
+For UI PRs, if the only captured screenshots are `visualValidation.source="local-rush-start"` and a PR has been created, run a final evaluator pass with `finalValidationMode=pr-cdn-fic` before attaching screenshots. Localhost failures such as `ERR_CERT_AUTHORITY_INVALID` / `assemblyLoadFailure` are not product failures; they are a signal to switch to PR CDN validation.
 
 Write progress:
 ```bash

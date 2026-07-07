@@ -110,8 +110,9 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 3. **rush update** (via `ow-rush`) if you changed any `package.json`.
 4. **Build:** `ow-build` on the affected project. If it fails:
    - Classify: rush infra error (`shrinkwrap-deps.json` missing, `inputsSnapshot not found`) → run `ow-rush install` once, retry. Auth/network error → stop and report. Code error → fix and rebuild (max 3 attempts).
+   - If the MCP request times out but a `rush build -t <project>` process is still running, do **not** treat it as build failure. Log `⚠️ Build tool timeout — tracking underlying Rush process`, wait for the real Rush process to exit, then read `common/temp/markdown-summary/build-summary.md` and the raw log. Record this in `agent-metrics.md` as `tool-timeout / self-recovered-by-process-tracking`.
 5. **Test:** `ow-test` scoped to the changed modules (not the full suite). If no tests exist for the modules, note it; don't run 600 unrelated tests.
-6. **Dev server:** `ow-start` on the project; poll `ow-session-capture` on `agentow:rush` until `[WATCHING]`. Extract the debug link with `ow-debuglink`.
+6. **Dev server (implementation smoke only):** `ow-start` on the project; poll `ow-session-capture` on `agentow:rush` until `[WATCHING]`. Extract the debug link with `ow-debuglink`. Screenshots taken from localhost/rush-start are **smoke evidence only**. If localhost debug fails on a real SharePoint tenant (`ERR_CERT_AUTHORITY_INVALID`, `assemblyLoadFailure`, debug consent, or missing bundle), proceed to PR creation and use PR CDN validation instead of looping on localhost.
 7. **Commit** (don't push yet).
 
 Write progress events for branch/build/test/dev-server/debug-link/commit using the exact event contract. If any step fails, log the failure before attempting recovery.
@@ -133,9 +134,10 @@ Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
 
 Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, cycle number, debug link, `sessionDir`, `reportFile`, `progressLog`, and `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for PASS/FAIL + blockers.
 
-For UI-visible changes, visual validation is mandatory:
+For UI-visible changes, visual validation is mandatory and the evaluator owns it:
 - BEFORE and AFTER screenshot paths must be present in the evaluator result.
 - If screenshots are missing, visual validation failed, or the evaluator says Playwright/browser tools were unavailable, treat the evaluator result as **FAIL** even if code inspection passed.
+- Screenshots created manually by the main session do **not** satisfy evaluator validation. If the main session writes a temporary spec to unblock an investigation, move that logic into the evaluator retry prompt and re-dispatch the evaluator.
 - Surface the exact failure reason to the user and record it in `progress.log`, `report.json`, and `final.md` if the run stops.
 - Do not claim the UI was verified without screenshot evidence.
 
@@ -178,8 +180,9 @@ Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat r
 ## Step 8: Ship
 
 1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no auto-generated "Testing" section).
-2. **Attach screenshots** for UI changes. If the evaluator did not capture BEFORE/AFTER screenshots, do not present the run as visually verified; include the visual-validation failure reason in the PR description only if the user explicitly chooses to ship a draft anyway.
-3. **Report** the PR URL to the user.
+2. **Final PR visual validation for UI changes:** after PR creation, wait for the PR's `SP-Client Validation` CDN debug query in PR threads. Dispatch the evaluator again with `finalValidationMode=pr-cdn-fic`, `prId`, `prUrl`, `sessionDir`, and the visual surface trace. The evaluator must capture final BEFORE/AFTER screenshots using the PR CDN query (or explicitly fail with the reason). Localhost/rush-start screenshots are not final PR screenshots when a PR CDN query exists.
+3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. If the evaluator did not capture BEFORE/AFTER screenshots, do not present the run as visually verified; include the visual-validation failure reason in the PR description only if the user explicitly chooses to ship a draft anyway.
+4. **Report** the PR URL to the user.
 
 Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status, PR URL if any, screenshot paths if captured, and any remaining blockers.
 

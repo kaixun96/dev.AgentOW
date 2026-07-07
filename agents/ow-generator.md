@@ -195,6 +195,7 @@ These need human intervention. Do NOT retry.
 | `RUSH_BUILD_CACHE_CREDENTIAL` expired/invalid | Skip build cache: set `RUSH_BUILD_CACHE_ENABLED=false`, retry once. If still fails → 7c |
 | `npm error code E401` (ADO npm auth) | Report immediately as failure (7c) — auth must be fixed manually |
 | Network timeout / DNS failure | Wait 30s, retry once. If still fails → 7c |
+| MCP `ow-build` timeout but Rush process still running | Keep tracking the underlying Rush process; read `common/temp/markdown-summary/build-summary.md` and raw log when it exits. Do NOT mark build failed from MCP timeout alone. |
 
 #### 7c. Code errors (the normal case)
 

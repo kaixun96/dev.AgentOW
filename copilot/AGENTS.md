@@ -114,6 +114,7 @@ The `agentow` skill walks you through this in detail. It auto-loads when the use
 - **Surgical changes** — every changed line traces to the request. Don't refactor adjacent code, don't fix unrelated dead code (mention it instead).
 - **Follow existing patterns** — search odsp-web first; never hand-craft what the monorepo already provides. Match local naming, imports, error handling.
 - **Evidence before claims** — run `ow-build` / `ow-test` and read the output before saying it works. "Should work" / "seems fine" = unverified assumption.
+- **Tool timeout ≠ operation failure** — if `ow-build` / `ow-rush` times out at the MCP layer, check whether the underlying Rush process is still running and wait for the real result. Use `common/temp/markdown-summary/build-summary.md` and raw logs before classifying the build.
 - **Verifiers verify independently** — subagents read the actual code, not your self-report.
 - **Surface, don't hide** — state assumptions explicitly. In interactive mode, ask when uncertain. In auto mode, record the assumption in the plan so the user can audit it after.
 - **Progress before action** — before each major tool/action, write the matching `progress.log` event so the user can follow the run from the file alone.

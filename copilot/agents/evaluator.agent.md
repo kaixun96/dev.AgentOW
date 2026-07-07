@@ -40,6 +40,8 @@ The dispatcher gives you:
 - `progressLog` — user-visible progress log
 - `artifactPath` — `evaluation/iter<N>/evaluator-report.md`
 - `debugUrl` — debug URL/query from the implementer, if already known
+- `finalValidationMode` — optional. If `pr-cdn-fic`, this is final PR validation and screenshots must use the PR SP-Client Validation CDN debug query, not localhost.
+- `prId` / `prUrl` — optional PR identity for fetching SP-Client Validation debug query.
 
 ## Procedure
 
@@ -50,18 +52,21 @@ Use `view` / `grep` to confirm the changed code matches the intent and the accep
 
 If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You may skip screenshots only when `surfaceTrace` is explicitly `Pattern: skip` with a non-UI/server-side reason, or `Pattern: D` has been probed and confirmed unreachable. If unsure whether the change is visible, treat it as visible and attempt screenshots.
 
-1. Get the debug link: call the `ow-debuglink` MCP tool with the test page URL → `fullTestUrl` (local PR build via the running `rush start`).
+1. Determine screenshot source:
+   - If `finalValidationMode == "pr-cdn-fic"` or a `prUrl` is provided, fetch the PR thread's **SP-Client Validation** query string and use that for AFTER. This is the final PR evidence path.
+   - Otherwise, get the local debug link: call the `ow-debuglink` MCP tool with the test page URL → `fullTestUrl` (local PR build via the running `rush start`). Localhost screenshots are implementation smoke evidence, not final PR evidence once a PR CDN query exists.
+2. Get the debug link/query:
    - If `ow-debuglink` is unavailable, returns no `fullTestUrl`, or the dev server is not ready, return `FAIL` with blocker `visual-validation-debug-link-missing`.
-2. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
+3. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
    - If browser tools are unavailable, do **not** stop at `playwright-tools-unavailable`. Use the FIC fallback below first.
    - If an AAD/login/consent page blocks access, return `FAIL` with blocker `playwright-auth-required` and tell the user exactly what page/prompt was seen.
-3. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
+4. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
    - If the surface hosts an iframe or another async shell, the outer Drawer/Dialog/Modal is not enough. Wait for the inner discriminator or iframe content to be visible before taking screenshots.
-4. `browser_screenshot` → save BEFORE to `<sessionDir>/evaluation/iter<N>/before-<component>.png`.
+5. `browser_screenshot` → save BEFORE to `<sessionDir>/evaluation/iter<N>/before-<component>.png`.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `before-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 BEFORE captured — <path>`.
-5. `browser_navigate` to `fullTestUrl` (debug params) → AFTER. Same setup + click. Verify discriminator again.
-6. `browser_screenshot` → save AFTER to `<sessionDir>/evaluation/iter<N>/after-<component>.png`.
+6. `browser_navigate` to the AFTER URL (local `fullTestUrl` or PR CDN query) → AFTER. Same setup + click. Verify discriminator again.
+7. `browser_screenshot` → save AFTER to `<sessionDir>/evaluation/iter<N>/after-<component>.png`.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 AFTER captured — <path>`.
 7. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
@@ -83,6 +88,7 @@ Rules for this fallback:
 - `SPPageProvider.loadPageAsync()` may finish authentication on `/_api/SP.Directory.DirectorySession/me` because its login check compares origin. After `loadPageAsync(targetUrl, { user })`, explicitly call `page.goto(targetUrl)` before looking for the UI.
 - For iframe-backed surfaces, wait for the iframe content, not just the chrome. Example: CreateGroupPanel opens the Drawer/Modal before `CreateGroup.aspx` finishes; if the screenshot is mostly blank white, the probe is too early. Wait for `iframe[src*="CreateGroup.aspx"]`, then its frame `load` state and non-empty body text, or a surface-specific readiness signal such as `CreateSiteReady`.
 - Save screenshots under `<sessionDir>/evaluation/iter<N>/` and report the same `visualValidation.beforePath` / `afterPath` fields as the MCP path.
+- Set `visualValidation.source` to `pr-cdn-fic`, `local-rush-start`, or `playwright-mcp`. Final PR validation should be `pr-cdn-fic` when a PR exists.
 
 Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed. A missing Playwright MCP plugin is not a FIC failure.
 
@@ -114,7 +120,7 @@ A criterion is PASS only with concrete evidence. "Looks right" is not evidence. 
 Write `artifactPath` with the full report. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","artifactPath":"<artifactPath>","visualValidation":{"status":"captured|skipped|failed","beforePath":"<absolute path>","afterPath":"<absolute path>","reasonForSkipOrFail":"<required if not captured>"},"blockers":[{"description":"<failure>","suggestedFix":"<specific next action>"}]}
+{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","artifactPath":"<artifactPath>","visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start|playwright-mcp","beforePath":"<absolute path>","afterPath":"<absolute path>","reasonForSkipOrFail":"<required if not captured>"},"blockers":[{"description":"<failure>","suggestedFix":"<specific next action>"}]}
 ```
 
 For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured` and both `beforePath` and `afterPath` are populated.
