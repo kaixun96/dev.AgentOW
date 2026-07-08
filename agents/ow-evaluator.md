@@ -226,7 +226,7 @@ Read the plan file. If it contains a `## Visual Validation` section with `Patter
 8. `browser_screenshot()` — save to `<sessionDir>/evaluation/iter<N>/before-<component>.png`
 
 **AFTER**:
-1. If this is final PR validation, use the PR's SP-Client Validation CDN debug query from PR threads. If this is implementation smoke before PR creation, get `fullTestUrl` from `ow-debuglink(sharePointPageUrl=<testPage>)` — this prepends the localhost debug query string to the test page URL.
+1. Prefer `fullTestUrl` from `ow-debuglink(sharePointPageUrl=<testPage>)` — this prepends the localhost debug query string to the test page URL and is available immediately after `rush start`. Use the PR's SP-Client Validation CDN debug query only if local debug validation fails or the orchestrator explicitly passes `finalValidationMode=pr-cdn-fic`.
 2. `browser_navigate(url=<fullTestUrl>)`
 3. Allow the debug bundle prompt if it appears
 4. Same setup + click as BEFORE
@@ -236,7 +236,7 @@ Read the plan file. If it contains a `## Visual Validation` section with `Patter
 
 ⚠️ **Do NOT add `market=qps-ploc`** to the AFTER URL. It renders pseudo-localized text (Ĺōàď ďēb...) that pollutes the screenshots. The technical proof that the PR build loaded should come from the `prBuildCount > 0` console assertion in your verification (read it from `window`), not from visual pseudo-localization.
 
-Local `rush start` screenshots are useful smoke evidence, but they are not final PR evidence when a PR CDN query exists. Final PR description screenshots must come from the evaluator using PR CDN/FIC and must set `visualValidation.source="pr-cdn-fic"`.
+Local `rush start` screenshots are acceptable PR evidence when they are captured by the evaluator and the discriminator proves the right surface. Set `visualValidation.source="local-rush-start"`. Use `pr-cdn-fic` only as fallback or explicit final mode.
 
 **If discriminator does not match on either capture:** the plan's selector / expected container is wrong. Mark visual validation as FAILED with specific evidence of what was found vs expected. The generator's fix cycle will re-trigger the planner if needed.
 

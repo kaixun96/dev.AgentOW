@@ -53,8 +53,8 @@ Use `view` / `grep` to confirm the changed code matches the intent and the accep
 If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You may skip screenshots only when `surfaceTrace` is explicitly `Pattern: skip` with a non-UI/server-side reason, or `Pattern: D` has been probed and confirmed unreachable. If unsure whether the change is visible, treat it as visible and attempt screenshots.
 
 1. Determine screenshot source:
-   - If `finalValidationMode == "pr-cdn-fic"` or a `prUrl` is provided, fetch the PR thread's **SP-Client Validation** query string and use that for AFTER. This is the final PR evidence path.
-   - Otherwise, get the local debug link: call the `ow-debuglink` MCP tool with the test page URL → `fullTestUrl` (local PR build via the running `rush start`). Localhost screenshots are implementation smoke evidence, not final PR evidence once a PR CDN query exists.
+   - **Default / preferred:** use the local `rush start` debug link because it is available before PR validation builds finish. Call `ow-debuglink` with the test page URL → `fullTestUrl`.
+   - Use PR CDN only when `finalValidationMode == "pr-cdn-fic"` is explicitly requested, or when local debug validation already failed for environment/tooling reasons (localhost cert/assembly-load failure, missing local dev server, browser MCP unavailable with a FIC spec that must use PR CDN, etc.).
 2. Get the debug link/query:
    - If `ow-debuglink` is unavailable, returns no `fullTestUrl`, or the dev server is not ready, return `FAIL` with blocker `visual-validation-debug-link-missing`.
 3. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
@@ -81,7 +81,8 @@ PLAYWRIGHT_FIC_AUTH_MODE=required rushx playwright --grep "<unique probe title>"
 ```
 
 Rules for this fallback:
-- Use the PR's **SP-Client Validation CDN debug query** from the PR thread when a PR exists. Do not prefer localhost debug query for final PR screenshots; localhost often requires extra TLS / assembly consent and can fail in a fresh codespace.
+- Prefer the local `rush start` debug query when the dev server is available. It is faster than waiting for PR validation builds.
+- Use the PR's **SP-Client Validation CDN debug query** from the PR thread only if local debug validation fails or `finalValidationMode=pr-cdn-fic` is explicitly requested.
 - If using a debug query, accept the SharePoint debug consent dialog before probing. Match both resource-key and English names: `/debugManifestLoadingConfirm|Allow|Load debug|Load/i`.
 - Use a real SharePoint page URL, usually `.../SitePages/Home.aspx`, not just the site root.
 - If the surface is flight-gated, force **all** prerequisite flights in both BEFORE and AFTER URLs. Example: Create group panel needs `1075` for the Create Site button; AFTER additionally enables `1535`.
@@ -90,7 +91,7 @@ Rules for this fallback:
 - For liked-by/comment/reaction surfaces, plan for a **multi-user fixture**. Same-user likes often do not render the liked-by entry point (`likeCount - userLiked` can be zero). If `adminUser` + `nonAdminUser` cannot be acquired from TRIPS in prod/dogfood, report `fixtureGap: true` with `missingFixture="multi-user liked-comment page"` instead of retrying single-user probes.
 - For Planner/PlanCreation surfaces, the visible entry point is gated by both group connection and server farm setting `ExternalService_isplannerintegrationsupported`. A TEAM_SITE or group site alone is not enough. If the New menu lacks `CommandBarNewPlanButton` after testing prod/dogfood/msit and a group-connected site, report `fixtureGap: true` with `missingFixture="Planner-integrated group-connected site"`.
 - Save screenshots under `<sessionDir>/evaluation/iter<N>/` and report the same `visualValidation.beforePath` / `afterPath` fields as the MCP path.
-- Set `visualValidation.source` to `pr-cdn-fic`, `local-rush-start`, or `playwright-mcp`. Final PR validation should be `pr-cdn-fic` when a PR exists.
+- Set `visualValidation.source` to `pr-cdn-fic`, `local-rush-start`, or `playwright-mcp`. Prefer `local-rush-start` when it succeeds; use `pr-cdn-fic` as fallback or explicit final mode.
 
 Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed. A missing Playwright MCP plugin is not a FIC failure.
 

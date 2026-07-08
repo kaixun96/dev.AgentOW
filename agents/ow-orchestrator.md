@@ -628,7 +628,7 @@ Manual screenshot recommended.
 })
 ```
 
-For UI PRs, if the only captured screenshots are `visualValidation.source="local-rush-start"` and a PR has been created, run a final evaluator pass with `finalValidationMode=pr-cdn-fic` before attaching screenshots. Localhost failures such as `ERR_CERT_AUTHORITY_INVALID` / `assemblyLoadFailure` are not product failures; they are a signal to switch to PR CDN validation.
+For UI PRs, evaluator-captured `visualValidation.source="local-rush-start"` screenshots are sufficient and should be attached to the PR description. Run a second evaluator pass with `finalValidationMode=pr-cdn-fic` only when local debug validation failed or the user explicitly asks for PR CDN screenshots. Localhost failures such as `ERR_CERT_AUTHORITY_INVALID` / `assemblyLoadFailure` are not product failures; they are a signal to switch to PR CDN validation.
 
 Write progress:
 ```bash
