@@ -182,6 +182,7 @@ Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat r
 1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no auto-generated "Testing" section).
 2. **Final PR visual validation for UI changes:** after PR creation, wait for the PR's `SP-Client Validation` CDN debug query in PR threads. Dispatch the evaluator again with `finalValidationMode=pr-cdn-fic`, `prId`, `prUrl`, `sessionDir`, and the visual surface trace. The evaluator must capture final BEFORE/AFTER screenshots using the PR CDN query (or explicitly fail with the reason). Localhost/rush-start screenshots are not final PR screenshots when a PR CDN query exists.
 3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. If the evaluator did not capture BEFORE/AFTER screenshots, do not present the run as visually verified; include the visual-validation failure reason in the PR description only if the user explicitly chooses to ship a draft anyway.
+   - If visual validation fails because a surface needs seeded data (liked comments, reactions, campaign telemetry, etc.), write `fixtureGap: true` and the missing fixture in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success.
 4. **Report** the PR URL to the user.
 
 Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status, PR URL if any, screenshot paths if captured, and any remaining blockers.

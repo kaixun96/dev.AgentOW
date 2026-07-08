@@ -130,13 +130,24 @@ Before launching, append:
 After the process exits:
 
 1. Check exit code.
-2. Search the task log for an ADO PR URL:
+2. **Immediately check worktree cleanliness**, regardless of exit code. This is mandatory because a headless `/agentow` process can exit 0 after updating a PR but still leave thousands of unrelated files changed in the shared checkout.
+   ```bash
+   git -C /workspaces/odsp-web status --porcelain
+   ```
+   If any output is present:
+   ```bash
+   git -C /workspaces/odsp-web stash push -u -m "agentow-batch-task<i>-leftovers"
+   ```
+   Record the stash name and changed-file count in `summary.md` notes. Do this before preparing the next task.
+3. Search the task log for an ADO PR URL. Support both URL shapes:
    ```regex
    https://dev\.azure\.com/onedrive/ODSP-Web/_git/odsp-web/pullrequest/[0-9]+
+   https://onedrive\.visualstudio\.com/ODSP-Web/_git/odsp-web/pullrequest/[0-9]+
    ```
-3. Also search recent `.aero/*/final.md` and `progress.log` if the URL is not in stdout.
+4. Also search recent `.aero/*/final.md` and `progress.log` if the URL is not in stdout.
    - Limit this fallback search to `.aero` entries newer than the task start timestamp to avoid picking up a PR URL from a previous task.
-4. Record:
+   - Treat "Updated existing draft PR" as success if a PR URL is present; do not require newly-created PR wording.
+5. Record:
    - `success` if exit code is 0 and PR URL found
    - `completed-no-pr` if exit code is 0 but no PR URL found
    - `failed` if exit code is non-zero
