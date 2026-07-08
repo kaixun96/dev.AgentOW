@@ -8,6 +8,7 @@ import { TmuxManager } from "../tools/tmuxManager.js";
 import { GitClient } from "../tools/gitClient.js";
 import { PrClient } from "../tools/prClient.js";
 import { PrAttach } from "../tools/prAttach.js";
+import { AdoClient } from "../tools/adoClient.js";
 import { extractDebugLinks, fetchDebugUrlsFromLanding, buildDebugQueryString, buildFullTestUrl } from "../tools/debugLink.js";
 import { FileLogger, RawOutputLog } from "../../shared/logger.js";
 import {
@@ -39,6 +40,7 @@ export function registerOwTools(
   const git = new GitClient(OW.odspWebRoot);
   const pr = new PrClient(OW.odspWebRoot, logger);
   const prAttach = new PrAttach(OW.odspWebRoot, logger);
+  const ado = new AdoClient(OW.odspWebRoot);
 
   // ── 1. ow-status ──────────────────────────────────────────────────────────
   registerMcpTool(server, "ow-status", {
@@ -405,5 +407,16 @@ export function registerOwTools(
       appendToDescription: input.appendToDescription,
     }, extras.signal);
     return successResultWithDebug(logger, "ow-pr-attach", result);
+  });
+
+  // ── 17. ow-pr-debug-query ────────────────────────────────────────────────
+  registerMcpTool(server, "ow-pr-debug-query", {
+    description: "Fetch the SP-Client Validation CDN debug query from an Azure DevOps PR thread. Uses az token first, then git credential fallback. Also probes loader/manifests HTTP status.",
+    inputSchema: {
+      prId: z.number().describe("Pull request ID"),
+    },
+  }, async (input, extras) => {
+    const result = await ado.getPrDebugQuery(input.prId, extras.signal);
+    return successResultWithDebug(logger, "ow-pr-debug-query", result);
   });
 }

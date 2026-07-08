@@ -30190,7 +30190,7 @@ var RawOutputLog = class {
 };
 
 // src/ow/mcp/owTools.ts
-import * as cp6 from "child_process";
+import * as cp7 from "child_process";
 import * as fs4 from "fs";
 
 // src/shared/constants.ts
@@ -30642,6 +30642,126 @@ function buildDescriptionAppend(input, uploaded) {
   return lines.join("\n");
 }
 
+// src/ow/tools/adoClient.ts
+import * as cp6 from "child_process";
+var ODSP_WEB_REPO_ID3 = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
+var ADO_ORG3 = "https://dev.azure.com/onedrive";
+var ADO_PROJECT3 = "ODSP-Web";
+var API_VERSION2 = "7.1";
+var DEBUG_QUERY_PATTERN = /\?debug=true&noredir=true&loader=[^`\s]+&debugManifestsFile=[^`\s]+/;
+function execCmd3(cmd, cwd, signal) {
+  return new Promise((resolve) => {
+    cp6.exec(cmd, { cwd, signal, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+      resolve({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
+    });
+  });
+}
+function extractCredentialPassword2(credentialOutput) {
+  let position = 0;
+  while (position < credentialOutput.length) {
+    const nextNewline = credentialOutput.indexOf("\n", position);
+    const end = nextNewline === -1 ? credentialOutput.length : nextNewline;
+    const line = credentialOutput.slice(position, end);
+    if (line.startsWith("password=")) {
+      return line.slice("password=".length);
+    }
+    position = end + 1;
+  }
+  return void 0;
+}
+function splitDebugQueryUrls(debugQuery) {
+  const query = new URLSearchParams(debugQuery.replace(/^\?/, ""));
+  return {
+    loader: query.get("loader") ?? void 0,
+    manifests: query.get("debugManifestsFile") ?? void 0
+  };
+}
+async function fetchStatus(url3, signal) {
+  if (!url3) {
+    return void 0;
+  }
+  try {
+    const response = await fetch(url3, { method: "HEAD", signal });
+    return response.status;
+  } catch {
+    return void 0;
+  }
+}
+var AdoClient = class {
+  constructor(cwd = OW.odspWebRoot) {
+    this.cwd = cwd;
+  }
+  cwd;
+  async getAuthorizationHeader(signal) {
+    const tokenResult = await execCmd3(
+      "az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv",
+      this.cwd,
+      signal
+    );
+    if (tokenResult.exitCode === 0 && tokenResult.stdout.trim()) {
+      return `Bearer ${tokenResult.stdout.trim()}`;
+    }
+    const credentialResult = await execCmd3(
+      "printf 'protocol=https\\nhost=onedrive.visualstudio.com\\n\\n' | git credential fill",
+      this.cwd,
+      signal
+    );
+    const credentialPassword = extractCredentialPassword2(credentialResult.stdout);
+    if (credentialResult.exitCode === 0 && credentialPassword) {
+      return `Basic ${Buffer.from(`:${credentialPassword}`).toString("base64")}`;
+    }
+    throw new Error(
+      `Failed to authenticate to Azure DevOps via az token or git credential.
+az stderr:
+${tokenResult.stderr}
+
+git credential stderr:
+${credentialResult.stderr}`
+    );
+  }
+  async getPullRequestThreads(prId, signal) {
+    const authorization = await this.getAuthorizationHeader(signal);
+    const url3 = `${ADO_ORG3}/${ADO_PROJECT3}/_apis/git/repositories/${ODSP_WEB_REPO_ID3}/pullRequests/${prId}/threads?api-version=${API_VERSION2}`;
+    const response = await fetch(url3, {
+      headers: { "Authorization": authorization },
+      signal
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PR ${prId} threads (HTTP ${response.status}): ${await response.text()}`);
+    }
+    const parsed = await response.json();
+    return parsed.value ?? [];
+  }
+  async getPrDebugQuery(prId, signal) {
+    const threads = await this.getPullRequestThreads(prId, signal);
+    for (const thread of threads) {
+      for (const comment of thread.comments ?? []) {
+        const content = comment.content ?? "";
+        const match = DEBUG_QUERY_PATTERN.exec(content);
+        if (match) {
+          const debugQuery = match[0];
+          const urls = splitDebugQueryUrls(debugQuery);
+          const [loaderStatus, manifestsStatus] = await Promise.all([
+            fetchStatus(urls.loader, signal),
+            fetchStatus(urls.manifests, signal)
+          ]);
+          return {
+            prId,
+            status: "available",
+            debugQuery,
+            threadId: thread.id,
+            commentId: comment.id,
+            author: comment.author?.displayName,
+            loaderStatus,
+            manifestsStatus
+          };
+        }
+      }
+    }
+    return { prId, status: "missing" };
+  }
+};
+
 // src/ow/tools/debugLink.ts
 function extractDebugLinks(rushOutput) {
   const lines = rushOutput.split("\n");
@@ -30734,7 +30854,7 @@ function truncateLines(lines, max = 20) {
 // src/ow/mcp/owTools.ts
 function execSimple(cmd) {
   return new Promise((resolve, reject) => {
-    cp6.exec(cmd, (err, stdout) => {
+    cp7.exec(cmd, (err, stdout) => {
       if (err) reject(err);
       else resolve(stdout.trim());
     });
@@ -30746,6 +30866,7 @@ function registerOwTools(server2, logger2, logDir) {
   const git = new GitClient(OW.odspWebRoot);
   const pr = new PrClient(OW.odspWebRoot, logger2);
   const prAttach = new PrAttach(OW.odspWebRoot, logger2);
+  const ado = new AdoClient(OW.odspWebRoot);
   registerMcpTool(server2, "ow-status", {
     description: "Environment snapshot: git branch, node version, rush install state, tmux sessions. Call this FIRST."
   }, async (extras) => {
@@ -31069,6 +31190,15 @@ function registerOwTools(server2, logger2, logDir) {
     }, extras.signal);
     return successResultWithDebug(logger2, "ow-pr-attach", result);
   });
+  registerMcpTool(server2, "ow-pr-debug-query", {
+    description: "Fetch the SP-Client Validation CDN debug query from an Azure DevOps PR thread. Uses az token first, then git credential fallback. Also probes loader/manifests HTTP status.",
+    inputSchema: {
+      prId: external_exports3.number().describe("Pull request ID")
+    }
+  }, async (input, extras) => {
+    const result = await ado.getPrDebugQuery(input.prId, extras.signal);
+    return successResultWithDebug(logger2, "ow-pr-debug-query", result);
+  });
 }
 
 // src/ow/mcp/instructions.ts
@@ -31104,6 +31234,7 @@ You are connected to the ow MCP server \u2014 a dev toolkit for odsp-web develop
 ### PR Creation
 - ow-pr-create       \u2014 Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
 - ow-pr-attach       \u2014 Upload screenshots/files as attachments to an existing PR and append them to the PR description. It never posts PR comments.
+- ow-pr-debug-query  \u2014 Fetch the PR SP-Client Validation CDN debug query from PR threads, with ADO auth fallback and CDN status probes.
 
 ## Development Loop
 

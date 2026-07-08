@@ -30,6 +30,7 @@ You are connected to the ow MCP server — a dev toolkit for odsp-web developmen
 ### PR Creation
 - ow-pr-create       — Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
 - ow-pr-attach       — Upload screenshots/files as attachments to an existing PR and append them to the PR description. It never posts PR comments.
+- ow-pr-debug-query  — Fetch the PR SP-Client Validation CDN debug query from PR threads, with ADO auth fallback and CDN status probes.
 
 ## Development Loop
 
