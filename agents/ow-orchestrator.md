@@ -337,7 +337,7 @@ echo "[$(date +%H:%M:%S)] ✅ Build passed" >> {progressLog}
 ```
 
 Check if the plan has **UI acceptance criteria** that require Playwright verification:
-- **If YES** → proceed to Step 5 (UI Verification)
+- **If YES** → first require `debugUrlStatus="ready"` and a non-empty `debugUrl` from the generator. If either is missing, do not dispatch either evaluator. Log `[blocked] Local debug URL missing — generator must run ow-start + ow-debuglink first`, re-prompt the generator once with the missing test page URL, and only proceed to Step 5 after the handoff is fixed. If localhost debug was attempted and failed for a concrete environment reason, create the draft PR and switch explicitly to `finalValidationMode=pr-cdn-fic` after fetching the PR CDN query.
 - **If NO** → skip to Step 6 (Final Assessment)
 
 ### Step 5: UI Verification (dual-evaluator ensemble)

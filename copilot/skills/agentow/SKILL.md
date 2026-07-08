@@ -112,7 +112,11 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
    - Classify: rush infra error (`shrinkwrap-deps.json` missing, `inputsSnapshot not found`) → run `ow-rush install` once, retry. Auth/network error → stop and report. Code error → fix and rebuild (max 3 attempts).
    - If the MCP request times out but a `rush build -t <project>` process is still running, do **not** treat it as build failure. Log `⚠️ Build tool timeout — tracking underlying Rush process`, wait for the real Rush process to exit, then read `common/temp/markdown-summary/build-summary.md` and the raw log. Record this in `agent-metrics.md` as `tool-timeout / self-recovered-by-process-tracking`.
 5. **Test:** `ow-test` scoped to the changed modules (not the full suite). If no tests exist for the modules, note it; don't run 600 unrelated tests.
-6. **Dev server (implementation smoke only):** `ow-start` on the project; poll `ow-session-capture` on `agentow:rush` until `[WATCHING]`. Extract the debug link with `ow-debuglink`. Screenshots taken from localhost/rush-start are **smoke evidence only**. If localhost debug fails on a real SharePoint tenant (`ERR_CERT_AUTHORITY_INVALID`, `assemblyLoadFailure`, debug consent, or missing bundle), proceed to PR creation and use PR CDN validation instead of looping on localhost.
+6. **Dev server + local debug URL (required for UI-visible changes):** `ow-start` on the project; poll `ow-session-capture` on `agentow:rush` until `[WATCHING]`. Extract the debug link with `ow-debuglink(sharePointPageUrl=<planner test page>)`. For Pattern A/B/C/D-reachable changes, this is a **pre-evaluator contract**, not optional smoke: do not dispatch the evaluator until you have either:
+   - `debugUrl=<local fullTestUrl>` from `ow-debuglink`, or
+   - an explicit `finalValidationMode=pr-cdn-fic` plus a PR SP-Client Validation CDN query after PR creation.
+
+   If local debug extraction fails because `rush start` is not ready, keep polling or fix the dev server. If localhost debug itself fails on a real SharePoint tenant (`ERR_CERT_AUTHORITY_INVALID`, `assemblyLoadFailure`, debug consent, or missing bundle), record the exact localhost failure and proceed to PR creation for PR CDN validation. Do **not** let the evaluator fall through to generic FIC credential probing when the real problem is that you never supplied a debug URL.
 7. **Commit** (don't push yet).
 
 Write progress events for branch/build/test/dev-server/debug-link/commit using the exact event contract. If any step fails, log the failure before attempting recovery.
@@ -131,6 +135,11 @@ Append a generator/implementation NDJSON line to `report.json`.
 ## Step 5: Verify (dispatch evaluator)
 
 Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
+
+Before dispatch, enforce the visual-input guard:
+- If the planner marked the change Pattern A/B/C, or Pattern D has not been proven unreachable, `debugUrl` is required.
+- If `debugUrl` is empty, do **not** dispatch the evaluator. Go back to Step 4 and start/fix local `rush start`, then run `ow-debuglink(sharePointPageUrl=<planner test page>)`.
+- The only exception is explicit final PR validation: pass `finalValidationMode=pr-cdn-fic` and the PR CDN debug query from `ow-pr-debug-query`.
 
 Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, cycle number, debug link, `sessionDir`, `reportFile`, `progressLog`, and `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for PASS/FAIL + blockers.
 

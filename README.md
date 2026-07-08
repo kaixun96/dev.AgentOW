@@ -211,7 +211,7 @@ Three-layer harness:
 
 Operational notes:
 - MCP tool timeout is not automatically a Rush failure. Long `rush build -t @msinternal/sp-pages` / `rush start` runs can outlive the MCP request; agents should track the underlying process and read Rush summaries before deciding.
-- Local `rush start` debug links are the preferred fast path for evaluator screenshots. PR SP-Client Validation CDN query is the fallback when localhost validation fails or the user explicitly asks for PR CDN screenshots.
+- Local `rush start` debug links are the preferred fast path for evaluator screenshots and are a required evaluator handoff for UI-visible changes. The orchestrator must not dispatch UI verification without a local `debugUrl`, unless it is explicitly running final PR CDN validation with a PR SP-Client Validation debug query.
 
 ### Agents
 

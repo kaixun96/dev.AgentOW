@@ -267,7 +267,9 @@ Repeat capture every few seconds until you see:
 ow-debuglink
 ```
 
-Record the `landingPage` and `debugQueryString` for the evaluator.
+Record the `landingPage`, `debugQueryString`, and, for UI plans, the `fullTestUrl` produced by `ow-debuglink(sharePointPageUrl=<planner test page>)`.
+
+For UI-visible plans, `debugUrl` is a required handoff. If `ow-debuglink` cannot produce a `fullTestUrl`, keep the dev server alive, record `debugUrlStatus="missing"` with the exact reason, and report `status="partial"` so the orchestrator does not dispatch the evaluator without a runnable local URL.
 
 ### Step 11: Send `build_done` + Write Final Report
 
@@ -281,13 +283,14 @@ SendMessage to ow-orchestrator:
    testStatus: <pass|fail|skipped-no-relevant-tests>
    rushStartTarget: agentow:rush
    debugUrl: <url or empty>
+   debugUrlStatus: <ready|missing|not-needed>
    blockers: [<if any>]"
 ```
 
 Then append the full NDJSON report to `{reportFile}`:
 
 ```json
-{"sender":"ow-generator","timestamp":"<ISO>","status":"success","cycle":1,"planPath":"<path>","tasksCompleted":["task1","task2"],"tasksPending":[],"buildStatus":"success","testStatus":"pass","rushStartTarget":"agentow:rush","debugUrl":"<url>","details":"<narrative>","blockers":[]}
+{"sender":"ow-generator","timestamp":"<ISO>","status":"success","cycle":1,"planPath":"<path>","tasksCompleted":["task1","task2"],"tasksPending":[],"buildStatus":"success","testStatus":"pass","rushStartTarget":"agentow:rush","debugUrl":"<url>","debugUrlStatus":"ready","details":"<narrative>","blockers":[]}
 ```
 
 Status values:
