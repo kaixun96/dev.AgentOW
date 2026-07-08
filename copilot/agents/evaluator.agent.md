@@ -87,6 +87,7 @@ Rules for this fallback:
 - If the surface is flight-gated, force **all** prerequisite flights in both BEFORE and AFTER URLs. Example: Create group panel needs `1075` for the Create Site button; AFTER additionally enables `1535`.
 - `SPPageProvider.loadPageAsync()` may finish authentication on `/_api/SP.Directory.DirectorySession/me` because its login check compares origin. After `loadPageAsync(targetUrl, { user })`, explicitly call `page.goto(targetUrl)` before looking for the UI.
 - For iframe-backed surfaces, wait for the iframe content, not just the chrome. Example: CreateGroupPanel opens the Drawer/Modal before `CreateGroup.aspx` finishes; if the screenshot is mostly blank white, the probe is too early. Wait for `iframe[src*="CreateGroup.aspx"]`, then its frame `load` state and non-empty body text, or a surface-specific readiness signal such as `CreateSiteReady`.
+- For liked-by/comment/reaction surfaces, plan for a **multi-user fixture**. Same-user likes often do not render the liked-by entry point (`likeCount - userLiked` can be zero). If `adminUser` + `nonAdminUser` cannot be acquired from TRIPS in prod/dogfood, report `fixtureGap: true` with `missingFixture="multi-user liked-comment page"` instead of retrying single-user probes.
 - Save screenshots under `<sessionDir>/evaluation/iter<N>/` and report the same `visualValidation.beforePath` / `afterPath` fields as the MCP path.
 - Set `visualValidation.source` to `pr-cdn-fic`, `local-rush-start`, or `playwright-mcp`. Final PR validation should be `pr-cdn-fic` when a PR exists.
 
