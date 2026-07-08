@@ -198,6 +198,8 @@ General rule for iframe-backed surfaces:
 
 **Multi-user fixture surfaces.** Liked-by/comment/reaction panels often require a second user to create the visible entry point. Do not keep probing with one user if the source condition excludes same-user data (for example, `comment.likeCount - Number(comment.userLiked) > 0`). Use a two-user fixture (`adminUser` creates/comments, `nonAdminUser` likes/reacts) or a known pre-provisioned page. If TRIPS cannot allocate the needed users in both prod and dogfood, report `fixtureGap: true` and name the missing fixture instead of marking the code unverified generically.
 
+**Planner fixture surfaces.** PlanCreationPanel is not reachable on every group site. Its command-bar entry requires `pageContext.site.group.id` and `legacyPageContext.farmSettings.ExternalService_isplannerintegrationsupported == 1`. If a freshly created group site still lacks `[data-automation-id="CommandBarNewPlanButton"]`, the blocker is a missing Planner-integrated group-connected fixture. Record that fixture gap explicitly instead of looping on generic team-site creation or frontend-only `_spPageContextInfo` patches.
+
 ### Step R-2.5b: Flight-/elevation-gated surface? FORCE the gating flights BEFORE you ever write `skip` / `un-reproducible` (MANDATORY)
 
 A surface that does not render in the **default** tenant state is NOT "un-reproducible" — it is "not-yet-forced". `skip` is a last resort, allowed ONLY after you have genuinely exhausted capture. Before ANY `skip` / `un-reproducible host` / `non-elevated standalone` verdict you MUST:
