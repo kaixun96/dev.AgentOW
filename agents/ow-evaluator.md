@@ -183,8 +183,6 @@ ow-debuglink(sharePointPageUrl=<test page URL>)
 
 This returns `fullTestUrl` — the complete URL with debug query string appended.
 
-If the orchestrator/generator did not provide a local `debugUrl` and this call cannot produce `fullTestUrl`, return `visualValidation.status="failed"` with blocker `orchestrator-debug-url-missing`. Do not run a FIC Playwright fallback just to compensate for a missing debug URL handoff; FIC is only valid after the local debug query or explicit PR CDN query is known.
-
 **If no debug link** (rush not running):
 1. Try `ow-start(project=<from plan>)` to launch rush
 2. Poll `ow-session-capture(target="agentow:rush")` until `[WATCHING]` appears

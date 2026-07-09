@@ -23,6 +23,7 @@ The dispatcher gives you:
 - `reportFile` — shared NDJSON report file
 - `progressLog` — user-visible progress log
 - `artifactPath` — `planning/planner-report.md`
+- `contextDocuments` — optional feature/domain docs already routed by the dispatcher. Treat these as the source of domain-specific rules and execution guards.
 
 ## What to investigate
 
@@ -37,6 +38,7 @@ The dispatcher gives you:
    - A discriminator (unique text/attribute) that proves it's THIS change's surface, not similar UI
    - Pattern: A (simple click) / B (needs REST data) / C (needs second user) / D (external dep — note a reachability probe hint) / skip (server-side, no UI)
    - If you cannot trace a reliable trigger from source, mark `skip` with the reason. Do NOT fabricate a selector.
+7. **Context guards** — if `contextDocuments` were provided, read them and summarize the exact guard/checklist items that apply. Cite the doc path and section; do not duplicate or reinterpret domain rules from memory.
 
 ## How to research
 
@@ -72,6 +74,9 @@ Write `artifactPath` and return the same structured report:
 
 ## Risks
 - <anything that could go wrong>
+
+## Context guards
+- <doc path + section> — <required guard/checklist item, or "none">
 ```
 
 Be honest about gaps. "I could not locate X" is a valid and useful finding — far better than a confident wrong answer.

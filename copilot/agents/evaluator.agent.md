@@ -42,6 +42,7 @@ The dispatcher gives you:
 - `debugUrl` — debug URL/query from the implementer, if already known
 - `finalValidationMode` — optional. If `pr-cdn-fic`, this is final PR validation and screenshots must use the PR SP-Client Validation CDN debug query, not localhost.
 - `prId` / `prUrl` — optional PR identity for fetching SP-Client Validation debug query.
+- `contextDocuments` — optional feature/domain docs. Domain-specific execution guards live there.
 
 ## Procedure
 
@@ -52,7 +53,7 @@ Use `view` / `grep` to confirm the changed code matches the intent and the accep
 
 If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You may skip screenshots only when `surfaceTrace` is explicitly `Pattern: skip` with a non-UI/server-side reason, or `Pattern: D` has been probed and confirmed unreachable. If unsure whether the change is visible, treat it as visible and attempt screenshots.
 
-**Input guard:** for UI-visible changes, a debug source must already be available. If neither `debugUrl` nor `finalValidationMode=pr-cdn-fic` with PR CDN query information is provided, return `FAIL` with blocker `orchestrator-debug-url-missing`. Do not run the FIC fallback just to discover credentials are unavailable; FIC is a browser/auth execution path, not a substitute for the orchestrator providing a local or PR CDN debug URL.
+If `contextDocuments` are provided, read them before UI verification and apply the documented domain-specific guards. Cite the doc path/section in the report.
 
 1. Determine screenshot source:
    - **Default / preferred:** use the local `rush start` debug link because it is available before PR validation builds finish. Call `ow-debuglink` with the test page URL → `fullTestUrl`.
@@ -83,7 +84,6 @@ PLAYWRIGHT_FIC_AUTH_MODE=required rushx playwright --grep "<unique probe title>"
 ```
 
 Rules for this fallback:
-- Only run this fallback after a debug source has been resolved (`debugUrl` from local `ow-debuglink`, or PR CDN query in explicit final validation mode). If the debug source is missing, fail with `orchestrator-debug-url-missing` instead of probing credentials.
 - Prefer the local `rush start` debug query when the dev server is available. It is faster than waiting for PR validation builds.
 - Use the PR's **SP-Client Validation CDN debug query** from the PR thread only if local debug validation fails or `finalValidationMode=pr-cdn-fic` is explicitly requested.
 - If using a debug query, accept the SharePoint debug consent dialog before probing. Match both resource-key and English names: `/debugManifestLoadingConfirm|Allow|Load debug|Load/i`.

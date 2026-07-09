@@ -6,29 +6,28 @@ const checks = [
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
-      "For Pattern A/B/C/D-reachable changes, this is a **pre-evaluator contract**",
-      "If `debugUrl` is empty, do **not** dispatch the evaluator."
+      "agentOW is the routing and execution layer; feature-specific rules and execution guards live in those context docs, not in this skill."
+    ]
+  },
+  {
+    file: "copilot/agents/planner.agent.md",
+    snippets: [
+      "`contextDocuments` — optional feature/domain docs already routed by the dispatcher.",
+      "read them and summarize the exact guard/checklist items that apply"
     ]
   },
   {
     file: "copilot/agents/evaluator.agent.md",
     snippets: [
-      "return `FAIL` with blocker `orchestrator-debug-url-missing`",
-      "FIC is a browser/auth execution path, not a substitute"
+      "`contextDocuments` — optional feature/domain docs.",
+      "apply the documented domain-specific guards"
     ]
   },
   {
-    file: "agents/ow-generator.md",
+    file: "README.md",
     snippets: [
-      "For UI-visible plans, `debugUrl` is a required handoff.",
-      "debugUrlStatus"
-    ]
-  },
-  {
-    file: "agents/ow-orchestrator.md",
-    snippets: [
-      "first require `debugUrlStatus=\"ready\"` and a non-empty `debugUrl`",
-      "do not dispatch either evaluator"
+      "agentOW is a routing/execution layer.",
+      "Feature-specific rules and execution guards should live in the routed context docs"
     ]
   }
 ];
