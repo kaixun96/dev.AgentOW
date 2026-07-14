@@ -100,13 +100,13 @@ If Playwright MCP/browser tools are unavailable, the evaluator must first try th
 
 The `agentow` skill walks you through this in detail. It auto-loads when the user asks to implement a feature or fix a bug in odsp-web.
 
-`ow-batch` is the Copilot batch entry point. It runs multiple tasks serially, launching a fresh headless `copilot --autopilot --allow-all --no-ask-user --enable-memory -p "/agentow --auto <task>"` process for each task and writing a batch `summary.md`. It does not use parallel worktrees because the shared `ow` MCP server is rooted at `/workspaces/odsp-web`.
+`ow-batch` is the Copilot batch entry point. The current main session runs multiple agentOW tasks serially in AUTO mode, writing a checkpoint after each task and carrying only batch bookkeeping forward. It does not launch nested Copilot processes, delegate the full pipeline, or use parallel worktrees because the shared `ow` MCP server is rooted at `/workspaces/odsp-web`.
 
 ## Modes
 
 - **Interactive** (default) — clarify intent, approve the plan, confirm before shipping with critical review issues. ~3-5 user touches.
 - **Auto** (`--auto` in the prompt) — skip all gates: no intent questions, auto-approve the plan, ship even with critical issues (PR is draft, a human reviews before publishing). Zero user touches.
-- **Batch** (`/ow-batch`) — serial unattended loop over multiple `/agentow --auto` runs. Each task gets a fresh Copilot process and one summary row.
+- **Batch** (`/ow-batch`) — serial unattended loop over multiple main-session agentOW AUTO runs. Each task gets fresh bounded planner/evaluator/reviewer subagents, a checkpoint, and one summary row.
 
 ## Core principles
 

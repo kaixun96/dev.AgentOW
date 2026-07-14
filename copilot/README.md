@@ -15,9 +15,9 @@ So the architecture collapses:
 | Separate orchestrator + generator agents | **Main session** is both — it retains context across fix cycles for free |
 | planner / evaluator / reviewer as persistent team members | Stateless `.agent.md` subagents, dispatched per-call via `@agentow-copilot:<name>` |
 | `TeamCreate` + `SendMessage` + idle/wake/watchdog/deadlock machinery | **None of it** — the main session drives synchronously; no idle agents means no deadlocks |
-| Batch = spawn a team per task | Batch = `copilot -p "/agentow <task>"` headless loop (cleaner isolation) |
+| Batch = spawn a team per task | Main session runs agentOW tasks serially, checkpointing between tasks |
 
-The key insight: the generator needs context continuity across fix cycles, and the main session already has it. Make the main session the implementer; keep subagents for bounded "look and report" work (which also offloads context-heavy reading from the main session). This mirrors the [ironflow-copilot](https://github.com/gim-home/TeamsPluginMarket) plugin's proven main-session-implementer pattern.
+The key insight: the generator needs context continuity across fix cycles, and the main session already has it. Make the main session the implementer; keep subagents for bounded "look and report" work. Batch mode repeats that pipeline serially in the main session, writes a concise checkpoint after each task, drops completed-task details from active reasoning, and relies on normal CLI compaction when context pressure requires it.
 
 ## Session artifacts and visual gate
 
@@ -56,7 +56,6 @@ Then:
 
 ```bash
 copilot -p "/agentow fix the elevation background on mobile"          # auto-ish, one shot
-copilot -p "/ow-batch 1. Fix bug A 2. Add feature B"                  # serial batch
 copilot                                                               # interactive session
 > /agentow add a loading spinner to PhotoGrid
 > /ow-batch tasks.md
@@ -70,7 +69,7 @@ These are written per the conventions of working Copilot CLI plugins (ironflow-c
 2. **Plugin-bundled MCP auto-load** — confirm Copilot loads `mcpServers` from `.claude-plugin/plugin.json` or `.mcp.json`; otherwise users must merge the same `ow` config into `~/.copilot/mcp-config.json`.
 3. **Subagent tool names** — agents declare `tools: [view, grep, glob, shell]` (from ironflow's read-only reviewers + an assumed `shell`). Confirm `shell` is the Copilot name for running commands, and confirm the main session's write/edit tool names.
 4. **`@agentow-copilot:<name>` dispatch + parallelism** — ironflow confirms the `@plugin:agent` syntax and single-message parallel dispatch; confirm it works with this plugin's agent names.
-5. **Headless permission flags** — `ow-batch` uses `copilot --autopilot --allow-all --no-ask-user --enable-memory --max-autopilot-continues 20 -p`. Confirmed on Copilot CLI 1.0.69-2; fallback is `--yolo`, then plain `copilot -p`.
+5. **Long unattended context behavior** — confirm task checkpoints plus normal Copilot CLI automatic compaction keep long serial batches reliable without nested CLI processes.
 
 ## Not ported yet
 
@@ -92,5 +91,5 @@ copilot/
 │   └── reviewer.agent.md        stateless: review → verdict
 └── skills/
     ├── agentow/SKILL.md         main-session orchestration
-    └── ow-batch/SKILL.md        serial headless /agentow --auto batch loop
+    └── ow-batch/SKILL.md        serial main-session agentOW loop with task checkpoints
 ```

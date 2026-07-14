@@ -193,6 +193,6 @@ Append `[HH:MM:SS] ✅ Workflow complete` after `final.md` is written.
 
 ## Notes
 
-- One feature/bug per run. For multiple, run the pipeline once per task (or loop `copilot -p "/agentow <task>"` headless for a batch — each gets a clean session).
+- One feature/bug per run. For multiple, use `ow-batch`; it runs this pipeline serially in the main session and checkpoints between tasks.
 - Specs/plans stay local (`.aero/`), never committed, never referenced from code.
 - If the user says "skip the review" / "don't make a PR" / "just code it" — follow them. The user is in control.

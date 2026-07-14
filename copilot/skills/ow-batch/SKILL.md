@@ -1,19 +1,43 @@
 ---
 name: ow-batch
-description: "Run multiple odsp-web agentOW tasks autonomously in Copilot CLI, one task per headless /agentow --auto run. Use when the user provides a list of features/bugs and wants each task to produce its own draft PR without stopping the whole batch on individual failures. Triggers on: ow-batch, batch agentow, run these tasks overnight, process this task list, multiple PRs."
+description: "Run multiple odsp-web agentOW tasks autonomously and serially in the current Copilot CLI session. Use when the user provides a list of features/bugs and wants each task to produce its own draft PR without stopping the whole batch on individual failures. Triggers on: ow-batch, batch agentow, run these tasks overnight, process this task list, multiple PRs."
 ---
 
 # agentOW Batch Mode (Copilot CLI)
 
-Run a list of odsp-web tasks sequentially. Each task gets a fresh headless Copilot CLI session running `/agentow --auto`, and each task should produce its own branch and draft PR. Failures in one task must not stop the batch.
+Run a list of odsp-web tasks sequentially in the **current main session**. For each item, the main session directly runs the complete agentOW pipeline in AUTO mode. Each task should produce its own branch and draft PR. A failure in one task must not stop the remaining tasks.
 
-## Why Copilot batch is different from Claude `/ow-batch`
+## Architecture: main-session serial agentOW
 
-Claude uses Agent Teams and can spawn a fresh team per task. Copilot CLI does not expose the same team primitive, and the `ow` MCP server is rooted at `/workspaces/odsp-web`, so do **not** use git worktrees for parallel execution. Run tasks **serially** in the main odsp-web checkout, using a fresh `copilot -p` process per task for session isolation.
+The current session is both:
+
+- the batch orchestrator across tasks; and
+- the agentOW orchestrator/implementer for the active task.
+
+It dispatches only the bounded planner, evaluator, and reviewer subagents required by the `agentow` skill. Their status remains visible in the current CLI session.
+
+The `ow` MCP server is rooted at `/workspaces/odsp-web`, so tasks must run **serially** in the shared checkout. Do not use parallel worktrees.
+
+Do **not**:
+
+- launch nested `copilot -p` processes;
+- delegate the complete agentOW pipeline to a general-purpose subagent;
+- run `/clear` or `/new` between tasks.
+
+Those approaches either hide the task context from the main session or abandon the batch.
+
+Copilot CLI does not expose an assistant-callable `/compact` command. Task-boundary context management therefore works by checkpointing and minimizing what is carried forward:
+
+1. Persist a concise checkpoint after every task.
+2. Carry only the batch summary, remaining task list, and latest checkpoint forward.
+3. Stop referencing completed-task diffs, logs, and subagent conversations.
+4. Rely on normal CLI automatic compaction when context pressure requires it.
+
+This is context minimization, not a guaranteed hard reset. It preserves unattended execution while keeping the main session fully informed during each task.
 
 ## Step 1: Parse tasks
 
-Accept tasks from:
+Accept tasks from an inline numbered list or a referenced file:
 
 ```text
 /ow-batch
@@ -21,15 +45,11 @@ Accept tasks from:
 2. Fix elevation background on mobile
 ```
 
-or:
-
 ```text
 /ow-batch tasks.md
 ```
 
-If no tasks are provided, ask the user once for the task list. After the list is confirmed, run autonomously.
-
-Normalize tasks into an ordered list. Each task must be one feature/fix. If an item contains multiple independent changes, split it before starting.
+If no tasks are provided, ask once for the task list. Normalize it into an ordered list where each item is one feature or fix. Split independent changes before starting.
 
 ## Step 2: Create batch artifacts
 
@@ -39,7 +59,8 @@ Create:
 /workspaces/odsp-web/.aero/batch-<YYYYMMDD-HHMMSS>/
 ├── batch.log
 ├── summary.md
-└── task<N>.log
+├── task<N>.log
+└── task<N>.checkpoint.md
 ```
 
 Initialize `summary.md`:
@@ -54,122 +75,139 @@ Started: <ISO timestamp>
 |---|------|--------|----|-------|
 ```
 
-Append to `batch.log` before every state transition. Use the same first-class progress style as `/agentow`: `[HH:MM:SS] <emoji> <short state>`.
-
-After initialization, append:
+Append concise timestamped state transitions to `batch.log`:
 
 ```text
 [HH:MM:SS] 🌙 Batch started — <N> tasks
+[HH:MM:SS] ▶️ Task <i>/<N> started — <task>
+[HH:MM:SS] ✅ Task <i>/<N> success — <PR>
+[HH:MM:SS] ⚠️ Task <i>/<N> success with blockers — <PR>
+[HH:MM:SS] ⚠️ Task <i>/<N> completed without PR
+[HH:MM:SS] ❌ Task <i>/<N> failed — <reason>
+[HH:MM:SS] 🌅 Batch complete — success <S>, blockers <B>, no-pr <P>, failed <F>
 ```
 
 ## Step 3: Preflight
 
 Before the first task:
 
-1. Run `copilot --version` and record it in `batch.log`.
-2. Run `git -C /workspaces/odsp-web status --short`.
-3. If the worktree has user changes before batch starts, stop and ask the user to clean/stash/commit them. Do not stash pre-existing user changes automatically.
-4. Run `git -C /workspaces/odsp-web fetch origin`.
+1. Run `git -C /workspaces/odsp-web status --short`.
+2. If the worktree has pre-existing user changes, stop and ask the user to clean, stash, or commit them. Never auto-stash changes that existed before the batch.
+3. Run `git -C /workspaces/odsp-web fetch origin`.
 
 ## Step 4: Run each task
 
 For each task `i`:
 
-### 4a. Prepare checkout
+### 4a. Prepare a clean baseline
 
-Before launching the task, return to a clean main baseline:
+Prefer:
 
 ```bash
 git -C /workspaces/odsp-web checkout main
 git -C /workspaces/odsp-web pull --ff-only origin main
 ```
 
-If checkout fails because the previous task left uncommitted changes:
-
-1. Preserve them, do not discard:
-   ```bash
-   git -C /workspaces/odsp-web stash push -u -m "agentow-batch-task<i>-failed"
-   ```
-2. Record the stash name in `summary.md` notes.
-3. Continue with the next task from main.
-
-### 4b. Launch headless agentOW
-
-Run a fresh Copilot CLI process from `/workspaces/odsp-web`:
+If local `main` has diverged from `origin/main`, do not reset, rebase, or rewrite it. Create a temporary baseline branch from `origin/main`:
 
 ```bash
-copilot --autopilot --allow-all --no-ask-user --enable-memory --max-autopilot-continues 20 \
-  -p "/agentow --auto <task text>"
+git -C /workspaces/odsp-web switch -c agentow-batch/<timestamp>-task<i> origin/main
 ```
 
-Redirect stdout/stderr to the per-task log:
+If a previous task left uncommitted changes, preserve them:
+
+```bash
+git -C /workspaces/odsp-web stash push -u -m "agentow-batch-task<i>-leftovers"
+```
+
+Record the stash in `summary.md`, then continue from a clean baseline.
+
+### 4b. Run agentOW directly in the current session
+
+Treat the task exactly as if the user had invoked:
+
+```text
+/agentow --auto <normalized task text>
+```
+
+Invoke the `agentow` skill if it is not already loaded, then execute its complete pipeline in the current session:
+
+1. The current session performs request refinement, plan synthesis, implementation, build/test, fix cycles, and shipping.
+2. Dispatch the agentOW planner, evaluator, and reviewer only for their bounded roles.
+3. Use a new agentOW `.aero/<session>` directory for this task.
+4. Run in AUTO mode: record assumptions instead of asking the user.
+5. Complete or update the task's draft PR.
+6. Do not end the batch after obtaining the PR URL. Continue to result capture and checkpointing.
+
+Write concise task-level state transitions to:
 
 ```text
 /workspaces/odsp-web/.aero/batch-<timestamp>/task<i>.log
 ```
 
-Compatibility confirmed on Copilot CLI 1.0.69-2: `--autopilot`, `--allow-all`, `--no-ask-user`, `--enable-memory`, and `--max-autopilot-continues` are supported. Still keep fallbacks for older clients: if `--allow-all` is not supported, retry with `--yolo`; if `--autopilot` is not supported, retry with plain `copilot -p`, but record the degraded mode in `batch.log`.
+Keep detailed reports in the task's own agentOW session directory.
 
-Before the first real task, run a one-line smoke check of the exact headless shell shape without `/agentow`:
+### 4c. Capture the result and clean the checkout
 
-```bash
-copilot --autopilot --allow-all --no-ask-user --enable-memory --max-autopilot-continues 1 \
-  -p "Reply exactly: BATCH_SMOKE_OK"
-```
+After agentOW finishes:
 
-If the output does not contain `BATCH_SMOKE_OK`, stop before mutating git and report the headless-launch failure.
+1. Read its `final.md`.
+2. Capture status, PR URL, branch, commit, build/tests, visual verification, screenshots, and remaining blockers.
+3. Check worktree cleanliness:
 
-Before launching, append:
-
-```text
-[HH:MM:SS] ▶️ Task <i>/<N> started — <task>
-```
-
-### 4c. Parse result
-
-After the process exits:
-
-1. Check exit code.
-2. **Immediately check worktree cleanliness**, regardless of exit code. This is mandatory because a headless `/agentow` process can exit 0 after updating a PR but still leave thousands of unrelated files changed in the shared checkout.
    ```bash
    git -C /workspaces/odsp-web status --porcelain
    ```
-   If any output is present:
-   ```bash
-   git -C /workspaces/odsp-web stash push -u -m "agentow-batch-task<i>-leftovers"
-   ```
-   Record the stash name and changed-file count in `summary.md` notes. Do this before preparing the next task.
-3. Search the task log for an ADO PR URL. Support both URL shapes:
+
+4. If uncommitted changes remain, stash them as `agentow-batch-task<i>-leftovers` and record the stash before the next task.
+5. Find the PR URL in `final.md`, the task log, or the recent agentOW `progress.log`. Support both URL forms:
+
    ```regex
    https://dev\.azure\.com/onedrive/ODSP-Web/_git/odsp-web/pullrequest/[0-9]+
    https://onedrive\.visualstudio\.com/ODSP-Web/_git/odsp-web/pullrequest/[0-9]+
    ```
-4. Also search recent `.aero/*/final.md` and `progress.log` if the URL is not in stdout.
-   - Limit this fallback search to `.aero` entries newer than the task start timestamp to avoid picking up a PR URL from a previous task.
-   - Treat "Updated existing draft PR" as success if a PR URL is present; do not require newly-created PR wording.
-5. Record:
-   - `success` if exit code is 0 and PR URL found
-   - `completed-no-pr` if exit code is 0 but no PR URL found
-   - `failed` if exit code is non-zero
-   - `stashed-failure` if uncommitted changes had to be stashed after failure
 
-### 4d. Append summary row
+Classify the result:
 
-Append one row to `summary.md`:
+- `success`: agentOW completed and a PR URL exists.
+- `success-with-blockers`: a PR exists but validation has an explicit fixture or environment blocker.
+- `completed-no-pr`: implementation completed but no PR URL exists.
+- `failed`: agentOW could not complete the task.
+- `stashed-failure`: failure also left changes that required preservation.
+
+### 4d. Write the task checkpoint
+
+Write `/workspaces/odsp-web/.aero/batch-<timestamp>/task<i>.checkpoint.md`:
 
 ```markdown
-| <i> | <task> | ✅ success / ⚠️ completed-no-pr / ❌ failed | <PR or —> | <task log path / stash note> |
+# Task <i> checkpoint
+
+- Task: <normalized task>
+- Status: <status>
+- PR: <url or —>
+- Branch: <branch>
+- Commit: <sha or —>
+- agentOW session: <path>
+- Build/tests: <concise result>
+- Visual verification: <concise result>
+- Remaining blockers: <none or concise list>
+- Stash: <name or none>
+- Next task: <i+1 task text or batch complete>
 ```
 
-Do not stop the batch on failure. Continue to task `i+1`.
+Append the summary row:
 
-Append exactly one task result line:
-
-```text
-[HH:MM:SS] ✅ Task <i>/<N> success — <PR>
-[HH:MM:SS] ⚠️ Task <i>/<N> completed without PR
-[HH:MM:SS] ❌ Task <i>/<N> failed — <reason>
+```markdown
+| <i> | <task> | ✅ success / ⚠️ success-with-blockers / ⚠️ completed-no-pr / ❌ failed | <PR or —> | <checkpoint path / stash note> |
 ```
+
+Then enforce the context boundary:
+
+1. Treat the checkpoint as the only task-specific context carried forward.
+2. Do not re-read or reason from the completed task's source diff, raw command output, planner report, evaluator report, reviewer report, or conversation turns unless batch bookkeeping is inconsistent.
+3. Do not reuse completed planner/evaluator/reviewer agents.
+4. Continue directly to task `i+1`.
+5. If the CLI automatically compacts, reload `summary.md`, `batch.log`, and the latest checkpoint before proceeding.
 
 ## Step 5: Final summary
 
@@ -180,6 +218,7 @@ After all tasks finish, append:
 
 - Total: <N>
 - ✅ Success: <count>
+- ⚠️ Success with blockers: <count>
 - ⚠️ Completed without PR: <count>
 - ❌ Failed: <count>
 - Stashes created: <count>
@@ -191,22 +230,19 @@ Tell the user:
 ```text
 Batch complete.
 Summary: /workspaces/odsp-web/.aero/batch-<timestamp>/summary.md
-Logs:    /workspaces/odsp-web/.aero/batch-<timestamp>/task*.log
-```
-
-Append:
-
-```text
-[HH:MM:SS] 🌅 Batch complete — success <S>, no-pr <P>, failed <F>
+Checkpoints: /workspaces/odsp-web/.aero/batch-<timestamp>/task*.checkpoint.md
+Logs: /workspaces/odsp-web/.aero/batch-<timestamp>/task*.log
 ```
 
 ## Rules
 
-- Run tasks serially. Do not run multiple `/agentow` tasks concurrently against the same `/workspaces/odsp-web` checkout.
-- Full batch mode is a mutating workflow: each real task may create branches and draft PRs. For testing ow-batch itself, use the smoke command above rather than a real `/agentow` prompt.
-- Never discard uncommitted changes. Stash task leftovers with a descriptive `agentow-batch-task<N>-failed` message.
-- Do not auto-stash changes that existed before the batch started; ask the user to resolve them.
-- Every task gets a fresh `copilot -p` process.
-- Every task runs `/agentow --auto`.
-- Every task writes a row to `summary.md`, even if it fails before agentOW starts.
+- Run tasks serially against `/workspaces/odsp-web`.
+- The main session runs every complete agentOW task directly.
+- Only planner, evaluator, and reviewer are delegated.
+- Never launch nested `copilot -p`, `/clear`, or `/new`.
+- Never delegate the complete pipeline to a subagent.
+- Never discard uncommitted changes or rewrite pushed history.
+- Every task gets a fresh agentOW session directory and fresh bounded subagents.
+- Every task writes a summary row and checkpoint, even if it fails.
+- After checkpointing, carry forward only batch bookkeeping and rely on normal CLI automatic compaction.
 - `summary.md` is the source of truth for the batch.
