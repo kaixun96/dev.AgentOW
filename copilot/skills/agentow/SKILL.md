@@ -143,13 +143,26 @@ For UI-visible changes, visual validation is mandatory and the evaluator owns it
 - Surface the exact failure reason to the user and record it in `progress.log`, `report.json`, and `final.md` if the run stops.
 - Do not claim the UI was verified without screenshot evidence.
 
+Before accepting any evaluator claim about auth, FIC, tenant suitability, test-page availability, or a fixture gap, inspect its `coverageManifest`. A single URL, credential, tenant, or site failure is resource-local evidence only.
+
+- Missing manifest or `coverageManifest.status="incomplete"` → append `[HH:MM:SS] 🔎 Environment discovery retry — evaluator evidence incomplete`, then re-dispatch the evaluator in `environment_discovery` mode in the **same implementation cycle**. Do not edit code, rebuild, retest, increment the generator cycle, or proceed to PR shipment.
+- A self-declared complete manifest is still malformed unless predicates are cited, every supported pool has a result, tenants are deduplicated, discovery paths are complete or explicitly blocked with evidence, and every unique discovered candidate has exactly one disposition. For a gap, require `candidatesDiscovered == candidatesProbed == candidateResults.length`, all candidate results rejected with evidence, no `unprobed` entries, and a non-empty `exhaustionReason` proving no discovery path remains. Downgrade any malformed manifest to `environment-discovery-incomplete`, retarget its blocker to `evaluator-environment`, and redispatch it through the same-cycle environment gate.
+- Complete manifest with an eligible candidate → require the evaluator to capture screenshots on that candidate.
+- Complete manifest with no eligible candidate → classify as an external `fixture-gap`; do not route it to the implementer as a code defect.
+
 ## Step 6: Fix loop
 
-**FAIL and cycle < 5:** YOU fix the blockers (you still have full context — no re-investigation needed). Re-build, re-test, re-dispatch `@agentow-copilot:evaluator`. Increment cycle.
+**Environment-discovery incomplete (any cycle):** re-dispatch only `@agentow-copilot:evaluator` in the same implementation cycle with the missing coverage requirements. If the retry is still incomplete, stop rather than auto-shipping an unsupported environment claim.
+
+**Evaluator-spec FAIL (any cycle):** re-dispatch only `@agentow-copilot:evaluator` in the same implementation cycle with the spec blocker. Do not edit code, rebuild, retest, or consume a product fix cycle.
+
+**Complete external fixture gap:** do not change product code. In interactive mode, show the coverage summary and ask whether to ship a draft with the blocker. In auto/batch mode, the run may continue only as `success-with-blockers`, preserving the complete manifest in `report.json` and `final.md`.
+
+**Product/code FAIL and cycle < 5:** YOU fix the blockers (you still have full context — no re-investigation needed). Re-build, re-test, re-dispatch `@agentow-copilot:evaluator`. Increment cycle.
 
 Before starting each fix cycle, append `[HH:MM:SS] 🔁 Fix cycle N+1 — <reason>`.
 
-**FAIL and cycle ≥ 5:**
+**Product/code FAIL and cycle ≥ 5:**
 - Interactive: show the remaining blockers, ask the user how to proceed.
 - Auto: proceed to ship anyway (the PR is draft; a human reviews).
 
@@ -184,7 +197,7 @@ Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat r
 1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no auto-generated "Testing" section).
 2. **Visual validation for UI changes:** prefer evaluator screenshots from the local `rush start` debug link because it is available immediately after implementation. If local debug validation captures BEFORE/AFTER successfully, attach those screenshots to the PR description. Only fall back to `ow-pr-debug-query` / `finalValidationMode=pr-cdn-fic` when local debug validation fails for environment/tooling reasons (for example localhost cert/assembly-load failure, missing browser MCP, or a surface that only reproduces against PR CDN).
 3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. Include `visualValidation.source` in the PR description (`local-rush-start` or `pr-cdn-fic`) so reviewers know which path produced the images. If the evaluator did not capture BEFORE/AFTER screenshots, do not present the run as visually verified; include the visual-validation failure reason in the PR description only if the user explicitly chooses to ship a draft anyway.
-   - If visual validation fails because a surface needs seeded data (liked comments, reactions, campaign telemetry, etc.), write `fixtureGap: true` and the missing fixture in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success.
+   - If visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.
 4. **Report** the PR URL to the user.
 
 Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status, PR URL if any, screenshot paths if captured, and any remaining blockers.

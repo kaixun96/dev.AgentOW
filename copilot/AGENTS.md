@@ -85,6 +85,8 @@ For any visible UI change, Playwright screenshots are mandatory. The evaluator m
 
 If Playwright MCP/browser tools are unavailable, the evaluator must first try the FIC Playwright fallback (`rushx playwright` / Heft) before returning a tooling failure. If authentication blocks the page, the debug link cannot be built, the selector cannot be found after all prerequisite flights are forced, the discriminator does not match, or no screenshot path is produced, the evaluator must return `FAIL` with a specific reason. Do not claim visual verification passed without screenshot paths.
 
+Environment claims have a second hard gate: one failed URL, credential, tenant, or site is resource-local evidence, not proof that all FIC environments are unsuitable. Before `fixtureGap`, the evaluator must enumerate available fresh/cached pools, deduplicate tenants, discover alternate candidates, apply source-cited capability predicates, and emit a complete `coverageManifest`. Missing or incomplete coverage triggers evaluator-only environment discovery in the same implementation cycle and cannot be auto-shipped.
+
 ## The pipeline
 
 ```
@@ -93,7 +95,7 @@ If Playwright MCP/browser tools are unavailable, the evaluator must first try th
 3. Plan         → you write the plan; (interactive) get user approval; (auto) proceed
 4. Implement    → YOU write the code, run ow-build, run ow-test
 5. Verify       → dispatch @evaluator → mandatory screenshots for UI changes
-6. Fix loop     → verdict FAIL? YOU fix (context retained) → re-dispatch @evaluator. Max 5 cycles.
+6. Fix loop     → classify FAIL: environment discovery stays evaluator-only; product defects return to YOU. Max 5 product cycles.
 7. Review       → dispatch @reviewer → surface findings
 8. Ship         → ow-pr-create (draft PR), then ow-pr-attach for screenshots if captured
 ```
@@ -114,6 +116,7 @@ The `agentow` skill walks you through this in detail. It auto-loads when the use
 - **Surgical changes** — every changed line traces to the request. Don't refactor adjacent code, don't fix unrelated dead code (mention it instead).
 - **Follow existing patterns** — search odsp-web first; never hand-craft what the monorepo already provides. Match local naming, imports, error handling.
 - **Evidence before claims** — run `ow-build` / `ow-test` and read the output before saying it works. "Should work" / "seems fine" = unverified assumption.
+- **Scope claims to evidence** — a local environment failure cannot support a fleet-wide conclusion; `fixtureGap` requires a complete coverage manifest.
 - **Tool timeout ≠ operation failure** — if `ow-build` / `ow-rush` times out at the MCP layer, check whether the underlying Rush process is still running and wait for the real result. Use `common/temp/markdown-summary/build-summary.md` and raw logs before classifying the build.
 - **Verifiers verify independently** — subagents read the actual code, not your self-report.
 - **Surface, don't hide** — state assumptions explicitly. In interactive mode, ask when uncertain. In auto mode, record the assumption in the plan so the user can audit it after.

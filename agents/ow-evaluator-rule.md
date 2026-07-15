@@ -74,6 +74,11 @@ If you find yourself wanting to write any of those, **stop** — that's vision's
 - `mode: "ui_verification"`, `cycle`, `buildStatus: "success"`, `rushStartTarget`, `planPath`, `outDir`, `reportFile`
 - Optional: `priorCycleArtifacts` (for cycle > 1)
 
+### `environment_discovery` mode
+- `mode: "environment_discovery"`, the same implementation `cycle`, `planPath`, `outDir`, `reportFile`, and `priorRuleFindingsPath`
+- Resume at Resource-scoped environment discovery. Do not request code changes, rebuild, retest, or increment the product cycle.
+- If an eligible candidate is found, continue the existing UI verification flow on that candidate. Otherwise emit the required complete/incomplete manifest.
+
 ---
 
 ## Mode: code_inspection
@@ -158,6 +163,40 @@ Recipe: read the plan's affected files; if any path matches the table, the spec 
    - TRIPS pool config must include `ficServicePrincipalObjectId` per tenant — if a pool returns `400 ficServicePrincipalObjectId missing`, the failure is in TRIPS config, NOT your spec; escalate to the playwright-utilities owner instead of working around it.
 4. Run an empirical probe before claiming auth-walled: try the spec under each candidate environment (`prod`, `dogfood`, `msit`) and capture `[SW-PROBE] auth probe` + `provision` JSON from console. Only after probes across all candidates fail may you assert "tenant feature unavailable" — and even then, label as `tenant feature unavailable (not auth-walled)`.
 
+#### Resource-scoped environment discovery (MANDATORY for fixture/auth/environment failures)
+
+One failed route, credential, tenant, or site is not fleet-wide evidence. Scope every observation to environment, pool, credential source, tenant, and URL. HTTP 404, expired auth, missing FIC service principal, allocation failure, permission denial, missing farm capability, or absent command rejects only that observed resource.
+
+The plan's **Exact fixture required** field defaults to false. Unless it is true, treat Test page and Starting URL candidates as seeds, then:
+
+1. Enumerate every supported fresh and cached FIC pool exposed by the harness. Record allocation failures; do not silently omit them.
+2. Deduplicate resources by tenant ID before counting coverage.
+3. Read the plan's source- or context-cited Capability predicates.
+4. Discover alternate candidate sites through available SharePoint search, REST/API, tenant inventory, or repo fixture inventories. If one path is permission-limited, try another documented path.
+5. Probe candidates until one satisfies every predicate or the available discovery space is actually exhausted. A configured candidate cap or unavailable discovery mechanism means coverage is incomplete, not that the fixture is absent.
+6. Stop on the first eligible candidate and continue BEFORE/AFTER capture there.
+
+Every environment-related failure MUST write a `coverageManifest` into `rule-findings.json`:
+
+```json
+{
+  "status": "complete|incomplete",
+  "exactFixtureRequired": false,
+  "capabilityPredicates": [{"predicate": "...", "source": "file:line or doc section"}],
+  "pools": [{"environment": "...", "pool": "...", "credentialSource": "fresh|cached", "authResult": "...", "evidencePath": "..."}],
+  "discoveryPaths": [{"method": "search|api|inventory", "status": "complete|blocked", "evidencePath": "..."}],
+  "uniqueTenantCount": 0,
+  "candidatesDiscovered": 0,
+  "candidatesProbed": 0,
+  "candidateResults": [{"candidateKey": "opaque", "discoverySource": "...", "result": "eligible|rejected|unprobed", "reason": "...", "evidencePath": "..."}],
+  "exhaustionReason": "..."
+}
+```
+
+Do not put credentials, tokens, user identities, or raw tenant IDs in summaries. If the manifest is missing or `status` is `incomplete`, set `failureKind: "environment-discovery-incomplete"` and emit a blocker with `target: "evaluator-environment"`. Only complete coverage with no eligible candidate may set `failureKind: "fixture-gap"` and `target: "external"`.
+
+`status: "complete"` is valid only when capability predicates are cited, every supported pool is represented or has an explicit allocation result, tenants are deduplicated, every available discovery path is complete or explicitly blocked with evidence, and every unique discovered candidate has exactly one disposition. For `fixture-gap`, require `candidatesDiscovered == candidatesProbed == candidateResults.length`, every candidate result is `rejected` with an evidence path, and `exhaustionReason` explains why no further discovery path remains. Any `unprobed` candidate makes the manifest incomplete.
+
 **Forbidden language in rule-findings.json**:
 
 - `"auth-walled FIC tenant"` — FIC is not an auth wall; it auto-issues per-tenant tokens.
@@ -196,9 +235,9 @@ General rule for iframe-backed surfaces:
 3. Wait for frame load state and a non-empty content discriminator (body text, known title/control, or postMessage readiness signal).
 4. Only then capture BEFORE/AFTER.
 
-**Multi-user fixture surfaces.** Liked-by/comment/reaction panels often require a second user to create the visible entry point. Do not keep probing with one user if the source condition excludes same-user data (for example, `comment.likeCount - Number(comment.userLiked) > 0`). Use a two-user fixture (`adminUser` creates/comments, `nonAdminUser` likes/reacts) or a known pre-provisioned page. If TRIPS cannot allocate the needed users in both prod and dogfood, report `fixtureGap: true` and name the missing fixture instead of marking the code unverified generically.
+**Multi-user fixture surfaces.** Liked-by/comment/reaction panels often require a second user to create the visible entry point. Do not keep probing with one user if the source condition excludes same-user data (for example, `comment.likeCount - Number(comment.userLiked) > 0`). Use a two-user fixture (`adminUser` creates/comments, `nonAdminUser` likes/reacts) or a known pre-provisioned page, then apply the resource-scoped environment discovery protocol before declaring that the required user pair is unavailable.
 
-**Planner fixture surfaces.** PlanCreationPanel is not reachable on every group site. Its command-bar entry requires `pageContext.site.group.id` and `legacyPageContext.farmSettings.ExternalService_isplannerintegrationsupported == 1`. If a freshly created group site still lacks `[data-automation-id="CommandBarNewPlanButton"]`, the blocker is a missing Planner-integrated group-connected fixture. Record that fixture gap explicitly instead of looping on generic team-site creation or frontend-only `_spPageContextInfo` patches.
+**Planner fixture surfaces.** PlanCreationPanel is not reachable on every group site. Its source-derived predicates are a non-empty `pageContext.site.group.id`, `legacyPageContext.farmSettings.ExternalService_isplannerintegrationsupported` equal to string or numeric `1`, and a visible `[data-automation-id="CommandBarNewPlanButton"]`. Treat known Planner fixture routes as seeds, discover alternate group-connected sites, and apply the resource-scoped environment discovery protocol before declaring a gap.
 
 ### Step R-2.5b: Flight-/elevation-gated surface? FORCE the gating flights BEFORE you ever write `skip` / `un-reproducible` (MANDATORY)
 
@@ -450,8 +489,21 @@ Template:
 {
   "cycle": <N>,
   "verdict": "PASS|FAIL|INCONCLUSIVE",
+  "failureKind": "product|evaluator-spec|environment-discovery-incomplete|fixture-gap",
   "environment": "prod|dogfood|msit",
   "environmentRationale": "<one line citing R-2.5 table row or 'default prod'>",
+  "coverageManifest": {
+    "status": "complete|incomplete",
+    "exactFixtureRequired": false,
+    "capabilityPredicates": [],
+    "pools": [],
+    "discoveryPaths": [],
+    "uniqueTenantCount": 0,
+    "candidatesDiscovered": 0,
+    "candidatesProbed": 0,
+    "candidateResults": [],
+    "exhaustionReason": ""
+  },
   "hardGateFailures": [
     { "code": "<symptom>", "predicted": "...", "actual": "...", "evidence": "..." }
   ],
@@ -463,10 +515,12 @@ Template:
     { "name": "borderTopLeftRadius", "expected": "0px", "actual": "16px", "verdict": "FAIL" }
   ],
   "blockers": [
-    { "id": "...", "target": "generator|evaluator-spec", "description": "predicted X / actual Y / suspected root cause file:line" }
+    { "id": "...", "target": "generator|evaluator-spec|evaluator-environment|external", "description": "predicted X / actual Y / suspected root cause file:line" }
   ]
 }
 ```
+
+Omit `coverageManifest` only when the verdict makes no claim about auth, FIC, tenants, sites, fixtures, or environment availability.
 
 ### Step R-8: verdict-lint hard gate
 
@@ -482,6 +536,7 @@ Treat any lint failure (especially schema completeness) as a procedural blocker;
 mode: ui_verification_rule_complete
 cycle: <N>
 result: PASS|FAIL
+failureKind: product|evaluator-spec|environment-discovery-incomplete|fixture-gap
 ruleFindingsPath: {outDir}/rule-findings.json
 expectedAfterPath: {outDir}/expected-after.md
 blockerCount: <N>

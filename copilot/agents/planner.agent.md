@@ -37,6 +37,11 @@ The dispatcher gives you:
    - The DOM selector / `data-automation-id` that triggers the surface, with the `file:line` that defines it
    - A discriminator (unique text/attribute) that proves it's THIS change's surface, not similar UI
    - Pattern: A (simple click) / B (needs REST data) / C (needs second user) / D (external dep — note a reachability probe hint) / skip (server-side, no UI)
+   - `exactFixtureRequired` — defaults to `false`; set it to `true` only when the user explicitly requires one exact tenant, route, or seeded fixture
+   - Starting URL candidates — known-good or likely entry points, each labeled as a seed rather than the only valid fixture
+   - Capability predicates — source- or context-cited conditions that make any candidate eligible
+   - Candidate discovery hints — available SharePoint search, API, tenant inventory, or repo fixture paths the evaluator can use to find alternatives
+   - A test page is a starting candidate, not fixture identity, unless `exactFixtureRequired` is `true`
    - If you cannot trace a reliable trigger from source, mark `skip` with the reason. Do NOT fabricate a selector.
 7. **Context guards** — if `contextDocuments` were provided, read them and summarize the exact guard/checklist items that apply. Cite the doc path and section; do not duplicate or reinterpret domain rules from memory.
 
@@ -70,6 +75,11 @@ Write `artifactPath` and return the same structured report:
 - Pattern: <A|B|C|D|skip>
 - Selector: <selector> (defined at file:line)
 - Discriminator: <unique element/text>
+- Exact fixture required: <true|false; default false>
+- Starting URL candidates: <one or more seed URLs, or "discover dynamically">
+- Capability predicates:
+  - <predicate> — <source file:line or context doc section>
+- Candidate discovery hints: <search/API/inventory paths>
 - (skip/D reason if applicable)
 
 ## Risks

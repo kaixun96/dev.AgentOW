@@ -187,6 +187,7 @@ Agent({
 
     BATCH MODE — CRITICAL FINAL STEP:
     When the entire pipeline completes (PR created OR failure), you MUST
+    write {sessionDir}/batch-result.json, then
     send a SendMessage to 'team-lead' as your VERY LAST action. Do NOT
     just write the result in plain text — plain text does not propagate
     to the dispatcher.
@@ -195,6 +196,7 @@ Agent({
     'BATCH_RESULT:' so the dispatcher can parse it reliably:
 
       Success:   SendMessage(to='team-lead', message='BATCH_RESULT: success | PR: <url>')
+      Blocked:   SendMessage(to='team-lead', message='BATCH_RESULT: success-with-blockers | PR: <url> | MANIFEST: <path>')
       Failure:   SendMessage(to='team-lead', message='BATCH_RESULT: failure | ERROR: <reason>')
 
     Send this exactly ONCE, after everything else is done. The dispatcher
@@ -226,10 +228,24 @@ while true; do
   ELAPSED=$((NOW - TASK_START))
   ELAPSED_MIN=$((ELAPSED / 60))
 
-  # Check completion
-  if [ -f "$SESSION_DIR/progress.log" ] && tail -5 "$SESSION_DIR/progress.log" | grep -q "✅ Workflow complete"; then
-    LAST_PR=$(tail -10 "$SESSION_DIR/progress.log" | grep -oE 'https://[^ ]+pullrequest/[0-9]+' | tail -1)
-    echo "WAKE_COMPLETE | PR=${LAST_PR:-unknown}"
+  # Check the persisted final result. It is written before Workflow complete
+  # and preserves success-with-blockers plus its coverage manifest.
+  if [ -f "$SESSION_DIR/batch-result.json" ]; then
+    RESULT_FIELDS=$(node -e "
+      const fs = require('fs');
+      const r = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+      const clean = (v) => String(v || '').replace(/[\\r\\n|]/g, ' ');
+      process.stdout.write([
+        clean(r.status),
+        clean(r.prUrl),
+        clean(r.manifestPath),
+        clean(r.error)
+      ].join('|'));
+    " "$SESSION_DIR/batch-result.json")
+    IFS='|' read -r RESULT_STATUS RESULT_PR RESULT_MANIFEST RESULT_ERROR <<EOF
+$RESULT_FIELDS
+EOF
+    echo "WAKE_COMPLETE | status=${RESULT_STATUS:-failure} | PR=${RESULT_PR:-unknown} | MANIFEST=${RESULT_MANIFEST:-none} | ERROR=${RESULT_ERROR:-none}"
     exit 0
   fi
 
@@ -260,7 +276,7 @@ Now call `Monitor` on `{watchdogBgId}`. Monitor streams each stdout line as a no
 
 You will receive notifications one at a time. For each:
 
-**`WAKE_COMPLETE | PR=<url>`** → workflow completed successfully (orchestrator wrote `✅ Workflow complete` to progress.log; PR URL extracted). Use this URL. Done.
+**`WAKE_COMPLETE | status=<status> | PR=<url> | MANIFEST=<path> | ERROR=<reason>`** → parse the persisted result. Preserve `success-with-blockers` and its manifest path; do not collapse it to plain success.
 
 **`WAKE_STALL_30MIN | log_idle=Xmin | last: <line>`** → pipeline has been silent for 30 min. Determine stuck agent from the last log line, then SendMessage to nudge:
 
@@ -286,10 +302,16 @@ Append to batch.log: `[$(date +%H:%M:%S)] 🔔 Task ${i} stall at 30min, woke ${
 Continue waiting (Monitor will fire again on the next event).
 
 **`WAKE_TIMEOUT_60MIN | log_idle=Xmin | last: <line>`** → final timeout. Final progress.log check:
-- If `✅ Workflow complete` is now in the log → success-recovered-from-log
+- If `batch-result.json` exists → parse it exactly like `WAKE_COMPLETE`
+- If only `✅ Workflow complete` exists without `batch-result.json` → mark failure `completion-result-missing`; do not infer success
 - Otherwise → mark timeout, give up
 
 **BATCH_RESULT SendMessage from orchestrator** → parse and done (this can arrive at any time; it overrides waiting for watchdog wake events).
+
+Accepted statuses:
+- `success` — PR created with all hard gates passed.
+- `success-with-blockers` — PR created only after a complete external fixture/environment manifest; preserve the manifest path in the summary.
+- `failure` — no successful task result.
 
 When you exit the wait (any path), kill the watchdog:
 ```bash
@@ -298,7 +320,8 @@ kill ${watchdogBgId} 2>/dev/null
 
 Append the appropriate batch.log entry:
 - Success via SendMessage: `[$(date +%H:%M:%S)] ✅ Task ${i} complete: PR <url>`
-- Success via watchdog WAKE_COMPLETE: `[$(date +%H:%M:%S)] ✅ Task ${i} complete (watchdog detected via log): PR <url>`
+- Success with blockers: `[$(date +%H:%M:%S)] ⚠️ Task ${i} complete with blockers: PR <url>; manifest <path>`
+- Success via watchdog WAKE_COMPLETE: `[$(date +%H:%M:%S)] ✅ Task ${i} complete (watchdog result): PR <url>`
 - Failure: `[$(date +%H:%M:%S)] ❌ Task ${i} failed: <reason>`
 - Timeout: `[$(date +%H:%M:%S)] ⏰ Task ${i} timed out after 60min`
 
@@ -311,7 +334,7 @@ Send `{"type":"shutdown_request"}` to all 5 agents via SendMessage. This frees m
 Append a row to `{batchSummary}`:
 
 ```markdown
-| {i} | {taskDescription} | ✅ success / ❌ failed / ⏰ timeout | {PR URL or "—"} | {sessionDir} |
+| {i} | {taskDescription} | ✅ success / ⚠️ success-with-blockers / ❌ failed / ⏰ timeout | {PR URL or "—"} | {sessionDir; manifest path when blocked} |
 ```
 
 ### 2j. Continue to next task
@@ -329,6 +352,7 @@ After all tasks finish, write the final summary section:
 
 - Total: {N}
 - ✅ Success: {successCount} (with PRs)
+- ⚠️ Success with blockers: {blockerCount} (with complete manifests)
 - ❌ Failed: {failureCount}
 - ⏰ Timed out: {timeoutCount}
 
@@ -349,6 +373,7 @@ Tell the user:
 
   Total: {N}
   ✅ {successCount} PRs created
+  ⚠️ {blockerCount} PRs created with complete external blockers
   ❌ {failureCount} failed
   ⏰ {timeoutCount} timed out
 

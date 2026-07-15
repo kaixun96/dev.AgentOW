@@ -383,11 +383,21 @@ Wait for `mode: ui_verification_rule_complete` response. It returns:
 - `ruleFindingsPath` — path to `rule-findings.json`
 - `expectedAfterPath` — `expected-after.md` (you may inspect, vision MUST NOT see it)
 - `result: PASS|FAIL`
+- `failureKind` — `product|evaluator-spec|environment-discovery-incomplete|fixture-gap`
 - Artifacts written to outDir: `before-<name>.png`, `after-<name>.png`, `before-<name>-cropped.png`, `after-<name>-cropped.png`, `composite-<name>.png`, `diff-<name>.png`, `before-aria.json`, `after-aria.json`, `before-probes.json`, `after-probes.json`, `aria-diff.json`, `pixel-diff.json`, `structural-diff.json`, `playwright-output.log`
+
+Before Step 5b, read `rule-findings.json` and enforce the environment evidence gate:
+
+- If `failureKind == "environment-discovery-incomplete"`, or an auth/FIC/tenant/site/fixture claim has no `coverageManifest`, do **not** dispatch vision and do not route to generator. Re-dispatch `ow-evaluator-rule` with `mode: environment_discovery`, the same implementation `cycle`, the prior findings path, and the missing manifest requirements. This retry does not rebuild, retest, or increment the product cycle.
+- If that retry still returns a missing/incomplete manifest, stop the workflow with an environment-verification blocker. An unsupported fleet-wide claim cannot be auto-shipped.
+- Treat a manifest as complete only when predicates are cited, every supported pool has a result, tenants are deduplicated, discovery paths are complete or explicitly blocked with evidence, and every unique candidate has one disposition. For a gap, require `candidatesDiscovered == candidatesProbed == candidateResults.length`, every candidate rejected with evidence, no `unprobed` result, and an `exhaustionReason` proving no discovery path remains.
+- Normalize any self-declared complete manifest that fails those checks to `failureKind: environment-discovery-incomplete` with `target: evaluator-environment`, then redispatch it through the same-cycle environment gate.
+- If `failureKind == "fixture-gap"`, require that complete manifest. Do not dispatch vision because no AFTER screenshot exists; route the complete external blocker according to Step 6.
+- Dispatch vision only when the AFTER PNG exists and the rule result is not an environment failure.
 
 #### Step 5b: Dispatch vision evaluator (cold-eye)
 
-> **⛔ PRECONDITION:** You must have already received `ui_verification_rule_complete` from Step 5a in a prior turn. If you have not, go back to Step 5a — do NOT dispatch vision speculatively. Vision will block forever polling for an AFTER PNG that only rule can produce.
+> **⛔ PRECONDITION:** You must have already received `ui_verification_rule_complete` from Step 5a in a prior turn, passed the environment evidence gate, and confirmed the AFTER PNG exists. If not, go back to Step 5a — do NOT dispatch vision speculatively.
 
 Locate the AFTER PNG produced by rule. Then:
 
@@ -414,6 +424,8 @@ echo "[$(date +%H:%M:%S)] 🔍 Rule: <rule verdict> | Vision: <vision verdict>" 
 | FAIL | * | **FAIL** | fix cycle, blockers from rule-findings.json |
 | PASS | FAIL | **FAIL** | fix cycle, blockers from vision-findings.json (target: generator) |
 
+An environment failure is handled before this table and never reaches vision.
+
 Vision FAIL overrides rule PASS. This is the whole point of the ensemble — rule cannot see occlusion/overflow because no probe captures it; if vision flags a `severity: blocker` issue (e.g. "placeholder gray slash overlaps title text at (x,y)"), the cycle FAILs even if every probe is green.
 
 When merging vision findings into the blocker list for the next generator cycle, prefix the description with `[vision]` and include the coordinate + element observation verbatim so the generator can reproduce.
@@ -434,19 +446,32 @@ Combine results from all agents:
 Read `reportFile` for structured NDJSON data.
 
 **If evaluator result is FAIL (any criteria):**
-1. If `cycle >= 5`:
-   - Inform user: "Max retry cycles reached. Remaining blockers: ..."
-   - Ask user for guidance
-2. If `cycle < 5`:
-   ```bash
-   echo "[$(date +%H:%M:%S)] ⚠️  Evaluation FAIL — starting fix cycle <N+1>" >> {progressLog}
-   ```
-   - Show blockers from evaluator
-   - **Route blockers by `target:` tag** (see `visual-quality-*` blocker schema in ow-evaluator.md):
-     - **Any blocker tagged `target: generator`** → dispatch to **generator** in cycle N+1. Generator must address the code defect (CSS, template, etc.). Even ONE generator-target blocker forces a generator cycle — do NOT let evaluator self-heal around it.
-     - **All blockers tagged `target: evaluator-spec` (no generator blockers)** → dispatch to **evaluator only** in cycle N+1; generator stays idle. Evaluator rewrites the spec, re-runs Playwright.
-     - **Untagged blockers** (legacy / non-visual-quality) → default to dispatching **generator** (safer default — code fix is more likely to be the real issue).
-   - Go back to **Step 2** with `cycle = N + 1` and `blockers` from evaluator, with the dispatch target chosen by the rule above.
+1. If any blocker is tagged `target: evaluator-environment`:
+   - Require `coverageManifest`.
+   - Missing/incomplete coverage → redispatch only the rule evaluator in the same implementation cycle. Do not invoke generator, rebuild, retest, increment the product cycle, or create a PR.
+   - Complete coverage with no eligible candidate → convert to `target: external`; do not invoke generator.
+2. If all blockers are tagged `target: external`:
+   - Interactive mode: show the coverage summary and ask whether to ship a draft with the external blocker.
+   - Auto/batch mode: continue only as `success-with-blockers`, preserving the complete manifest in `report.json`, `final.md`, and the PR description.
+3. If all blockers are tagged `target: evaluator-spec`:
+   - Redispatch only `ow-evaluator-rule` with the unchanged implementation `cycle` and the spec blockers.
+   - Do not invoke generator, rebuild, retest, increment the product cycle, or go back to the generator entry step.
+4. Otherwise apply the product retry limit:
+   - If `cycle >= 5`:
+     - Inform user: "Max retry cycles reached. Remaining blockers: ..."
+     - Ask user for guidance
+   - If `cycle < 5`:
+     ```bash
+     echo "[$(date +%H:%M:%S)] ⚠️  Evaluation FAIL — starting fix cycle <N+1>" >> {progressLog}
+     ```
+     - Show blockers from evaluator.
+     - **Route blockers by `target:` tag** (see `visual-quality-*` blocker schema in ow-evaluator.md):
+       - **Any blocker tagged `target: generator`** → dispatch to **generator** in cycle N+1. Generator must address the code defect (CSS, template, etc.). Even ONE generator-target blocker forces a generator cycle — do NOT let evaluator self-heal around it.
+       - **All blockers tagged `target: evaluator-spec` (no generator blockers)** → handled before the product retry limit above with the unchanged implementation cycle.
+       - **Any blocker tagged `target: evaluator-environment`** → handled by the same-cycle environment evidence gate above; it must never fall through to generator routing.
+       - **All blockers tagged `target: external`** → handled as a complete external gap above; it must never fall through to generator routing.
+       - **Untagged blockers** (legacy / non-visual-quality) → default to dispatching **generator** (safer default — code fix is more likely to be the real issue).
+     - Go back to **Step 2** with `cycle = N + 1` and `blockers` from evaluator, with the dispatch target chosen by the rule above.
 
 **Anti-laziness check**: in the cycle log, count `target: generator` vs `target: evaluator-spec` ratio across the session. If 3+ consecutive cycles produce ONLY `target: evaluator-spec` blockers, raise a concern in the log:
 ```
@@ -615,6 +640,8 @@ ow-pr-attach({
 
 If `visualValidation.status == "failed"`, log the failure but proceed — the PR is still valid, the screenshots just couldn't be captured:
 
+This path is forbidden when `failureKind == "environment-discovery-incomplete"` or the coverage manifest is missing/incomplete. Those states block PR creation. A complete `fixture-gap` may proceed only under the Step 6 interactive or auto/batch policy and must include the coverage summary.
+
 ```
 ow-pr-attach({
   prId: <prId>,
@@ -637,6 +664,14 @@ echo "[$(date +%H:%M:%S)] 📸 Visual validation attached to PR" >> {progressLog
 
 #### Step 7d: Report Completion
 
+**When `batchMode` is true, persist the final result before writing Workflow complete or sending the final message.** Write `{sessionDir}/batch-result.json`:
+
+```json
+{"status":"success|success-with-blockers|failure","prUrl":"<url or empty>","manifestPath":"<coverageManifest path or empty>","error":"<one-line reason or empty>"}
+```
+
+The status and manifest path must match the final `BATCH_RESULT` message. This file is the watchdog recovery source of truth.
+
 Write progress:
 ```bash
 echo "[$(date +%H:%M:%S)] ✅ Workflow complete" >> {progressLog}
@@ -653,6 +688,14 @@ SendMessage(
 )
 ```
 
+Or when a PR is created with a complete external fixture/environment blocker:
+```
+SendMessage(
+  to='team-lead',
+  message='BATCH_RESULT: success-with-blockers | PR: <prUrl> | MANIFEST: <coverageManifest path>'
+)
+```
+
 Or on failure:
 ```
 SendMessage(
@@ -661,7 +704,7 @@ SendMessage(
 )
 ```
 
-The `BATCH_RESULT:` prefix MUST be present and the format must be exactly as shown — the dispatcher parses it. After sending, your work is done.
+The `BATCH_RESULT:` prefix MUST be present and the status must be exactly `success`, `success-with-blockers`, or `failure` as shown — the dispatcher parses it. After sending, your work is done.
 
 **If `batchMode` is false (normal interactive/auto run):**
 

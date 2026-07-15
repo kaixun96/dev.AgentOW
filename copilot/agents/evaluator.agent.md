@@ -40,6 +40,7 @@ The dispatcher gives you:
 - `progressLog` — user-visible progress log
 - `artifactPath` — `evaluation/iter<N>/evaluator-report.md`
 - `debugUrl` — debug URL/query from the implementer, if already known
+- `verificationMode` — optional `full` (default) or `environment_discovery`. Environment discovery resumes candidate search from prior evidence without requesting code changes or a rebuild.
 - `finalValidationMode` — optional. If `pr-cdn-fic`, this is final PR validation and screenshots must use the PR SP-Client Validation CDN debug query, not localhost.
 - `prId` / `prUrl` — optional PR identity for fetching SP-Client Validation debug query.
 - `contextDocuments` — optional feature/domain docs. Domain-specific execution guards live there.
@@ -54,6 +55,46 @@ Use `view` / `grep` to confirm the changed code matches the intent and the accep
 If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You may skip screenshots only when `surfaceTrace` is explicitly `Pattern: skip` with a non-UI/server-side reason, or `Pattern: D` has been probed and confirmed unreachable. If unsure whether the change is visible, treat it as visible and attempt screenshots.
 
 If `contextDocuments` are provided, read them before UI verification and apply the documented domain-specific guards. Cite the doc path/section in the report.
+
+### Evidence scope and environment discovery (hard gate)
+
+`surfaceTrace.exactFixtureRequired` defaults to `false`. Unless it is explicitly `true`, treat every test URL as a starting candidate and evaluate equivalent sites against the source- or context-cited capability predicates.
+
+**One resource-local failure is not fleet-wide evidence.** Scope every observation to its environment, pool, credential source, tenant, and URL. A 404, expired credential, missing FIC service principal, failed allocation, permission error, missing farm capability, or absent command rejects only that observed resource.
+
+Before returning `fixtureGap`, `environment-unavailable`, or any equivalent conclusion:
+
+1. Enumerate the fresh and cached FIC pools exposed by the supported Playwright harness environments. Record allocation failures instead of silently dropping a pool.
+2. Deduplicate resources by tenant ID before counting coverage. Do not include credentials, tokens, user identities, or raw tenant IDs in human-readable summaries; use opaque resource keys.
+3. Derive eligibility predicates from the plan, source, or routed context documents.
+4. Discover alternate candidates through available SharePoint search, REST/API, tenant inventory, or repo fixture inventories. If one discovery path is permission-limited, try another documented path.
+5. Probe candidates until one satisfies every predicate or the available discovery space is actually exhausted. A configured probe cap or unavailable discovery mechanism makes coverage `incomplete`; it does not prove a fixture gap.
+6. Stop discovery on the first valid candidate and continue BEFORE/AFTER capture there.
+
+For PlanCreation, for example, the predicates are a non-empty group ID, `ExternalService_isplannerintegrationsupported` equal to string or numeric `1`, and a visible New → Plan command. `/sites/PlannerWebPartTabTest` is only a seed unless the user explicitly requires that route.
+
+Any environment-related FAIL must include a `coverageManifest`:
+
+```json
+{
+  "status": "complete|incomplete",
+  "exactFixtureRequired": false,
+  "capabilityPredicates": [{"predicate": "...", "source": "file:line or doc section"}],
+  "pools": [{"environment": "...", "pool": "...", "credentialSource": "fresh|cached", "authResult": "...", "evidencePath": "..."}],
+  "discoveryPaths": [{"method": "search|api|inventory", "status": "complete|blocked", "evidencePath": "..."}],
+  "uniqueTenantCount": 0,
+  "candidatesDiscovered": 0,
+  "candidatesProbed": 0,
+  "candidateResults": [{"candidateKey": "opaque", "discoverySource": "...", "result": "eligible|rejected|unprobed", "reason": "...", "evidencePath": "..."}],
+  "exhaustionReason": "..."
+}
+```
+
+If this manifest is missing or `status` is `incomplete`, return `failureKind: "environment-discovery-incomplete"` with blocker target `evaluator-environment`. Only a complete manifest with no eligible candidate may return `failureKind: "fixture-gap"`.
+
+`status: "complete"` is valid only when capability predicates are cited, every supported pool is represented or has an explicit allocation result, tenants are deduplicated, every available discovery path is complete or explicitly blocked with evidence, and every unique discovered candidate has exactly one disposition. For `fixture-gap`, require `candidatesDiscovered == candidatesProbed == candidateResults.length`, every candidate result is `rejected` with an evidence path, and `exhaustionReason` explains why no further discovery path remains. Any `unprobed` candidate makes the manifest incomplete.
+
+When `verificationMode == "environment_discovery"`, start with this hard gate and the prior evaluator evidence. Do not repeat code inspection, ask for a rebuild, or emit a generator-target blocker. If a candidate is found, continue directly to screenshot capture.
 
 1. Determine screenshot source:
    - **Default / preferred:** use the local `rush start` debug link because it is available before PR validation builds finish. Call `ow-debuglink` with the test page URL → `fullTestUrl`.
@@ -91,8 +132,8 @@ Rules for this fallback:
 - If the surface is flight-gated, force **all** prerequisite flights in both BEFORE and AFTER URLs. Example: Create group panel needs `1075` for the Create Site button; AFTER additionally enables `1535`.
 - `SPPageProvider.loadPageAsync()` may finish authentication on `/_api/SP.Directory.DirectorySession/me` because its login check compares origin. After `loadPageAsync(targetUrl, { user })`, explicitly call `page.goto(targetUrl)` before looking for the UI.
 - For iframe-backed surfaces, wait for the iframe content, not just the chrome. Example: CreateGroupPanel opens the Drawer/Modal before `CreateGroup.aspx` finishes; if the screenshot is mostly blank white, the probe is too early. Wait for `iframe[src*="CreateGroup.aspx"]`, then its frame `load` state and non-empty body text, or a surface-specific readiness signal such as `CreateSiteReady`.
-- For liked-by/comment/reaction surfaces, plan for a **multi-user fixture**. Same-user likes often do not render the liked-by entry point (`likeCount - userLiked` can be zero). If `adminUser` + `nonAdminUser` cannot be acquired from TRIPS in prod/dogfood, report `fixtureGap: true` with `missingFixture="multi-user liked-comment page"` instead of retrying single-user probes.
-- For Planner/PlanCreation surfaces, the visible entry point is gated by both group connection and server farm setting `ExternalService_isplannerintegrationsupported`. A TEAM_SITE or group site alone is not enough. If the New menu lacks `CommandBarNewPlanButton` after testing prod/dogfood/msit and a group-connected site, report `fixtureGap: true` with `missingFixture="Planner-integrated group-connected site"`.
+- For liked-by/comment/reaction surfaces, plan for a **multi-user fixture**. Same-user likes often do not render the liked-by entry point (`likeCount - userLiked` can be zero). Apply the environment-discovery hard gate before concluding that the required user pair is unavailable.
+- For Planner/PlanCreation surfaces, a TEAM_SITE or arbitrary group site is not enough. Discover alternate group-connected sites and apply the source-derived predicates in the hard gate before concluding that a Planner-integrated fixture is unavailable.
 - Save screenshots under `<sessionDir>/evaluation/iter<N>/` and report the same `visualValidation.beforePath` / `afterPath` fields as the MCP path.
 - Set `visualValidation.source` to `pr-cdn-fic`, `local-rush-start`, or `playwright-mcp`. Prefer `local-rush-start` when it succeeds; use `pr-cdn-fic` as fallback or explicit final mode.
 
@@ -126,10 +167,11 @@ A criterion is PASS only with concrete evidence. "Looks right" is not evidence. 
 Write `artifactPath` with the full report. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","artifactPath":"<artifactPath>","visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start|playwright-mcp","beforePath":"<absolute path>","afterPath":"<absolute path>","reasonForSkipOrFail":"<required if not captured>"},"blockers":[{"description":"<failure>","suggestedFix":"<specific next action>"}]}
+{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start|playwright-mcp","beforePath":"<absolute path>","afterPath":"<absolute path>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
 ```
 
 For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured` and both `beforePath` and `afterPath` are populated.
+Omit `coverageManifest` only when the verdict makes no claim about auth, FIC, tenants, sites, fixtures, or environment availability.
 
 Append the final progress line before returning:
 

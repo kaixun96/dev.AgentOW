@@ -160,7 +160,12 @@ This section is MANDATORY. It tells the evaluator how to capture BEFORE/AFTER sc
 - **Setup needed** (only for Pattern B/C):
   - <e.g. POST /_api/comments with body {...} as adminUser>
   - <e.g. open page as nonAdminUser, click like button>
-- **Test page**: <SharePoint URL, or "default" for ElevationTest>
+- **Exact fixture required**: `false` by default; use `true` only when the user explicitly requires one tenant, route, or seeded fixture
+- **Starting URL candidates**: <known or likely entry URLs; each is a seed unless exact fixture is required>
+- **Capability predicates**:
+  - <eligibility condition> — <source file:line or routed context doc section>
+- **Candidate discovery hints**: <SharePoint search, REST/API, tenant inventory, or repo fixture path>
+- **Test page**: <SharePoint seed URL, or "default" for ElevationTest; not fixture identity by default>
 - **Flights**: `['1535']` or specific flight IDs
 
 ### Verification
@@ -308,7 +313,6 @@ screenshotName: <kebab-case identifier used in filenames, e.g. "amplify-drawer">
 | **skip** | Surface trace cannot be reliably determined from source code OR is server-side (no UI surface affected). MUST include `reasonForSkip`. |
 
 ### When to skip
-- Pattern D (external product dependency)
 - Server-side only changes (no UI surface affected)
 - Surface is rendered conditionally in ways that cannot be triggered in test (e.g. error states that require backend failure)
 - The changed code is in a hook/utility shared by many components and no single trigger demonstrates THIS PR's effect
@@ -324,6 +328,7 @@ If skipping, replace the entire Surface Trace section with:
 **Critical rules for Visual Validation**:
 - **Every selector MUST cite source (`file:line`).** Do NOT guess or use "similar looking" selectors from other components.
 - **The expected container + discriminator must be specific to THIS PR.** Generic things like "any Drawer rendered" are not acceptable — the evaluator needs to prove it captured the right surface, not just any UI.
+- **A test page is a starting candidate unless Exact fixture required is true.** For capability-gated surfaces, provide source-cited predicates and discovery hints so one missing route cannot become a fleet-wide fixture conclusion.
 - **If you cannot trace the surface from source code, mark pattern=skip.** Do NOT fabricate a trigger you "think" might work.
 
 **Critical:** Every task MUST reference exact file paths discovered during research. No placeholder paths.
