@@ -138,7 +138,11 @@ Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, sur
 
 For UI-visible changes, visual validation is mandatory and the evaluator owns it:
 - BEFORE and AFTER screenshot paths must be present in the evaluator result.
+- Primary `beforePath` / `afterPath` must be full browser-page/viewport screenshots that include the surrounding page context, not Drawer/Dialog/component-only crops. Their dimensions must match the evaluator's recorded viewport.
+- Optional close-up crops belong only in `beforeCropPath` / `afterCropPath`; they are supplemental evidence.
 - If screenshots are missing, visual validation failed, or the evaluator says Playwright/browser tools were unavailable, treat the evaluator result as **FAIL** even if code inspection passed.
+- Before accepting PASS, independently `view` both primary images and run `file -- "<beforePath>" "<afterPath>"`; do not trust filenames, `captureMethod`, `dimensionEvidence`, or the evaluator's dimension claim without this cross-check.
+- If either primary image lacks surrounding page context or its actual PNG dimensions do not match the recorded viewport, classify it as `evaluator-spec` and re-dispatch the evaluator once in the same implementation cycle.
 - Screenshots created manually by the main session do **not** satisfy evaluator validation. If the main session writes a temporary spec to unblock an investigation, move that logic into the evaluator retry prompt and re-dispatch the evaluator.
 - Surface the exact failure reason to the user and record it in `progress.log`, `report.json`, and `final.md` if the run stops.
 - Do not claim the UI was verified without screenshot evidence.
@@ -154,7 +158,7 @@ Before accepting any evaluator claim about auth, FIC, tenant suitability, test-p
 
 **Environment-discovery incomplete (any cycle):** re-dispatch only `@agentow-copilot:evaluator` in the same implementation cycle with the missing coverage requirements. If the retry is still incomplete, stop rather than auto-shipping an unsupported environment claim.
 
-**Evaluator-spec FAIL (any cycle):** re-dispatch only `@agentow-copilot:evaluator` in the same implementation cycle with the spec blocker. Do not edit code, rebuild, retest, or consume a product fix cycle.
+**Evaluator-spec FAIL (any cycle):** re-dispatch only `@agentow-copilot:evaluator` once in the same implementation cycle with the spec blocker. Do not edit code, rebuild, retest, or consume a product fix cycle. If the retry still violates the evaluator contract, stop and report the blocker rather than looping or auto-shipping.
 
 **Complete external fixture gap:** do not change product code. In interactive mode, show the coverage summary and ask whether to ship a draft with the blocker. In auto/batch mode, the run may continue only as `success-with-blockers`, preserving the complete manifest in `report.json` and `final.md`.
 
@@ -196,7 +200,7 @@ Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat r
 
 1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no auto-generated "Testing" section).
 2. **Visual validation for UI changes:** prefer evaluator screenshots from the local `rush start` debug link because it is available immediately after implementation. If local debug validation captures BEFORE/AFTER successfully, attach those screenshots to the PR description. Only fall back to `ow-pr-debug-query` / `finalValidationMode=pr-cdn-fic` when local debug validation fails for environment/tooling reasons (for example localhost cert/assembly-load failure, missing browser MCP, or a surface that only reproduces against PR CDN).
-3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. Include `visualValidation.source` in the PR description (`local-rush-start` or `pr-cdn-fic`) so reviewers know which path produced the images. If the evaluator did not capture BEFORE/AFTER screenshots, do not present the run as visually verified; include the visual-validation failure reason in the PR description only if the user explicitly chooses to ship a draft anyway.
+3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. The primary BEFORE/AFTER table in the PR description MUST embed the full-page/viewport `beforePath` and `afterPath`. Component crops may be attached as clearly labeled supplemental detail links, but must never replace the primary images. Include `visualValidation.source` in the PR description (`local-rush-start` or `pr-cdn-fic`) so reviewers know which path produced the images. If the evaluator did not capture valid full-page/viewport BEFORE/AFTER screenshots, do not present the run as visually verified; include the visual-validation failure reason in the PR description only if the user explicitly chooses to ship a draft anyway.
    - If visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.
 4. **Report** the PR URL to the user.
 

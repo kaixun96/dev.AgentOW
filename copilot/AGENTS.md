@@ -85,6 +85,8 @@ For any visible UI change, Playwright screenshots are mandatory. The evaluator m
 
 If Playwright MCP/browser tools are unavailable, the evaluator must first try the FIC Playwright fallback (`rushx playwright` / Heft) before returning a tooling failure. If authentication blocks the page, the debug link cannot be built, the selector cannot be found after all prerequisite flights are forced, the discriminator does not match, or no screenshot path is produced, the evaluator must return `FAIL` with a specific reason. Do not claim visual verification passed without screenshot paths.
 
+Primary PR screenshots must show the full browser page/viewport, including surrounding page context. Drawer/Dialog/component crops are supplemental only and must not be stored in `visualValidation.beforePath` / `afterPath` or embedded as the primary BEFORE/AFTER table. Before accepting evaluator PASS, the main session must independently view both primary images and compare their actual PNG dimensions with the recorded viewport.
+
 Environment claims have a second hard gate: one failed URL, credential, tenant, or site is resource-local evidence, not proof that all FIC environments are unsuitable. Before `fixtureGap`, the evaluator must enumerate available fresh/cached pools, deduplicate tenants, discover alternate candidates, apply source-cited capability predicates, and emit a complete `coverageManifest`. Missing or incomplete coverage triggers evaluator-only environment discovery in the same implementation cycle and cannot be auto-shipped.
 
 ## The pipeline

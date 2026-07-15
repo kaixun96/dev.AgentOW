@@ -32,7 +32,12 @@ const checks = [
       "A configured probe cap or unavailable discovery mechanism makes coverage `incomplete`",
       "Any `unprobed` candidate makes the manifest incomplete",
       "`candidatesDiscovered == candidatesProbed == candidateResults.length`",
-      "every candidate result is `rejected` with an evidence path"
+      "every candidate result is `rejected` with an evidence path",
+      "full browser page/viewport",
+      "primary-screenshot-not-full-viewport",
+      "`visualValidation.beforePath` / `afterPath` MUST point to full-page/viewport PNGs",
+      "Run `file -- \"<beforePath>\" \"<afterPath>\"`",
+      "`captureMethod` is `page`"
     ]
   },
   {
@@ -45,14 +50,20 @@ const checks = [
       "Downgrade any malformed manifest to `environment-discovery-incomplete`",
       "a non-empty `exhaustionReason` proving no discovery path remains",
       "retarget its blocker to `evaluator-environment`",
-      "do not route it to the implementer as a code defect"
+      "do not route it to the implementer as a code defect",
+      "Primary `beforePath` / `afterPath` must be full browser-page/viewport screenshots",
+      "Component crops may be attached as clearly labeled supplemental detail links",
+      "independently `view` both primary images and run `file -- \"<beforePath>\" \"<afterPath>\"`",
+      "If the retry still violates the evaluator contract, stop and report the blocker"
     ]
   },
   {
     file: "copilot/AGENTS.md",
     snippets: [
       "one failed URL, credential, tenant, or site is resource-local evidence",
-      "Missing or incomplete coverage triggers evaluator-only environment discovery"
+      "Missing or incomplete coverage triggers evaluator-only environment discovery",
+      "Primary PR screenshots must show the full browser page/viewport",
+      "the main session must independently view both primary images"
     ]
   },
   {
@@ -132,7 +143,11 @@ const forbiddenChecks = [
   },
   {
     file: "copilot/agents/evaluator.agent.md",
-    snippets: ["If `adminUser` + `nonAdminUser` cannot be acquired from TRIPS"]
+    snippets: [
+      "If `adminUser` + `nonAdminUser` cannot be acquired from TRIPS",
+      "save BEFORE to `<sessionDir>/evaluation/iter<N>/before-<component>.png`",
+      "save AFTER to `<sessionDir>/evaluation/iter<N>/after-<component>.png`"
+    ]
   },
   {
     file: "agents/ow-evaluator-rule.md",

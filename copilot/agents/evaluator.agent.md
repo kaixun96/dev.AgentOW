@@ -106,14 +106,21 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    - If an AAD/login/consent page blocks access, return `FAIL` with blocker `playwright-auth-required` and tell the user exactly what page/prompt was seen.
 4. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
    - If the surface hosts an iframe or another async shell, the outer Drawer/Dialog/Modal is not enough. Wait for the inner discriminator or iframe content to be visible before taking screenshots.
-5. `browser_screenshot` → save BEFORE to `<sessionDir>/evaluation/iter<N>/before-<component>.png`.
+5. Capture the primary BEFORE screenshot as the **full browser page/viewport**, including SharePoint chrome, page canvas, backdrop, and target surface. Never use an element/locator/selector crop as primary PR evidence.
+   - Set and record one viewport size for both phases.
+   - With browser MCP, take a page screenshot without an element/ref/selector.
+   - With a Playwright spec, use `page.screenshot({ path, fullPage: false })` after setting the viewport; `fullPage: false` captures the entire current viewport rather than one DOM element.
+   - Save it to `<sessionDir>/evaluation/iter<N>/before-<component>-full.png`.
+   - You may additionally save `<sessionDir>/evaluation/iter<N>/before-<component>-crop.png` for close-up inspection, but a crop is supplemental only.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `before-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 BEFORE captured — <path>`.
 6. `browser_navigate` to the AFTER URL (local `fullTestUrl` or PR CDN query) → AFTER. Same setup + click. Verify discriminator again.
-7. `browser_screenshot` → save AFTER to `<sessionDir>/evaluation/iter<N>/after-<component>.png`.
+7. Capture the primary AFTER screenshot with the same full-page/viewport method and dimensions → save to `<sessionDir>/evaluation/iter<N>/after-<component>-full.png`.
+   - An optional `<sessionDir>/evaluation/iter<N>/after-<component>-crop.png` may accompany it, but must not replace it.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 AFTER captured — <path>`.
-7. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
+8. Run `file -- "<beforePath>" "<afterPath>"` with the shell tool and quote its PNG dimension output in `evaluator-report.md`. Verify both primary PNG dimensions equal the configured viewport dimensions and visually inspect both images for surrounding page context. If either primary image is component-width, clipped, missing page context, or otherwise not the full viewport, return `failureKind: "evaluator-spec"` with blocker `primary-screenshot-not-full-viewport`.
+9. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
 
 ### FIC fallback when Playwright MCP/browser tools are unavailable
 
@@ -134,7 +141,7 @@ Rules for this fallback:
 - For iframe-backed surfaces, wait for the iframe content, not just the chrome. Example: CreateGroupPanel opens the Drawer/Modal before `CreateGroup.aspx` finishes; if the screenshot is mostly blank white, the probe is too early. Wait for `iframe[src*="CreateGroup.aspx"]`, then its frame `load` state and non-empty body text, or a surface-specific readiness signal such as `CreateSiteReady`.
 - For liked-by/comment/reaction surfaces, plan for a **multi-user fixture**. Same-user likes often do not render the liked-by entry point (`likeCount - userLiked` can be zero). Apply the environment-discovery hard gate before concluding that the required user pair is unavailable.
 - For Planner/PlanCreation surfaces, a TEAM_SITE or arbitrary group site is not enough. Discover alternate group-connected sites and apply the source-derived predicates in the hard gate before concluding that a Planner-integrated fixture is unavailable.
-- Save screenshots under `<sessionDir>/evaluation/iter<N>/` and report the same `visualValidation.beforePath` / `afterPath` fields as the MCP path.
+- Save screenshots under `<sessionDir>/evaluation/iter<N>/`. `visualValidation.beforePath` / `afterPath` MUST point to full-page/viewport PNGs. Put optional component crops only in `beforeCropPath` / `afterCropPath`.
 - Set `visualValidation.source` to `pr-cdn-fic`, `local-rush-start`, or `playwright-mcp`. Prefer `local-rush-start` when it succeeds; use `pr-cdn-fic` as fallback or explicit final mode.
 
 Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed. A missing Playwright MCP plugin is not a FIC failure.
@@ -167,10 +174,10 @@ A criterion is PASS only with concrete evidence. "Looks right" is not evidence. 
 Write `artifactPath` with the full report. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start|playwright-mcp","beforePath":"<absolute path>","afterPath":"<absolute path>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
+{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start|playwright-mcp","captureMethod":"page","viewport":{"width":1440,"height":1000},"beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<optional component crop>","afterCropPath":"<optional component crop>","dimensionEvidence":"<verbatim file output>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
 ```
 
-For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured` and both `beforePath` and `afterPath` are populated.
+For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured`, `captureMethod` is `page`, both primary paths are populated, both PNG dimensions match `visualValidation.viewport`, and visual inspection confirms surrounding page context. Component-only crops are never valid primary paths.
 Omit `coverageManifest` only when the verdict makes no claim about auth, FIC, tenants, sites, fixtures, or environment availability.
 
 Append the final progress line before returning:
