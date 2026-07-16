@@ -63,7 +63,24 @@ const checks = [
       "one failed URL, credential, tenant, or site is resource-local evidence",
       "Missing or incomplete coverage triggers evaluator-only environment discovery",
       "Primary PR screenshots must show the full browser page/viewport",
-      "the main session must independently view both primary images"
+      "the main session must independently view both primary images",
+      "detached tmux supervisor",
+      "retries interrupted children",
+      "advances after terminal failures"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-batch/SKILL.md",
+    snippets: [
+      "Architecture: detached supervisor, not a conversation loop",
+      "`ow-batch-start`",
+      "Ending or interrupting the parent Copilot turn does not terminate the batch.",
+      "Every task has a finite attempt timeout and finite retry count.",
+      "A single task failure never stops later tasks.",
+      "`state.json` is written atomically",
+      "`ow-batch-resume`",
+      "Do not run Task 1 directly in the parent session",
+      "Do not repeatedly poll a healthy supervisor"
     ]
   },
   {
@@ -152,6 +169,14 @@ const forbiddenChecks = [
   {
     file: "agents/ow-evaluator-rule.md",
     snippets: ["If TRIPS cannot allocate the needed users in both prod and dogfood"]
+  },
+  {
+    file: "copilot/skills/ow-batch/SKILL.md",
+    snippets: [
+      "Run a list of odsp-web tasks sequentially in the **current main session**",
+      "Never launch nested `copilot -p`",
+      "rely on normal CLI automatic compaction"
+    ]
   }
 ];
 

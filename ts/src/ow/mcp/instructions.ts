@@ -6,6 +6,12 @@ You are connected to the ow MCP server — a dev toolkit for odsp-web developmen
 ### Environment
 - ow-status          — ALWAYS call first. Returns: git branch, rush install status, tmux sessions, node version.
 
+### Durable Batch
+- ow-batch-start      — Start a serial multi-task agentOW supervisor in tmux. Each task gets a fresh Copilot session, hard timeout, retries, persisted state, and failure isolation.
+- ow-batch-status     — Read state/logs for the latest or specified durable batch.
+- ow-batch-resume     — Restart a missing supervisor from state.json without restarting completed tasks.
+- ow-batch-stop       — Stop the supervisor and persist a terminal stopped state.
+
 ### Rush
 - ow-rush            — Run any rush command with structured output and error parsing.
 - ow-build           — rush build -t <project>. Auto-scopes from git diff if project not specified.
@@ -44,6 +50,10 @@ Since Claude Code runs directly inside the Codespace, all commands execute local
 6. ow-session-capture on 'agentow:rush' — poll until [WATCHING] or FAILURE:.
 7. ow-debuglink — extract debug URL from rush output.
 8. ow-pr-create — push and create draft PR when ready.
+
+## Durable Batch Loop
+
+For multiple unattended tasks, use ow-batch-start instead of executing agentOW tasks in the current conversation. The tool launches a tmux supervisor that survives the parent Copilot turn, runs exactly one task at a time, retries interrupted Copilot sessions, records terminal failures, and advances to later tasks. Use ow-batch-status for progress and ow-batch-resume if a Codespace restart removed the tmux process.
 
 ## Rules
 

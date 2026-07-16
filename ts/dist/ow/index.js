@@ -2980,7 +2980,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve.call(this, root, ref);
+      let _sch = resolve4.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a2 = root.localRefs) === null || _a2 === void 0 ? void 0 : _a2[ref];
         const { schemaId } = this.opts;
@@ -3007,7 +3007,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve(root, ref) {
+    function resolve4(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3222,8 +3222,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input = path4;
+    function removeDotSegments(path7) {
+      let input = path7;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3422,8 +3422,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path4, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const [path7, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path7 && path7 !== "/" ? path7 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -3582,7 +3582,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve(baseURI, relativeURI, options) {
+    function resolve4(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -3809,7 +3809,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve,
+      resolve: resolve4,
       resolveComponent,
       equal,
       serialize,
@@ -6785,12 +6785,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs6, exportName) {
+    function addFormats(ajv, list, fs9, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs6[f]);
+        ajv.addFormat(f, fs9[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -6799,9 +6799,9 @@ var require_dist = __commonJS({
 });
 
 // src/ow/index.ts
-import * as fs5 from "fs";
-import * as path3 from "path";
-import * as url2 from "url";
+import * as fs8 from "fs";
+import * as path6 from "path";
+import * as url3 from "url";
 
 // node_modules/zod/v3/helpers/util.js
 var util;
@@ -7162,8 +7162,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path7, errorMaps, issueData } = params;
+  const fullPath = [...path7, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7278,11 +7278,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path7, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path7;
     this._key = key;
   }
   get path() {
@@ -11205,10 +11205,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path7) {
+  if (!path7)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path7.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11591,11 +11591,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path7, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path7);
     return iss;
   });
 }
@@ -11778,7 +11778,7 @@ function formatError(error48, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error48, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error49, path4 = []) => {
+  const processError = (error49, path7 = []) => {
     var _a2, _b;
     for (const issue2 of error49.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
@@ -11788,7 +11788,7 @@ function treeifyError(error48, mapper = (issue2) => issue2.message) {
       } else if (issue2.code === "invalid_element") {
         processError({ issues: issue2.issues }, issue2.path);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path7, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -11820,8 +11820,8 @@ function treeifyError(error48, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path4) {
+  const path7 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path7) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -12850,10 +12850,10 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
   inst._zod.check = (payload) => {
     try {
       const trimmed = payload.value.trim();
-      const url3 = new URL(trimmed);
+      const url4 = new URL(trimmed);
       if (def.hostname) {
         def.hostname.lastIndex = 0;
-        if (!def.hostname.test(url3.hostname)) {
+        if (!def.hostname.test(url4.hostname)) {
           payload.issues.push({
             code: "invalid_format",
             format: "url",
@@ -12867,7 +12867,7 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
       }
       if (def.protocol) {
         def.protocol.lastIndex = 0;
-        if (!def.protocol.test(url3.protocol.endsWith(":") ? url3.protocol.slice(0, -1) : url3.protocol)) {
+        if (!def.protocol.test(url4.protocol.endsWith(":") ? url4.protocol.slice(0, -1) : url4.protocol)) {
           payload.issues.push({
             code: "invalid_format",
             format: "url",
@@ -12880,7 +12880,7 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
         }
       }
       if (def.normalize) {
-        payload.value = url3.href;
+        payload.value = url4.href;
       } else {
         payload.value = trimmed;
       }
@@ -24227,13 +24227,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path4 = ref.slice(1).split("/").filter(Boolean);
-  if (path4.length === 0) {
+  const path7 = ref.slice(1).split("/").filter(Boolean);
+  if (path7.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path4[0] === defsKey) {
-    const key = path4[1];
+  if (path7[0] === defsKey) {
+    const key = path7[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -27997,7 +27997,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+        await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error48) {
@@ -28014,7 +28014,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve4, reject) => {
       const earlyReject = (error48) => {
         reject(error48);
       };
@@ -28092,7 +28092,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve(parseResult.data);
+            resolve4(parseResult.data);
           }
         } catch (error48) {
           reject(error48);
@@ -28353,12 +28353,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve4, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve, interval);
+      const timeoutId = setTimeout(resolve4, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -29458,7 +29458,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -30107,12 +30107,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve) => {
+    return new Promise((resolve4) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve();
+        resolve4();
       } else {
-        this._stdout.once("drain", resolve);
+        this._stdout.once("drain", resolve4);
       }
     });
   }
@@ -30191,7 +30191,8 @@ var RawOutputLog = class {
 
 // src/ow/mcp/owTools.ts
 import * as cp7 from "child_process";
-import * as fs4 from "fs";
+import * as fs6 from "fs";
+import * as path4 from "path";
 
 // src/shared/constants.ts
 var OW = {
@@ -30219,7 +30220,7 @@ var RushCli = class {
     const errors = [];
     const warnings = [];
     this.logger?.info("rush", `rush ${args2.join(" ")}`);
-    const exitCode = await new Promise((resolve, reject) => {
+    const exitCode = await new Promise((resolve4, reject) => {
       const proc = cp.spawn("rush", args2, {
         cwd: this.cwd,
         stdio: ["ignore", "pipe", "pipe"],
@@ -30237,7 +30238,7 @@ var RushCli = class {
       const stderrLines = [];
       proc.stderr?.on("data", (d) => stderrLines.push(d.toString()));
       proc.once("error", reject);
-      proc.once("exit", (code) => resolve(code ?? 1));
+      proc.once("exit", (code) => resolve4(code ?? 1));
     });
     return { exitCode, lines, errors, warnings, durationMs: Date.now() - start };
   }
@@ -30265,10 +30266,10 @@ var RushCli = class {
 // src/ow/tools/tmuxManager.ts
 import * as cp2 from "child_process";
 function exec2(cmd, signal) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve4, reject) => {
     cp2.exec(cmd, { signal }, (err, stdout) => {
       if (err) reject(err);
-      else resolve(stdout);
+      else resolve4(stdout);
     });
   });
 }
@@ -30336,7 +30337,7 @@ var GitClient = class {
   }
   cwd;
   async run(args2, signal) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve4, reject) => {
       const proc = cp3.spawn("git", args2, {
         cwd: this.cwd,
         stdio: ["ignore", "pipe", "pipe"],
@@ -30347,7 +30348,7 @@ var GitClient = class {
       proc.stderr.on("data", (d) => out.push(d));
       proc.once("error", reject);
       proc.once("exit", (code) => {
-        resolve({ exitCode: code ?? 1, output: Buffer.concat(out).toString("utf8").trim() });
+        resolve4({ exitCode: code ?? 1, output: Buffer.concat(out).toString("utf8").trim() });
       });
     });
   }
@@ -30380,13 +30381,13 @@ var ODSP_WEB_REPO_ID = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
 var ADO_ORG = "https://dev.azure.com/onedrive";
 var ADO_PROJECT = "ODSP-Web";
 function execCmd(cmd, cwd, signal) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve4, reject) => {
     const proc = cp4.exec(cmd, { cwd, signal }, (err, stdout, stderr) => {
       if (err && err.killed) {
         reject(new Error("Aborted"));
         return;
       }
-      resolve({ exitCode: err?.code ?? 0, stdout: stdout.trim(), stderr: stderr.trim() });
+      resolve4({ exitCode: err?.code ?? 0, stdout: stdout.trim(), stderr: stderr.trim() });
     });
   });
 }
@@ -30489,9 +30490,9 @@ var ADO_ORG2 = "https://dev.azure.com/onedrive";
 var ADO_PROJECT2 = "ODSP-Web";
 var API_VERSION = "7.0";
 function execCmd2(cmd, cwd, signal) {
-  return new Promise((resolve) => {
+  return new Promise((resolve4) => {
     const proc = cp5.exec(cmd, { cwd, signal, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
+      resolve4({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
     });
   });
 }
@@ -30537,8 +30538,8 @@ function extractCredentialPassword(credentialOutput) {
 }
 function replacePlaceholders(text, uploaded) {
   let out = text;
-  for (const { name, url: url3 } of uploaded) {
-    out = out.split(`{{${name}}}`).join(url3);
+  for (const { name, url: url4 } of uploaded) {
+    out = out.split(`{{${name}}}`).join(url4);
   }
   return out;
 }
@@ -30571,12 +30572,12 @@ var PrAttach = class {
         throw new Error(`Failed to upload attachment '${att.name}' (HTTP ${resp.status}): ${errBody}`);
       }
       const parsed = await resp.json();
-      const url3 = parsed.url;
-      if (!url3) {
+      const url4 = parsed.url;
+      if (!url4) {
         throw new Error(`ADO did not return a URL for attachment '${att.name}'. Response: ${JSON.stringify(parsed)}`);
       }
-      uploaded.push({ name: att.name, url: url3 });
-      this.logger?.info("pr-attach", `uploaded ${att.name} -> ${url3}`);
+      uploaded.push({ name: att.name, url: url4 });
+      this.logger?.info("pr-attach", `uploaded ${att.name} -> ${url4}`);
     }
     let commentPosted = false;
     let descriptionUpdated = false;
@@ -30650,9 +30651,9 @@ var ADO_PROJECT3 = "ODSP-Web";
 var API_VERSION2 = "7.1";
 var DEBUG_QUERY_PATTERN = /\?debug=true&noredir=true&loader=[^`\s]+&debugManifestsFile=[^`\s]+/;
 function execCmd3(cmd, cwd, signal) {
-  return new Promise((resolve) => {
+  return new Promise((resolve4) => {
     cp6.exec(cmd, { cwd, signal, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
+      resolve4({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
     });
   });
 }
@@ -30676,12 +30677,12 @@ function splitDebugQueryUrls(debugQuery) {
     manifests: query.get("debugManifestsFile") ?? void 0
   };
 }
-async function fetchStatus(url3, signal) {
-  if (!url3) {
+async function fetchStatus(url4, signal) {
+  if (!url4) {
     return void 0;
   }
   try {
-    const response = await fetch(url3, { method: "HEAD", signal });
+    const response = await fetch(url4, { method: "HEAD", signal });
     return response.status;
   } catch {
     return void 0;
@@ -30721,8 +30722,8 @@ ${credentialResult.stderr}`
   }
   async getPullRequestThreads(prId, signal) {
     const authorization = await this.getAuthorizationHeader(signal);
-    const url3 = `${ADO_ORG3}/${ADO_PROJECT3}/_apis/git/repositories/${ODSP_WEB_REPO_ID3}/pullRequests/${prId}/threads?api-version=${API_VERSION2}`;
-    const response = await fetch(url3, {
+    const url4 = `${ADO_ORG3}/${ADO_PROJECT3}/_apis/git/repositories/${ODSP_WEB_REPO_ID3}/pullRequests/${prId}/threads?api-version=${API_VERSION2}`;
+    const response = await fetch(url4, {
       headers: { "Authorization": authorization },
       signal
     });
@@ -30761,6 +30762,446 @@ ${credentialResult.stderr}`
     return { prId, status: "missing" };
   }
 };
+
+// src/ow/tools/batchState.ts
+import * as fs4 from "fs";
+import * as path3 from "path";
+var BATCH_STATE_VERSION = 1;
+var TERMINAL_TASK_STATUSES = /* @__PURE__ */ new Set([
+  "success",
+  "success-with-blockers",
+  "completed-no-pr",
+  "failed",
+  "stashed-failure"
+]);
+function now() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+function assertBatchDir(batchDir, repositoryRoot) {
+  const resolvedBatchDir = path3.resolve(batchDir);
+  const aeroRoot = path3.resolve(repositoryRoot, ".aero");
+  if (resolvedBatchDir !== aeroRoot && !resolvedBatchDir.startsWith(`${aeroRoot}${path3.sep}`)) {
+    throw new Error(`Batch directory must be under ${aeroRoot}: ${resolvedBatchDir}`);
+  }
+}
+function taskStatusLabel(status) {
+  switch (status) {
+    case "success":
+      return "\u2705 success";
+    case "success-with-blockers":
+      return "\u26A0\uFE0F success-with-blockers";
+    case "completed-no-pr":
+      return "\u26A0\uFE0F completed-no-pr";
+    case "failed":
+      return "\u274C failed";
+    case "stashed-failure":
+      return "\u274C stashed-failure";
+    case "in_progress":
+      return "\u25B6\uFE0F in progress";
+    default:
+      return "pending";
+  }
+}
+function applyStoppedState(state, reason, clearSupervisor) {
+  state.status = "stopped";
+  state.completedAt = now();
+  if (clearSupervisor) {
+    state.supervisorPid = 0;
+  }
+  if (state.currentTaskIndex > 0) {
+    const task = state.tasks[state.currentTaskIndex - 1];
+    if (task?.index === state.currentTaskIndex) {
+      task.error = reason;
+      task.heartbeatAt = now();
+    }
+  }
+}
+function createTask(batchDir, batchId, description, index) {
+  const timestamp = now();
+  return {
+    index,
+    description,
+    status: "pending",
+    phase: "pending",
+    attempts: 0,
+    childPid: 0,
+    childIdentity: "",
+    copilotSessionName: `${batchId}-task${index}`,
+    agentowSessionDir: `${batchDir}/task${index}-agentow`,
+    resultPath: `${batchDir}/task${index}-result.json`,
+    logPath: `${batchDir}/task${index}.log`,
+    checkpointPath: `${batchDir}/task${index}.checkpoint.md`,
+    startedAt: "",
+    attemptStartedAt: "",
+    heartbeatAt: timestamp,
+    completedAt: "",
+    prUrl: "",
+    branch: "",
+    commit: "",
+    error: "",
+    stash: ""
+  };
+}
+function isTerminalTaskStatus(status) {
+  return TERMINAL_TASK_STATUSES.has(status);
+}
+var BatchStateStore = class _BatchStateStore {
+  constructor(batchDir) {
+    this.batchDir = batchDir;
+    this.statePath = `${batchDir}/state.json`;
+    this.lockPath = `${batchDir}/supervisor.lock`;
+  }
+  batchDir;
+  statePath;
+  lockPath;
+  static create(options) {
+    if (options.tasks.length === 0) {
+      throw new Error("At least one batch task is required.");
+    }
+    assertBatchDir(options.batchDir, options.repositoryRoot);
+    fs4.mkdirSync(options.batchDir, { recursive: true });
+    const store = new _BatchStateStore(options.batchDir);
+    if (fs4.existsSync(store.statePath)) {
+      throw new Error(`Batch state already exists: ${store.statePath}`);
+    }
+    const createdAt = now();
+    const batchId = path3.basename(options.batchDir);
+    const tasks = options.tasks.map(
+      (description, offset) => createTask(options.batchDir, batchId, description, offset + 1)
+    );
+    const state = {
+      version: BATCH_STATE_VERSION,
+      batchId,
+      status: "running",
+      repositoryRoot: options.repositoryRoot,
+      batchDir: options.batchDir,
+      summaryPath: `${options.batchDir}/summary.md`,
+      logPath: `${options.batchDir}/batch.log`,
+      supervisorWindow: options.supervisorWindow,
+      supervisorPid: 0,
+      currentTaskIndex: 1,
+      taskTimeoutMinutes: options.taskTimeoutMinutes,
+      maxAttempts: options.maxAttempts,
+      createdAt,
+      updatedAt: createdAt,
+      completedAt: "",
+      tasks
+    };
+    store.writeState(state);
+    store.writeSummary(state);
+    store.appendLog(`\u{1F319} Batch started \u2014 ${tasks.length} tasks`);
+    return store;
+  }
+  read() {
+    const state = JSON.parse(fs4.readFileSync(this.statePath, "utf8"));
+    if (state.version !== BATCH_STATE_VERSION) {
+      throw new Error(`Unsupported batch state version ${state.version}: ${this.statePath}`);
+    }
+    for (const task of state.tasks) {
+      task.childIdentity ??= "";
+    }
+    assertBatchDir(state.batchDir, state.repositoryRoot);
+    return state;
+  }
+  update(mutator, updateSummary = false) {
+    const state = this.read();
+    mutator(state);
+    state.updatedAt = now();
+    this.writeState(state);
+    if (updateSummary) {
+      this.writeSummary(state);
+    }
+    return state;
+  }
+  setSupervisorPid(pid) {
+    return this.update((state) => {
+      state.supervisorPid = pid;
+    });
+  }
+  startTask(index) {
+    return this.update((state) => {
+      const task = this.getTask(state, index);
+      const timestamp = now();
+      task.status = "in_progress";
+      task.phase = "preparing";
+      task.startedAt = task.startedAt || timestamp;
+      task.heartbeatAt = timestamp;
+      task.error = "";
+      state.currentTaskIndex = index;
+    }, true);
+  }
+  startAttempt(index, phase) {
+    return this.update((state) => {
+      const task = this.getTask(state, index);
+      task.status = "in_progress";
+      task.phase = phase;
+      task.attempts++;
+      task.childPid = 0;
+      task.childIdentity = "";
+      task.attemptStartedAt = now();
+      task.heartbeatAt = now();
+      state.currentTaskIndex = index;
+    }, true);
+  }
+  heartbeat(index, phase) {
+    return this.update((state) => {
+      const task = this.getTask(state, index);
+      task.phase = phase;
+      task.heartbeatAt = now();
+    });
+  }
+  setChildProcess(index, childPid, childIdentity = "") {
+    return this.update((state) => {
+      const task = this.getTask(state, index);
+      task.childPid = childPid;
+      task.childIdentity = childIdentity;
+      task.heartbeatAt = now();
+    });
+  }
+  completeTask(index, options) {
+    if (!isTerminalTaskStatus(options.status)) {
+      throw new Error(`Cannot complete task with non-terminal status: ${options.status}`);
+    }
+    const state = this.update((draft) => {
+      const task = this.getTask(draft, index);
+      const timestamp = now();
+      task.status = options.status;
+      task.phase = "complete";
+      task.childPid = 0;
+      task.childIdentity = "";
+      task.heartbeatAt = timestamp;
+      task.completedAt = timestamp;
+      task.prUrl = options.prUrl;
+      task.branch = options.branch;
+      task.commit = options.commit;
+      task.error = options.error;
+      task.stash = options.stash;
+      const nextTask = draft.tasks.find((candidate) => !isTerminalTaskStatus(candidate.status));
+      if (nextTask) {
+        draft.currentTaskIndex = nextTask.index;
+      } else {
+        draft.status = "completed";
+        draft.currentTaskIndex = 0;
+        draft.completedAt = timestamp;
+        draft.supervisorPid = 0;
+      }
+    }, true);
+    this.writeCheckpoint(this.getTask(state, index));
+    return state;
+  }
+  requestStop(reason) {
+    return this.update((state) => {
+      applyStoppedState(state, reason, false);
+    }, true);
+  }
+  stop(reason) {
+    return this.update((state) => {
+      applyStoppedState(state, reason, true);
+    }, true);
+  }
+  acquireLock() {
+    if (!this.tryAcquireLock()) {
+      const existingPid = Number.parseInt(fs4.readFileSync(this.lockPath, "utf8"), 10);
+      throw new Error(`Batch supervisor is already running with PID ${existingPid}.`);
+    }
+  }
+  tryAcquireLock() {
+    fs4.mkdirSync(this.batchDir, { recursive: true });
+    try {
+      const fd = fs4.openSync(this.lockPath, "wx");
+      fs4.writeFileSync(fd, String(process.pid), "utf8");
+      fs4.closeSync(fd);
+      return true;
+    } catch (error48) {
+      if (error48.code !== "EEXIST") {
+        throw error48;
+      }
+    }
+    const existingPid = Number.parseInt(fs4.readFileSync(this.lockPath, "utf8"), 10);
+    if (!Number.isFinite(existingPid)) {
+      const lockAgeMs = Date.now() - fs4.statSync(this.lockPath).mtimeMs;
+      if (lockAgeMs < 3e4) {
+        return false;
+      }
+    }
+    if (Number.isFinite(existingPid)) {
+      try {
+        process.kill(existingPid, 0);
+        return false;
+      } catch (error48) {
+        if (error48.code !== "ESRCH") {
+          throw error48;
+        }
+      }
+    }
+    fs4.rmSync(this.lockPath, { force: true });
+    try {
+      const fd = fs4.openSync(this.lockPath, "wx");
+      fs4.writeFileSync(fd, String(process.pid), "utf8");
+      fs4.closeSync(fd);
+      return true;
+    } catch (error48) {
+      if (error48.code === "EEXIST") {
+        return false;
+      }
+      throw error48;
+    }
+  }
+  releaseLock() {
+    fs4.rmSync(this.lockPath, { force: true });
+  }
+  appendLog(message) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString().slice(11, 19);
+    fs4.appendFileSync(`${this.batchDir}/batch.log`, `[${timestamp}] ${message}
+`, "utf8");
+  }
+  getTask(state, index) {
+    const task = state.tasks[index - 1];
+    if (!task || task.index !== index) {
+      throw new Error(`Unknown batch task index ${index}.`);
+    }
+    return task;
+  }
+  writeState(state) {
+    const temporaryPath = `${this.statePath}.${process.pid}.tmp`;
+    fs4.writeFileSync(temporaryPath, JSON.stringify(state), "utf8");
+    fs4.renameSync(temporaryPath, this.statePath);
+  }
+  writeSummary(state) {
+    const lines = [
+      `# agentOW Copilot Batch \u2014 ${state.batchId}`,
+      "",
+      `Total tasks: ${state.tasks.length}`,
+      `Started: ${state.createdAt}`,
+      `Status: ${state.status}`,
+      "",
+      "| # | Task | Status | PR | Notes |",
+      "|---|------|--------|----|-------|"
+    ];
+    for (const task of state.tasks) {
+      const pr = task.prUrl ? `[PR](${task.prUrl})` : "\u2014";
+      const notes = task.error || task.stash || task.phase;
+      lines.push(`| ${task.index} | ${task.description.replace(/\|/g, "\\|")} | ${taskStatusLabel(task.status)} | ${pr} | ${notes.replace(/\|/g, "\\|")} |`);
+    }
+    if (state.status === "completed") {
+      lines.push("", `Finished: ${state.completedAt}`);
+    }
+    fs4.writeFileSync(state.summaryPath, `${lines.join("\n")}
+`, "utf8");
+  }
+  writeCheckpoint(task) {
+    const lines = [
+      `# Task ${task.index} checkpoint`,
+      "",
+      `- Task: ${task.description}`,
+      `- Status: ${task.status}`,
+      `- PR: ${task.prUrl || "\u2014"}`,
+      `- Branch: ${task.branch || "\u2014"}`,
+      `- Commit: ${task.commit || "\u2014"}`,
+      `- agentOW session: ${task.agentowSessionDir}`,
+      `- Attempts: ${task.attempts}`,
+      `- Remaining blockers: ${task.error || "none"}`,
+      `- Stash: ${task.stash || "none"}`
+    ];
+    fs4.writeFileSync(task.checkpointPath, `${lines.join("\n")}
+`, "utf8");
+  }
+};
+
+// src/ow/tools/processTree.ts
+import * as fs5 from "fs";
+var PROCESS_EXIT_POLL_MS = 250;
+var BOOT_ID = (() => {
+  try {
+    return fs5.readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim();
+  } catch {
+    return "";
+  }
+})();
+function readProcessStartTime(pid) {
+  try {
+    const stat = fs5.readFileSync(`/proc/${pid}/stat`, "utf8");
+    const commandEnd = stat.lastIndexOf(")");
+    if (commandEnd < 0) {
+      return "";
+    }
+    const fields = stat.slice(commandEnd + 2).split(" ");
+    return fields[19] ?? "";
+  } catch {
+    return "";
+  }
+}
+function getProcessIdentity(pid) {
+  if (pid <= 0) {
+    return "";
+  }
+  const startTime = readProcessStartTime(pid);
+  if (!startTime) {
+    return "";
+  }
+  return `${BOOT_ID}:${startTime}`;
+}
+function getProcessCommandLine(pid) {
+  if (pid <= 0) {
+    return "";
+  }
+  try {
+    return fs5.readFileSync(`/proc/${pid}/cmdline`, "utf8").replace(/\0/g, " ");
+  } catch {
+    return "";
+  }
+}
+function isSameProcess(pid, identity) {
+  return pid > 0 && identity !== "" && getProcessIdentity(pid) === identity;
+}
+function isProcessGroupAlive(processGroupId) {
+  try {
+    process.kill(-processGroupId, 0);
+    return true;
+  } catch (error48) {
+    return error48 instanceof Error && "code" in error48 && error48.code === "EPERM";
+  }
+}
+async function waitUntilProcessGroupExited(processGroupId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isProcessGroupAlive(processGroupId)) {
+      return true;
+    }
+    await new Promise((resolve4) => setTimeout(resolve4, PROCESS_EXIT_POLL_MS));
+  }
+  return !isProcessGroupAlive(processGroupId);
+}
+function signalProcessGroup(pid, signal) {
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    try {
+      process.kill(pid, signal);
+    } catch {
+      return;
+    }
+  }
+}
+async function terminateProcessGroup(pid, identity, gracefulTimeoutMs = 1e4) {
+  if (!isSameProcess(pid, identity)) {
+    return;
+  }
+  signalProcessGroup(pid, "SIGTERM");
+  if (await waitUntilProcessGroupExited(pid, gracefulTimeoutMs)) {
+    return;
+  }
+  signalProcessGroup(pid, "SIGKILL");
+  if (!await waitUntilProcessGroupExited(pid, 5e3)) {
+    throw new Error(`Process group ${pid} did not exit after SIGKILL.`);
+  }
+}
+async function terminateNewProcessGroup(pid) {
+  signalProcessGroup(pid, "SIGKILL");
+  if (!await waitUntilProcessGroupExited(pid, 5e3)) {
+    throw new Error(`New process group ${pid} did not exit after SIGKILL.`);
+  }
+}
 
 // src/ow/tools/debugLink.ts
 function extractDebugLinks(rushOutput) {
@@ -30852,13 +31293,47 @@ function truncateLines(lines, max = 20) {
 }
 
 // src/ow/mcp/owTools.ts
+var BATCH_ARTIFACT_EXCLUDE_PATHSPEC = ":(exclude).aero/**";
 function execSimple(cmd) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve4, reject) => {
     cp7.exec(cmd, (err, stdout) => {
       if (err) reject(err);
-      else resolve(stdout.trim());
+      else resolve4(stdout.trim());
     });
   });
+}
+function compactTimestamp() {
+  return (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace("T", "-").replace(".", "-").replace("Z", "");
+}
+function shellQuote(value) {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+function findLatestBatchDir() {
+  const aeroRoot = `${OW.odspWebRoot}/.aero`;
+  let entries;
+  try {
+    entries = fs6.readdirSync(aeroRoot, { withFileTypes: true });
+  } catch {
+    return void 0;
+  }
+  const candidates = [];
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith("batch-")) {
+      const batchDir = `${aeroRoot}/${entry.name}`;
+      if (fs6.existsSync(`${batchDir}/state.json`)) {
+        candidates.push(batchDir);
+      }
+    }
+  }
+  candidates.sort((left, right) => right.localeCompare(left));
+  return candidates[0];
+}
+async function startBatchSupervisor(tmux, state, signal) {
+  const target = await tmux.openWindow(state.supervisorWindow, signal);
+  const executable = path4.resolve(process.argv[1]);
+  const runnerCommand = `restarts=0; while [ "$restarts" -lt 10 ]; do ${shellQuote(process.execPath)} ${shellQuote(executable)} batch-runner --batch-dir ${shellQuote(state.batchDir)}; code=$?; [ "$code" -eq 0 ] && break; restarts=$((restarts + 1)); delay=$((restarts * 30)); [ "$delay" -gt 300 ] && delay=300; echo "[$(date +%H:%M:%S)] supervisor exited $code; restart $restarts/10 in $delay seconds" >> ${shellQuote(state.logPath)}; [ "$restarts" -ge 10 ] && break; sleep "$delay"; done; [ "$code" -ne 0 ] && echo "[$(date +%H:%M:%S)] supervisor stopped after $restarts failed restarts" >> ${shellQuote(state.logPath)}`;
+  await tmux.send(target, runnerCommand, true, signal);
+  return target;
 }
 function registerOwTools(server2, logger2, logDir) {
   const rush = new RushCli(OW.odspWebRoot, logger2);
@@ -30874,7 +31349,7 @@ function registerOwTools(server2, logger2, logDir) {
       git.branch(extras.signal).catch(() => "unknown"),
       execSimple("node -v").catch(() => "unknown"),
       tmux.listWindows(extras.signal),
-      fs4.promises.access(`${OW.odspWebRoot}/common/temp/last-install.flag`).then(() => true).catch(() => false)
+      fs6.promises.access(`${OW.odspWebRoot}/common/temp/last-install.flag`).then(() => true).catch(() => false)
     ]);
     return successResultWithDebug(logger2, "ow-status", {
       branch,
@@ -30882,6 +31357,173 @@ function registerOwTools(server2, logger2, logDir) {
       rushInstalled,
       tmuxWindows: windows,
       cwd: OW.odspWebRoot
+    });
+  });
+  registerMcpTool(server2, "ow-batch-start", {
+    description: "Start a durable serial agentOW batch in tmux. Each task runs in a fresh autonomous Copilot session, retries on interruption, and cannot block later tasks indefinitely.",
+    inputSchema: {
+      tasks: external_exports3.array(external_exports3.string().min(1)).min(1).max(100).describe("Ordered feature/bug descriptions; one draft PR per task."),
+      taskTimeoutMinutes: external_exports3.number().int().min(15).max(480).optional().describe("Hard timeout for each Copilot attempt (default: 180)."),
+      maxAttempts: external_exports3.number().int().min(1).max(5).optional().describe("Copilot attempts per task before recording failure and continuing (default: 3).")
+    }
+  }, async (input, extras) => {
+    const gitStatus = await git.run([
+      "status",
+      "--short",
+      "--untracked-files=all",
+      "--",
+      ".",
+      BATCH_ARTIFACT_EXCLUDE_PATHSPEC
+    ], extras.signal);
+    if (gitStatus.exitCode !== 0) {
+      throw new Error(`Unable to inspect odsp-web worktree: ${gitStatus.output}`);
+    }
+    if (gitStatus.output.trim()) {
+      throw new Error(`Cannot start ow-batch with a dirty odsp-web worktree:
+${gitStatus.output}`);
+    }
+    const timestamp = compactTimestamp();
+    const batchDir = `${OW.odspWebRoot}/.aero/batch-${timestamp}`;
+    const supervisorWindow = `batch-${timestamp}`;
+    const tasks = input.tasks.map((task) => task.trim());
+    const store = BatchStateStore.create({
+      batchDir,
+      repositoryRoot: OW.odspWebRoot,
+      tasks,
+      taskTimeoutMinutes: input.taskTimeoutMinutes ?? 180,
+      maxAttempts: input.maxAttempts ?? 3,
+      supervisorWindow
+    });
+    try {
+      const target = await startBatchSupervisor(tmux, store.read(), extras.signal);
+      return successResultWithDebug(logger2, "ow-batch-start", {
+        batchDir,
+        statePath: store.statePath,
+        summaryPath: `${batchDir}/summary.md`,
+        logPath: `${batchDir}/batch.log`,
+        tmuxTarget: target,
+        taskCount: tasks.length,
+        message: "Durable batch supervisor started. The batch continues if this Copilot session exits."
+      });
+    } catch (error48) {
+      store.stop(`Failed to start supervisor: ${error48 instanceof Error ? error48.message : String(error48)}`);
+      throw error48;
+    }
+  });
+  registerMcpTool(server2, "ow-batch-status", {
+    description: "Read persisted ow-batch state. Defaults to the most recent durable batch.",
+    inputSchema: {
+      batchDir: external_exports3.string().optional().describe("Absolute batch directory. Omit to inspect the latest durable batch.")
+    }
+  }, async (input, extras) => {
+    const batchDir = input.batchDir ?? findLatestBatchDir();
+    if (!batchDir) {
+      throw new Error("No durable ow-batch state found.");
+    }
+    const store = new BatchStateStore(batchDir);
+    const state = store.read();
+    const windows = await tmux.listWindows(extras.signal);
+    const supervisorActive = windows.some((window) => window.name === state.supervisorWindow);
+    const logTail = fs6.existsSync(state.logPath) ? fs6.readFileSync(state.logPath, "utf8").trimEnd().split("\n").slice(-20) : [];
+    return successResultWithDebug(logger2, "ow-batch-status", {
+      state,
+      supervisorActive,
+      logTail
+    });
+  });
+  registerMcpTool(server2, "ow-batch-resume", {
+    description: "Restart a missing durable batch supervisor from its persisted state. Safe to call repeatedly.",
+    inputSchema: {
+      batchDir: external_exports3.string().optional().describe("Absolute batch directory. Omit to resume the latest durable batch.")
+    }
+  }, async (input, extras) => {
+    const batchDir = input.batchDir ?? findLatestBatchDir();
+    if (!batchDir) {
+      throw new Error("No durable ow-batch state found.");
+    }
+    const store = new BatchStateStore(batchDir);
+    const state = store.read();
+    if (state.status !== "running") {
+      return successResultWithDebug(logger2, "ow-batch-resume", {
+        batchDir,
+        resumed: false,
+        status: state.status
+      });
+    }
+    const windows = await tmux.listWindows(extras.signal);
+    const existing = windows.find((window) => window.name === state.supervisorWindow);
+    if (existing) {
+      return successResultWithDebug(logger2, "ow-batch-resume", {
+        batchDir,
+        resumed: false,
+        status: state.status,
+        tmuxTarget: existing.target
+      });
+    }
+    const target = await startBatchSupervisor(tmux, state, extras.signal);
+    store.appendLog("\u267B\uFE0F Missing supervisor restarted from persisted state");
+    return successResultWithDebug(logger2, "ow-batch-resume", {
+      batchDir,
+      resumed: true,
+      status: state.status,
+      tmuxTarget: target
+    });
+  });
+  registerMcpTool(server2, "ow-batch-stop", {
+    description: "Stop a durable batch supervisor and persist the stopped state.",
+    inputSchema: {
+      batchDir: external_exports3.string().optional().describe("Absolute batch directory. Omit to stop the latest durable batch."),
+      reason: external_exports3.string().optional().describe("Reason recorded in state and batch log.")
+    }
+  }, async (input, extras) => {
+    const batchDir = input.batchDir ?? findLatestBatchDir();
+    if (!batchDir) {
+      throw new Error("No durable ow-batch state found.");
+    }
+    const store = new BatchStateStore(batchDir);
+    const stopReason = input.reason ?? "Stopped by user";
+    let state = store.requestStop(stopReason);
+    const stopDeadline = Date.now() + 5e3;
+    while (Date.now() < stopDeadline && state.supervisorPid > 0) {
+      const activeTask = state.tasks.find((task) => task.childPid > 0);
+      if (activeTask) {
+        const childIdentity = activeTask.childIdentity || getProcessIdentity(activeTask.childPid);
+        const childCommandLine = getProcessCommandLine(activeTask.childPid);
+        if (!activeTask.childIdentity && childIdentity && childCommandLine && !childCommandLine.toLowerCase().includes("copilot")) {
+          throw new Error(`Refusing to terminate unverified process ${activeTask.childPid}.`);
+        }
+        await terminateProcessGroup(activeTask.childPid, childIdentity);
+        store.setChildProcess(activeTask.index, 0, "");
+      }
+      await new Promise((resolve4) => setTimeout(resolve4, 100));
+      state = store.read();
+    }
+    await tmux.killWindow(state.supervisorWindow, extras.signal);
+    state = store.read();
+    const remainingTask = state.tasks.find((task) => task.childPid > 0);
+    if (remainingTask) {
+      await terminateProcessGroup(
+        remainingTask.childPid,
+        remainingTask.childIdentity || getProcessIdentity(remainingTask.childPid)
+      );
+      store.setChildProcess(remainingTask.index, 0, "");
+    }
+    const lockDeadline = Date.now() + 5e3;
+    while (!store.tryAcquireLock()) {
+      if (Date.now() >= lockDeadline) {
+        throw new Error("Timed out waiting for the batch supervisor to release its lifecycle lock.");
+      }
+      await new Promise((resolve4) => setTimeout(resolve4, 100));
+    }
+    try {
+      store.stop(stopReason);
+    } finally {
+      store.releaseLock();
+    }
+    store.appendLog(`\u23F9\uFE0F Batch stopped \u2014 ${stopReason}`);
+    return successResultWithDebug(logger2, "ow-batch-stop", {
+      batchDir,
+      status: "stopped"
     });
   });
   registerMcpTool(server2, "ow-rush", {
@@ -31123,7 +31765,7 @@ function registerOwTools(server2, logger2, logDir) {
     const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? `${OW.odspWebRoot}/../dev.AgentOW`;
     let version2 = "unknown";
     try {
-      const pkg = JSON.parse(await fs4.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
+      const pkg = JSON.parse(await fs6.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
       version2 = pkg.version ?? "unknown";
     } catch {
     }
@@ -31210,6 +31852,12 @@ You are connected to the ow MCP server \u2014 a dev toolkit for odsp-web develop
 ### Environment
 - ow-status          \u2014 ALWAYS call first. Returns: git branch, rush install status, tmux sessions, node version.
 
+### Durable Batch
+- ow-batch-start      \u2014 Start a serial multi-task agentOW supervisor in tmux. Each task gets a fresh Copilot session, hard timeout, retries, persisted state, and failure isolation.
+- ow-batch-status     \u2014 Read state/logs for the latest or specified durable batch.
+- ow-batch-resume     \u2014 Restart a missing supervisor from state.json without restarting completed tasks.
+- ow-batch-stop       \u2014 Stop the supervisor and persist a terminal stopped state.
+
 ### Rush
 - ow-rush            \u2014 Run any rush command with structured output and error parsing.
 - ow-build           \u2014 rush build -t <project>. Auto-scopes from git diff if project not specified.
@@ -31249,6 +31897,10 @@ Since Claude Code runs directly inside the Codespace, all commands execute local
 7. ow-debuglink \u2014 extract debug URL from rush output.
 8. ow-pr-create \u2014 push and create draft PR when ready.
 
+## Durable Batch Loop
+
+For multiple unattended tasks, use ow-batch-start instead of executing agentOW tasks in the current conversation. The tool launches a tmux supervisor that survives the parent Copilot turn, runs exactly one task at a time, retries interrupted Copilot sessions, records terminal failures, and advances to later tasks. Use ow-batch-status for progress and ow-batch-resume if a Codespace restart removed the tmux process.
+
 ## Rules
 
 - Never use npm/pnpm/yarn/jest/tsc/webpack directly \u2014 always use rush.
@@ -31260,17 +31912,638 @@ Since Claude Code runs directly inside the Codespace, all commands execute local
 - To invalidate cache: ow-session-send with text='i' pressEnter=false.
 `;
 
+// src/ow/tools/copilotBatchRunner.ts
+import * as cp8 from "child_process";
+import * as fs7 from "fs";
+import * as path5 from "path";
+import * as url2 from "url";
+var ChildTerminationError = class extends Error {
+};
+var PR_URL_PATTERN = /https:\/\/(?:dev\.azure\.com\/onedrive|onedrive\.visualstudio\.com)\/ODSP-Web\/_git\/odsp-web\/pullrequest\/[0-9]+/i;
+var VALID_RESULT_STATUSES = /* @__PURE__ */ new Set([
+  "success",
+  "success-with-blockers",
+  "completed-no-pr",
+  "failed",
+  "stashed-failure"
+]);
+var BATCH_ARTIFACT_EXCLUDE_PATHSPEC2 = ":(exclude).aero/**";
+function derivePluginRoot() {
+  const bundleDir = path5.dirname(url2.fileURLToPath(import.meta.url));
+  return path5.resolve(bundleDir, "../../..");
+}
+function readAgentResult(task) {
+  let parsedResult = null;
+  if (fs7.existsSync(task.resultPath)) {
+    try {
+      const parsed = JSON.parse(fs7.readFileSync(task.resultPath, "utf8"));
+      if (parsed.status && VALID_RESULT_STATUSES.has(parsed.status)) {
+        parsedResult = {
+          status: parsed.status,
+          prUrl: parsed.prUrl ?? "",
+          branch: parsed.branch ?? "",
+          commit: parsed.commit ?? "",
+          error: parsed.error ?? ""
+        };
+      }
+    } catch {
+      parsedResult = null;
+    }
+    const parsedResultDoesNotRequirePr = parsedResult !== null && parsedResult.status !== "success" && parsedResult.status !== "success-with-blockers";
+    if (parsedResult?.prUrl || parsedResultDoesNotRequirePr) {
+      return parsedResult;
+    }
+  }
+  const finalPath = `${task.agentowSessionDir}/final.md`;
+  if (!fs7.existsSync(finalPath)) {
+    return null;
+  }
+  const finalContent = fs7.readFileSync(finalPath, "utf8");
+  const prUrl = finalContent.match(PR_URL_PATTERN)?.[0] ?? "";
+  const lower = finalContent.toLowerCase();
+  if (prUrl) {
+    return {
+      status: parsedResult?.status === "success-with-blockers" || lower.includes("success-with-blockers") || lower.includes("remaining blockers:") && !lower.includes("remaining blockers: none") ? "success-with-blockers" : "success",
+      prUrl,
+      branch: parsedResult?.branch ?? "",
+      commit: parsedResult?.commit ?? "",
+      error: parsedResult?.error ?? ""
+    };
+  }
+  if (lower.includes("status: failed") || lower.includes("status: failure")) {
+    return {
+      status: "failed",
+      prUrl: "",
+      branch: "",
+      commit: "",
+      error: "agentOW final.md reported failure"
+    };
+  }
+  return null;
+}
+function buildInitialPrompt(task) {
+  return `/agentow --auto
+
+<task>
+${task.description}
+</task>
+
+<batch_contract>
+This task is owned by a durable ow-batch supervisor.
+
+- Use this exact agentOW session directory: ${task.agentowSessionDir}
+- Do not ask the user questions.
+- Do not start or modify any other batch task.
+- Continue through planning, implementation, build/tests, evaluation, review, commit, push, and draft PR creation.
+- Do not stop after planning, a build, or a partial implementation.
+- Before your final response, atomically write ${task.resultPath} as compact JSON with exactly these fields:
+  {"status":"success|success-with-blockers|completed-no-pr|failed","prUrl":"","branch":"","commit":"","error":""}
+- "success" requires a draft PR URL. Use "success-with-blockers" only when a draft PR exists with explicit external blockers. Use "completed-no-pr" when implementation is complete but no PR was created. Use "failed" for all other terminal failures.
+- Also write the normal ${task.agentowSessionDir}/final.md.
+</batch_contract>`;
+}
+function buildResumePrompt(task) {
+  return `Resume the existing agentOW AUTO task. Read ${task.agentowSessionDir}/progress.log, plan.md, report.json, implementation/evaluation artifacts, the current git branch, and the worktree. Continue from the last completed phase; do not restart planning or discard existing work.
+
+Do not finish until ${task.resultPath} exists with compact JSON fields status, prUrl, branch, commit, and error, and ${task.agentowSessionDir}/final.md is complete. A success status requires a draft PR URL.`;
+}
+function buildRecoveryPrompt(task) {
+  return `/agentow --auto
+
+<task>
+${task.description}
+</task>
+
+<recovery_contract>
+A previous Copilot session for this durable batch task became unavailable. Recover from the existing worktree and ${task.agentowSessionDir}; read progress.log, plan.md, report.json, implementation/evaluation artifacts, and git history before taking action. Continue from the last completed phase rather than discarding or repeating valid work. Do not ask the user questions or modify another batch task.
+
+Continue through implementation, build/tests, evaluation, review, commit, push, and draft PR creation. Before finishing, atomically write ${task.resultPath} as compact JSON with fields status, prUrl, branch, commit, and error, and complete ${task.agentowSessionDir}/final.md. A success status requires a draft PR URL.
+</recovery_contract>`;
+}
+function runCommand(command2, args2, cwd) {
+  return new Promise((resolve4) => {
+    const child = cp8.spawn(command2, args2, {
+      cwd,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    const stdout = [];
+    const stderr = [];
+    let settled = false;
+    const settle = (result) => {
+      if (!settled) {
+        settled = true;
+        resolve4(result);
+      }
+    };
+    child.stdout?.on("data", (chunk) => stdout.push(String(chunk)));
+    child.stderr?.on("data", (chunk) => stderr.push(String(chunk)));
+    child.on("error", (error48) => {
+      stderr.push(error48.message);
+      settle({ exitCode: 1, stdout: stdout.join(""), stderr: stderr.join("") });
+    });
+    child.on("close", (code) => {
+      settle({ exitCode: code ?? 1, stdout: stdout.join(""), stderr: stderr.join("") });
+    });
+  });
+}
+async function runGit(repositoryRoot, args2) {
+  return runCommand("git", ["--no-pager", ...args2], repositoryRoot);
+}
+async function prepareTaskBaseline(state, task) {
+  const status = await runGit(state.repositoryRoot, [
+    "status",
+    "--porcelain",
+    "--untracked-files=all",
+    "--",
+    ".",
+    BATCH_ARTIFACT_EXCLUDE_PATHSPEC2
+  ]);
+  if (status.exitCode !== 0) {
+    throw new Error(`git status failed: ${status.stderr || status.stdout}`);
+  }
+  if (status.stdout.trim()) {
+    throw new Error("Cannot start a new batch task with a dirty worktree.");
+  }
+  const fetch2 = await runGit(state.repositoryRoot, ["fetch", "origin"]);
+  if (fetch2.exitCode !== 0) {
+    throw new Error(`git fetch failed: ${fetch2.stderr || fetch2.stdout}`);
+  }
+  const baselineBranch = `agentow-batch/${state.batchId}-task${task.index}-base`;
+  const switched = await runGit(state.repositoryRoot, [
+    "switch",
+    "-C",
+    baselineBranch,
+    "origin/main"
+  ]);
+  if (switched.exitCode !== 0) {
+    throw new Error(`git switch failed: ${switched.stderr || switched.stdout}`);
+  }
+}
+async function currentGitMetadata(repositoryRoot) {
+  const [branchResult, commitResult] = await Promise.all([
+    runGit(repositoryRoot, ["branch", "--show-current"]),
+    runGit(repositoryRoot, ["rev-parse", "HEAD"])
+  ]);
+  return {
+    branch: branchResult.exitCode === 0 ? branchResult.stdout.trim() : "",
+    commit: commitResult.exitCode === 0 ? commitResult.stdout.trim() : ""
+  };
+}
+async function getWorktreeStatus(repositoryRoot) {
+  return runGit(repositoryRoot, [
+    "status",
+    "--porcelain",
+    "--untracked-files=all",
+    "--",
+    ".",
+    BATCH_ARTIFACT_EXCLUDE_PATHSPEC2
+  ]);
+}
+async function tryRunGit(repositoryRoot, args2) {
+  try {
+    return await runGit(repositoryRoot, args2);
+  } catch (error48) {
+    return { exitCode: 1, stdout: "", stderr: error48 instanceof Error ? error48.message : String(error48) };
+  }
+}
+async function createRecoverySnapshot(state, task, status) {
+  const snapshotDir = `${state.batchDir}/task${task.index}-recovery-${Date.now()}`;
+  fs7.mkdirSync(snapshotDir, { recursive: true });
+  fs7.writeFileSync(`${snapshotDir}/status.txt`, status, "utf8");
+  const [workingDiff, indexDiff, unmergedIndex, untracked] = await Promise.all([
+    tryRunGit(state.repositoryRoot, ["diff", "--binary", "HEAD"]),
+    tryRunGit(state.repositoryRoot, ["diff", "--cached", "--binary", "HEAD"]),
+    tryRunGit(state.repositoryRoot, ["ls-files", "-u"]),
+    tryRunGit(state.repositoryRoot, [
+      "ls-files",
+      "--others",
+      "--exclude-standard",
+      "-z",
+      "--",
+      ".",
+      BATCH_ARTIFACT_EXCLUDE_PATHSPEC2
+    ])
+  ]);
+  fs7.writeFileSync(`${snapshotDir}/working.patch`, workingDiff.stdout, "utf8");
+  fs7.writeFileSync(`${snapshotDir}/index.patch`, indexDiff.stdout, "utf8");
+  fs7.writeFileSync(`${snapshotDir}/unmerged-index.txt`, unmergedIndex.stdout, "utf8");
+  const normalizedRoot = `${path5.resolve(state.repositoryRoot)}${path5.sep}`;
+  for (const relativePath of untracked.stdout.split("\0").filter(Boolean)) {
+    const sourcePath = path5.resolve(state.repositoryRoot, relativePath);
+    if (!sourcePath.startsWith(normalizedRoot) || !fs7.existsSync(sourcePath)) {
+      continue;
+    }
+    const destinationPath = `${snapshotDir}/untracked/${relativePath}`;
+    fs7.mkdirSync(path5.dirname(destinationPath), { recursive: true });
+    fs7.cpSync(sourcePath, destinationPath, { recursive: true, verbatimSymlinks: true });
+  }
+  return snapshotDir;
+}
+async function restoreCleanBaseline(repositoryRoot) {
+  for (const operation of [
+    ["merge", "--abort"],
+    ["rebase", "--abort"],
+    ["cherry-pick", "--abort"],
+    ["am", "--abort"]
+  ]) {
+    await tryRunGit(repositoryRoot, operation);
+  }
+  const reset = await runGit(repositoryRoot, ["reset", "--hard", "HEAD"]);
+  if (reset.exitCode !== 0) {
+    throw new Error(`git reset failed: ${reset.stderr || reset.stdout}`);
+  }
+  const clean = await runGit(repositoryRoot, ["clean", "-fd", "-e", ".aero/"]);
+  if (clean.exitCode !== 0) {
+    throw new Error(`git clean failed: ${clean.stderr || clean.stdout}`);
+  }
+  const status = await getWorktreeStatus(repositoryRoot);
+  if (status.exitCode !== 0 || status.stdout.trim()) {
+    throw new Error(`Failed to restore a clean worktree: ${status.stderr || status.stdout}`);
+  }
+}
+async function preserveDirtyChanges(state, task) {
+  const status = await getWorktreeStatus(state.repositoryRoot);
+  if (status.exitCode !== 0 || !status.stdout.trim()) {
+    return "";
+  }
+  const message = `${state.batchId}-task${task.index}-leftovers`;
+  const stash = await runGit(state.repositoryRoot, [
+    "stash",
+    "push",
+    "-u",
+    "-m",
+    message,
+    "--",
+    ".",
+    BATCH_ARTIFACT_EXCLUDE_PATHSPEC2
+  ]);
+  if (stash.exitCode === 0) {
+    const remainingStatus = await getWorktreeStatus(state.repositoryRoot);
+    if (remainingStatus.exitCode === 0 && !remainingStatus.stdout.trim()) {
+      const stashCommit = await runGit(state.repositoryRoot, [
+        "rev-parse",
+        "--verify",
+        "refs/stash"
+      ]);
+      return stashCommit.exitCode === 0 ? stashCommit.stdout.trim() : message;
+    }
+  }
+  const snapshotDir = await createRecoverySnapshot(state, task, status.stdout);
+  await restoreCleanBaseline(state.repositoryRoot);
+  return `snapshot:${snapshotDir}`;
+}
+async function waitForDetachedCopilot(state, task, options, store) {
+  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 6e4;
+  const attemptStartedAt = Date.parse(task.attemptStartedAt);
+  const originalDeadline = Number.isFinite(attemptStartedAt) ? attemptStartedAt + state.taskTimeoutMinutes * 6e4 : Date.now() + state.taskTimeoutMinutes * 6e4;
+  const lastHeartbeatAt = Date.parse(task.heartbeatAt);
+  const resumedAfterGap = Number.isFinite(lastHeartbeatAt) && Date.now() - lastHeartbeatAt > heartbeatIntervalMs * 2;
+  const deadline = resumedAfterGap ? Math.max(originalDeadline, Date.now() + heartbeatIntervalMs) : originalDeadline;
+  while (isSameProcess(task.childPid, task.childIdentity)) {
+    if (readAgentResult(task)) {
+      return { exitCode: 0, timedOut: false };
+    }
+    if (Date.now() >= deadline) {
+      try {
+        await terminateProcessGroup(task.childPid, task.childIdentity);
+      } catch (error48) {
+        throw new ChildTerminationError(
+          `Failed to terminate detached Copilot PID ${task.childPid}: ${error48 instanceof Error ? error48.message : String(error48)}`
+        );
+      }
+      store.setChildProcess(task.index, 0, "");
+      return { exitCode: 124, timedOut: true };
+    }
+    store.heartbeat(task.index, `copilot-running-detached-pid-${task.childPid}`);
+    await new Promise((resolve4) => setTimeout(resolve4, heartbeatIntervalMs));
+  }
+  store.setChildProcess(task.index, 0, "");
+  return { exitCode: 1, timedOut: false };
+}
+function runCopilot(state, task, options, store) {
+  if (store.read().status !== "running") {
+    return Promise.resolve({ exitCode: 0, timedOut: false });
+  }
+  return new Promise((resolve4, reject) => {
+    fs7.mkdirSync(task.agentowSessionDir, { recursive: true });
+    const copilotBin = options.copilotBin ?? process.env.AGENTOW_COPILOT_BIN ?? "copilot";
+    const pluginRoot = options.pluginRoot ?? process.env.AGENTOW_COPILOT_PLUGIN_ROOT ?? derivePluginRoot();
+    const recoveryGeneration = Math.floor((task.attempts - 1) / 2);
+    const startsNewSession = task.attempts % 2 === 1;
+    const sessionName = recoveryGeneration === 0 ? task.copilotSessionName : `${task.copilotSessionName}-recovery-${recoveryGeneration}`;
+    const prompt = task.attempts === 1 ? buildInitialPrompt(task) : startsNewSession ? buildRecoveryPrompt(task) : buildResumePrompt(task);
+    const args2 = [
+      "-C",
+      state.repositoryRoot,
+      "--plugin-dir",
+      pluginRoot,
+      "--allow-all",
+      "--no-ask-user",
+      "--autopilot",
+      "--max-autopilot-continues",
+      "100",
+      "--context",
+      "long_context",
+      "--no-auto-update",
+      "--output-format",
+      "json"
+    ];
+    if (startsNewSession) {
+      args2.push("--name", sessionName);
+    } else {
+      args2.push(`--resume=${sessionName}`);
+    }
+    args2.push("--prompt", prompt);
+    const logFd = fs7.openSync(task.logPath, "a");
+    const child = cp8.spawn(copilotBin, args2, {
+      cwd: state.repositoryRoot,
+      detached: true,
+      env: {
+        ...process.env,
+        COPILOT_ALLOW_ALL: "true",
+        NO_COLOR: "1"
+      },
+      stdio: ["ignore", logFd, logFd]
+    });
+    fs7.closeSync(logFd);
+    const childPid = child.pid;
+    const childIdentity = childPid ? getProcessIdentity(childPid) : "";
+    let finished = false;
+    if (childPid && !childIdentity) {
+      finished = true;
+      void (async () => {
+        try {
+          await terminateNewProcessGroup(childPid);
+          resolve4({ exitCode: 1, timedOut: false });
+        } catch (error48) {
+          reject(new ChildTerminationError(
+            `Unable to terminate unverified Copilot PID ${childPid}: ${error48 instanceof Error ? error48.message : String(error48)}`
+          ));
+        }
+      })();
+      return;
+    }
+    if (childPid) {
+      store.setChildProcess(task.index, childPid, childIdentity);
+    }
+    let monitor;
+    const terminateAndSettle = (result, errorPrefix) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      if (monitor) {
+        clearInterval(monitor);
+      }
+      void (async () => {
+        try {
+          if (childPid) {
+            await terminateProcessGroup(childPid, childIdentity);
+          }
+          store.setChildProcess(task.index, 0, "");
+          resolve4(result);
+        } catch (error48) {
+          reject(new ChildTerminationError(
+            `${errorPrefix} Copilot PID ${childPid ?? 0}: ${error48 instanceof Error ? error48.message : String(error48)}`
+          ));
+        }
+      })();
+    };
+    if (store.read().status !== "running") {
+      terminateAndSettle({ exitCode: 0, timedOut: false }, "Failed to stop");
+      return;
+    }
+    const startedAt = Date.now();
+    const timeoutMs = state.taskTimeoutMinutes * 6e4;
+    const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 6e4;
+    const monitorIntervalMs = Math.min(heartbeatIntervalMs, 1e3);
+    let lastHeartbeatAt = startedAt;
+    monitor = setInterval(() => {
+      const currentTime = Date.now();
+      const elapsedMs = currentTime - startedAt;
+      if (store.read().status !== "running") {
+        terminateAndSettle({ exitCode: 0, timedOut: false }, "Failed to stop");
+      } else if (elapsedMs >= timeoutMs) {
+        terminateAndSettle({ exitCode: 124, timedOut: true }, "Failed to terminate");
+      } else if (currentTime - lastHeartbeatAt >= heartbeatIntervalMs) {
+        store.heartbeat(task.index, `copilot-running-${Math.floor(elapsedMs / 6e4)}m`);
+        lastHeartbeatAt = currentTime;
+      }
+    }, monitorIntervalMs);
+    monitor.unref();
+    child.on("error", (error48) => {
+      fs7.appendFileSync(task.logPath, `
+runner spawn error: ${error48.message}
+`, "utf8");
+      if (!finished) {
+        finished = true;
+        clearInterval(monitor);
+        store.setChildProcess(task.index, 0, "");
+        resolve4({ exitCode: 1, timedOut: false });
+      }
+    });
+    child.on("close", (code) => {
+      if (!finished) {
+        finished = true;
+        clearInterval(monitor);
+        store.setChildProcess(task.index, 0, "");
+        resolve4({ exitCode: code ?? 1, timedOut: false });
+      }
+    });
+  });
+}
+async function executeTask(store, initialState, initialTask, options) {
+  let state = initialState;
+  let task = initialTask;
+  if (task.status === "pending") {
+    await prepareTaskBaseline(state, task);
+    if (store.read().status !== "running") {
+      return;
+    }
+    state = store.startTask(task.index);
+    task = state.tasks[task.index - 1];
+    store.appendLog(`\u25B6\uFE0F Task ${task.index}/${state.tasks.length} started \u2014 ${task.description}`);
+  }
+  if (task.childPid > 0 && !task.childIdentity) {
+    const observedIdentity = getProcessIdentity(task.childPid);
+    const observedCommandLine = getProcessCommandLine(task.childPid);
+    state = observedIdentity && observedCommandLine.toLowerCase().includes("copilot") ? store.setChildProcess(task.index, task.childPid, observedIdentity) : store.setChildProcess(task.index, 0, "");
+    task = state.tasks[task.index - 1];
+  }
+  while (task.attempts < state.maxAttempts || task.childPid > 0) {
+    state = store.read();
+    if (state.status !== "running") {
+      return;
+    }
+    task = state.tasks[task.index - 1];
+    const existingResult = readAgentResult(task);
+    if (existingResult) {
+      await finalizeTask(store, state, task, existingResult);
+      return;
+    }
+    if (task.childPid > 0) {
+      store.appendLog(`\u267B\uFE0F Task ${task.index} reattached to Copilot PID ${task.childPid}`);
+      const detachedResult = await waitForDetachedCopilot(state, task, options, store);
+      state = store.read();
+      task = state.tasks[task.index - 1];
+      if (state.status !== "running") {
+        return;
+      }
+      const recoveredResult = readAgentResult(task);
+      if (recoveredResult) {
+        await finalizeTask(store, state, task, recoveredResult);
+        return;
+      }
+      const detachedReason = detachedResult.timedOut ? `Detached Copilot PID ${task.childPid} timed out` : `Detached Copilot PID ${task.childPid} exited without a terminal result`;
+      store.appendLog(`\u26A0\uFE0F Task ${task.index} ${detachedReason}`);
+    }
+    const nextAttempt = task.attempts + 1;
+    const attemptPhase = nextAttempt === 1 ? "copilot-start" : nextAttempt % 2 === 1 ? `copilot-recovery-${nextAttempt}` : `copilot-resume-${nextAttempt}`;
+    state = store.startAttempt(
+      task.index,
+      attemptPhase
+    );
+    task = state.tasks[task.index - 1];
+    if (state.status !== "running") {
+      return;
+    }
+    store.appendLog(`\u{1F916} Task ${task.index} Copilot attempt ${task.attempts}/${state.maxAttempts}`);
+    const processResult = await runCopilot(
+      state,
+      task,
+      options,
+      store
+    );
+    state = store.read();
+    task = state.tasks[task.index - 1];
+    if (state.status !== "running") {
+      return;
+    }
+    const result = readAgentResult(task);
+    if (result) {
+      await finalizeTask(store, state, task, result);
+      return;
+    }
+    const reason = processResult.timedOut ? `Copilot attempt ${task.attempts} timed out after ${state.taskTimeoutMinutes} minutes` : `Copilot attempt ${task.attempts} exited ${processResult.exitCode} without a terminal result`;
+    store.appendLog(`\u26A0\uFE0F Task ${task.index} ${reason}`);
+    state = store.heartbeat(task.index, reason);
+    task = state.tasks[task.index - 1];
+  }
+  const metadata = await currentGitMetadata(state.repositoryRoot);
+  const stash = await preserveDirtyChanges(state, task);
+  const status = stash ? "stashed-failure" : "failed";
+  store.completeTask(task.index, {
+    status,
+    prUrl: "",
+    branch: metadata.branch,
+    commit: metadata.commit,
+    error: `No terminal agentOW result after ${task.attempts} attempts`,
+    stash
+  });
+  store.appendLog(`\u274C Task ${task.index}/${state.tasks.length} failed \u2014 attempts exhausted`);
+}
+async function finalizeTask(store, state, task, result) {
+  const metadata = await currentGitMetadata(state.repositoryRoot);
+  const stash = await preserveDirtyChanges(state, task);
+  let status = result.status;
+  let error48 = result.error;
+  if (stash && status === "success") {
+    status = "success-with-blockers";
+    error48 = "PR created, but uncommitted task changes were preserved in a stash.";
+  } else if (stash && (status === "failed" || status === "completed-no-pr")) {
+    status = "stashed-failure";
+  }
+  store.completeTask(task.index, {
+    status,
+    prUrl: result.prUrl,
+    branch: result.branch || metadata.branch,
+    commit: result.commit || metadata.commit,
+    error: error48,
+    stash
+  });
+  const marker = status === "success" ? "\u2705" : status === "success-with-blockers" ? "\u26A0\uFE0F" : "\u274C";
+  store.appendLog(`${marker} Task ${task.index}/${state.tasks.length} ${status}${result.prUrl ? ` \u2014 ${result.prUrl}` : ""}`);
+}
+async function runCopilotBatch(batchDir, options = {}) {
+  const store = new BatchStateStore(batchDir);
+  store.acquireLock();
+  let state = null;
+  try {
+    state = store.setSupervisorPid(process.pid);
+    store.appendLog(`\u267B\uFE0F Supervisor active \u2014 PID ${process.pid}`);
+    while (state.status === "running") {
+      const task = state.tasks.find((candidate) => !isTerminalTaskStatus(candidate.status));
+      if (!task) {
+        state = store.update((draft) => {
+          draft.status = "completed";
+          draft.currentTaskIndex = 0;
+          draft.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+          draft.supervisorPid = 0;
+        }, true);
+        break;
+      }
+      try {
+        await executeTask(store, state, task, options);
+      } catch (error48) {
+        const message = error48 instanceof Error ? error48.message : String(error48);
+        if (error48 instanceof ChildTerminationError) {
+          store.update((draft) => {
+            draft.status = "stopped";
+            draft.supervisorPid = 0;
+          }, true);
+          store.appendLog(`\u26D4 Batch stopped \u2014 ${message}`);
+          break;
+        }
+        const metadata = await currentGitMetadata(state.repositoryRoot);
+        const stash = await preserveDirtyChanges(state, task);
+        store.completeTask(task.index, {
+          status: stash ? "stashed-failure" : "failed",
+          prUrl: "",
+          branch: metadata.branch,
+          commit: metadata.commit,
+          error: message,
+          stash
+        });
+        store.appendLog(`\u274C Task ${task.index}/${state.tasks.length} failed \u2014 ${message}`);
+      }
+      state = store.read();
+    }
+    if (state.status === "completed") {
+      store.appendLog("\u{1F305} Batch complete");
+    }
+  } finally {
+    try {
+      store.setSupervisorPid(0);
+    } catch {
+    }
+    store.releaseLock();
+  }
+}
+
 // src/ow/index.ts
 var args = process.argv.slice(2);
 var command = args[0] ?? "";
+if (command === "batch-runner") {
+  const batchDirIndex = args.indexOf("--batch-dir");
+  const batchDir = batchDirIndex >= 0 ? args[batchDirIndex + 1] : void 0;
+  if (!batchDir) {
+    process.stderr.write("Usage: agentow batch-runner --batch-dir <absolute-path>\n");
+    process.exit(1);
+  }
+  await runCopilotBatch(batchDir);
+  process.exit(0);
+}
 if (command !== "mcp") {
-  process.stdout.write("Usage: agentow mcp\n  Start as an MCP server (stdio transport).\n");
+  process.stdout.write(
+    "Usage:\n  agentow mcp\n    Start as an MCP server (stdio transport).\n  agentow batch-runner --batch-dir <absolute-path>\n    Resume a persisted durable Copilot batch.\n"
+  );
   process.exit(1);
 }
-var distDir = path3.dirname(url2.fileURLToPath(import.meta.url));
-var logsDir = path3.join(distDir, "logs");
-var toolLogDir = path3.join(logsDir, "tools");
-fs5.mkdirSync(toolLogDir, { recursive: true });
+var distDir = path6.dirname(url3.fileURLToPath(import.meta.url));
+var logsDir = path6.join(distDir, "logs");
+var toolLogDir = path6.join(logsDir, "tools");
+fs8.mkdirSync(toolLogDir, { recursive: true });
 purgeLogs(logsDir, 7);
 var logger = new FileLogger(logsDir, "ow-mcp");
 var server = new McpServer(

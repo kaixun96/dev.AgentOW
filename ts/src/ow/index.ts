@@ -7,12 +7,30 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { FileLogger, purgeLogs } from "../shared/logger.js";
 import { registerOwTools } from "./mcp/owTools.js";
 import { OW_MCP_INSTRUCTIONS } from "./mcp/instructions.js";
+import { runCopilotBatch } from "./tools/copilotBatchRunner.js";
 
 const args = process.argv.slice(2);
 const command = args[0] ?? "";
 
+if (command === "batch-runner") {
+  const batchDirIndex: number = args.indexOf("--batch-dir");
+  const batchDir: string | undefined = batchDirIndex >= 0 ? args[batchDirIndex + 1] : undefined;
+  if (!batchDir) {
+    process.stderr.write("Usage: agentow batch-runner --batch-dir <absolute-path>\n");
+    process.exit(1);
+  }
+  await runCopilotBatch(batchDir);
+  process.exit(0);
+}
+
 if (command !== "mcp") {
-  process.stdout.write("Usage: agentow mcp\n  Start as an MCP server (stdio transport).\n");
+  process.stdout.write(
+    "Usage:\n" +
+    "  agentow mcp\n" +
+    "    Start as an MCP server (stdio transport).\n" +
+    "  agentow batch-runner --batch-dir <absolute-path>\n" +
+    "    Resume a persisted durable Copilot batch.\n",
+  );
   process.exit(1);
 }
 

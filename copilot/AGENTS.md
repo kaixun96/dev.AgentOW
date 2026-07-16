@@ -104,13 +104,13 @@ Environment claims have a second hard gate: one failed URL, credential, tenant, 
 
 The `agentow` skill walks you through this in detail. It auto-loads when the user asks to implement a feature or fix a bug in odsp-web.
 
-`ow-batch` is the Copilot batch entry point. The current main session runs multiple agentOW tasks serially in AUTO mode, writing a checkpoint after each task and carrying only batch bookkeeping forward. It does not launch nested Copilot processes, delegate the full pipeline, or use parallel worktrees because the shared `ow` MCP server is rooted at `/workspaces/odsp-web`.
+`ow-batch` is the durable Copilot batch entry point. The main session dispatches `ow-batch-start`, which launches a detached tmux supervisor. The supervisor runs one fresh named `copilot -p` agentOW AUTO session at a time, persists atomic state and checkpoints, retries interrupted children, times out stalled attempts, and advances after terminal failures. It never uses parallel odsp-web worktrees because the shared checkout is `/workspaces/odsp-web`.
 
 ## Modes
 
 - **Interactive** (default) — clarify intent, approve the plan, confirm before shipping with critical review issues. ~3-5 user touches.
 - **Auto** (`--auto` in the prompt) — skip all gates: no intent questions, auto-approve the plan, ship even with critical issues (PR is draft, a human reviews before publishing). Zero user touches.
-- **Batch** (`/ow-batch`) — serial unattended loop over multiple main-session agentOW AUTO runs. Each task gets fresh bounded planner/evaluator/reviewer subagents, a checkpoint, and one summary row.
+- **Batch** (`/ow-batch`) — durable serial supervisor over multiple isolated agentOW AUTO sessions. Parent-session interruption does not stop the batch; persisted state supports recovery after a Codespace restart.
 
 ## Core principles
 

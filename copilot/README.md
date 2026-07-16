@@ -2,7 +2,7 @@
 
 A port of [agentOW](../README.md) to GitHub Copilot CLI. Same goal — odsp-web feature description → draft PR — but re-architected around Copilot CLI's grain instead of Claude Code's Agent Teams.
 
-> **Status: thin slice / proof of concept.** Covers the core pipeline (research → plan → implement → verify → fix loop → review → PR) plus serial batch mode. Standalone screenshots and the adversarial dual-evaluator are NOT ported yet. Several Copilot-specific integration points need verification — see [Needs verification](#needs-verification).
+> **Status: thin slice.** Covers the core pipeline (research → plan → implement → verify → fix loop → review → PR) plus durable serial batch mode. Standalone screenshots and the adversarial dual-evaluator are NOT ported yet. Several Copilot-specific integration points still need verification — see [Needs verification](#needs-verification).
 
 ## Why it's structured differently from the Claude version
 
@@ -14,10 +14,12 @@ So the architecture collapses:
 |---------------------|---------------------|
 | Separate orchestrator + generator agents | **Main session** is both — it retains context across fix cycles for free |
 | planner / evaluator / reviewer as persistent team members | Stateless `.agent.md` subagents, dispatched per-call via `@agentow-copilot:<name>` |
-| `TeamCreate` + `SendMessage` + idle/wake/watchdog/deadlock machinery | **None of it** — the main session drives synchronously; no idle agents means no deadlocks |
-| Batch = spawn a team per task | Main session runs agentOW tasks serially, checkpointing between tasks |
+| `TeamCreate` + `SendMessage` + idle/wake/watchdog/deadlock machinery | Main session drives one agentOW task synchronously |
+| Batch = spawn a team per task | Detached tmux supervisor starts one named `copilot -p` agentOW session per task |
 
-The key insight: the generator needs context continuity across fix cycles, and the main session already has it. Make the main session the implementer; keep subagents for bounded "look and report" work. Batch mode repeats that pipeline serially in the main session, writes a concise checkpoint after each task, drops completed-task details from active reasoning, and relies on normal CLI compaction when context pressure requires it.
+For one task, the generator needs context continuity across fix cycles, and the main session already has it. Make that session the implementer; keep subagents for bounded "look and report" work.
+
+Batch mode deliberately uses a different durability boundary. `ow-batch-start` writes atomic state under `.aero/batch-*`, launches a detached tmux supervisor, and gives every task a fresh named Copilot session. Interrupted child sessions are resumed, every attempt has a hard timeout, timed-out process groups fully exit before retry, exhausted tasks are checkpointed and skipped, and dirty or conflicted work is preserved before the supervisor proceeds without depending on the parent conversation remaining alive.
 
 ## Session artifacts and visual gate
 
@@ -41,7 +43,7 @@ For visible UI changes, BEFORE/AFTER Playwright screenshots are mandatory. If th
 
 ## Shared MCP server
 
-The TypeScript MCP server (`../ts/`) is **reused unchanged** — Copilot CLI has first-class MCP support. The built bundle is copied into this plugin at `ts/dist/ow/index.js`, and `.mcp.json` / `plugin.json` launch that self-contained copy. Both the Claude and Copilot versions can connect to the same tool codebase independently (each CLI spawns its own MCP process).
+The TypeScript MCP server (`../ts/`) is shared by both plugins. The built bundle is copied into this plugin at `ts/dist/ow/index.js`, and `.mcp.json` / `plugin.json` launch that self-contained copy. It includes the durable batch supervisor and state tools used by Copilot batch mode.
 
 ## Install
 
@@ -61,6 +63,8 @@ copilot                                                               # interact
 > /ow-batch tasks.md
 ```
 
+`/ow-batch` returns immediately after launching the supervisor. Use `/ow-batch` with no new task list, or call `ow-batch-status`, to inspect or recover the latest batch.
+
 ## Needs verification (the spike)
 
 These are written per the conventions of working Copilot CLI plugins (ironflow-copilot, slidesshare), but each is an integration point I could not test from here. Verify before relying on the port:
@@ -69,7 +73,7 @@ These are written per the conventions of working Copilot CLI plugins (ironflow-c
 2. **Plugin-bundled MCP auto-load** — confirm Copilot loads `mcpServers` from `.claude-plugin/plugin.json` or `.mcp.json`; otherwise users must merge the same `ow` config into `~/.copilot/mcp-config.json`.
 3. **Subagent tool names** — agents declare `tools: [view, grep, glob, shell]` (from ironflow's read-only reviewers + an assumed `shell`). Confirm `shell` is the Copilot name for running commands, and confirm the main session's write/edit tool names.
 4. **`@agentow-copilot:<name>` dispatch + parallelism** — ironflow confirms the `@plugin:agent` syntax and single-message parallel dispatch; confirm it works with this plugin's agent names.
-5. **Long unattended context behavior** — confirm task checkpoints plus normal Copilot CLI automatic compaction keep long serial batches reliable without nested CLI processes.
+5. **Codespace lifecycle boundary** — the detached supervisor survives parent-session and terminal interruption. A forced Codespace shutdown pauses all local processes; `ow-batch-resume` restarts from persisted state without repeating terminal tasks.
 
 ## Not ported yet
 
@@ -91,5 +95,5 @@ copilot/
 │   └── reviewer.agent.md        stateless: review → verdict
 └── skills/
     ├── agentow/SKILL.md         main-session orchestration
-    └── ow-batch/SKILL.md        serial main-session agentOW loop with task checkpoints
+    └── ow-batch/SKILL.md        durable tmux-supervised serial agentOW batch
 ```

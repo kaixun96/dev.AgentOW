@@ -9,6 +9,7 @@
     "build": "npm run validate-prompts && tsup && npm run sync-artifacts",
     "sync-artifacts": "node scripts/sync-build-artifacts.mjs",
     "validate-prompts": "node scripts/validate-agentow-prompts.mjs",
+    "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/ow/index.ts mcp"
   },

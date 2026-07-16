@@ -36,6 +36,20 @@ function copyMatchingFiles(source, destination, predicate) {
 copyDirectoryContents(distDir, path.join(repoRoot, "copilot", "ts", "dist"));
 console.log("copilot MCP dist synced");
 
+const copilotInstall = path.join(
+  os.homedir(),
+  ".copilot",
+  "installed-plugins",
+  "agentOW",
+  "agentow-copilot",
+);
+if (fs.existsSync(copilotInstall)) {
+  copyDirectoryContents(path.join(repoRoot, "copilot"), copilotInstall);
+  console.log(`copilot plugin synced to ${copilotInstall}`);
+} else {
+  console.log(`copilot plugin install not found, skipped: ${copilotInstall}`);
+}
+
 const pluginJson = JSON.parse(
   fs.readFileSync(path.join(repoRoot, ".claude-plugin", "plugin.json"), "utf8"),
 );

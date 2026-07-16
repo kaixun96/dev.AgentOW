@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as cp from "node:child_process";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import { OW } from "../../shared/constants.js";
 import { RushCli } from "../tools/rushCli.js";
 import { TmuxManager } from "../tools/tmuxManager.js";
@@ -9,6 +10,12 @@ import { GitClient } from "../tools/gitClient.js";
 import { PrClient } from "../tools/prClient.js";
 import { PrAttach } from "../tools/prAttach.js";
 import { AdoClient } from "../tools/adoClient.js";
+import { BatchStateStore, type BatchState, type BatchTaskState } from "../tools/batchState.js";
+import {
+  getProcessCommandLine,
+  getProcessIdentity,
+  terminateProcessGroup,
+} from "../tools/processTree.js";
 import { extractDebugLinks, fetchDebugUrlsFromLanding, buildDebugQueryString, buildFullTestUrl } from "../tools/debugLink.js";
 import { FileLogger, RawOutputLog } from "../../shared/logger.js";
 import {
@@ -21,6 +28,8 @@ import {
   textResult,
 } from "../../shared/mcpHelpers.js";
 
+const BATCH_ARTIFACT_EXCLUDE_PATHSPEC = ":(exclude).aero/**";
+
 function execSimple(cmd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     cp.exec(cmd, (err, stdout) => {
@@ -28,6 +37,53 @@ function execSimple(cmd: string): Promise<string> {
       else resolve(stdout.trim());
     });
   });
+}
+
+function compactTimestamp(): string {
+  return new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(".", "-").replace("Z", "");
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function findLatestBatchDir(): string | undefined {
+  const aeroRoot = `${OW.odspWebRoot}/.aero`;
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(aeroRoot, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+  const candidates: string[] = [];
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith("batch-")) {
+      const batchDir: string = `${aeroRoot}/${entry.name}`;
+      if (fs.existsSync(`${batchDir}/state.json`)) {
+        candidates.push(batchDir);
+      }
+    }
+  }
+  candidates.sort((left, right) => right.localeCompare(left));
+  return candidates[0];
+}
+
+async function startBatchSupervisor(
+  tmux: TmuxManager,
+  state: BatchState,
+  signal?: AbortSignal,
+): Promise<string> {
+  const target: string = await tmux.openWindow(state.supervisorWindow, signal);
+  const executable: string = path.resolve(process.argv[1]);
+  const runnerCommand: string =
+    `restarts=0; while [ "$restarts" -lt 10 ]; do ${shellQuote(process.execPath)} ${shellQuote(executable)} batch-runner ` +
+    `--batch-dir ${shellQuote(state.batchDir)}; code=$?; [ "$code" -eq 0 ] && break; ` +
+    `restarts=$((restarts + 1)); delay=$((restarts * 30)); [ "$delay" -gt 300 ] && delay=300; ` +
+    `echo "[$(date +%H:%M:%S)] supervisor exited $code; restart $restarts/10 in $delay seconds" >> ${shellQuote(state.logPath)}; ` +
+    `[ "$restarts" -ge 10 ] && break; sleep "$delay"; done; [ "$code" -ne 0 ] && ` +
+    `echo "[$(date +%H:%M:%S)] supervisor stopped after $restarts failed restarts" >> ${shellQuote(state.logPath)}`;
+  await tmux.send(target, runnerCommand, true, signal);
+  return target;
 }
 
 export function registerOwTools(
@@ -62,7 +118,189 @@ export function registerOwTools(
     });
   });
 
-  // ── 2. ow-rush ────────────────────────────────────────────────────────────
+  // ── 2. ow-batch-start ─────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-batch-start", {
+    description: "Start a durable serial agentOW batch in tmux. Each task runs in a fresh autonomous Copilot session, retries on interruption, and cannot block later tasks indefinitely.",
+    inputSchema: {
+      tasks: z.array(z.string().min(1)).min(1).max(100).describe("Ordered feature/bug descriptions; one draft PR per task."),
+      taskTimeoutMinutes: z.number().int().min(15).max(480).optional().describe("Hard timeout for each Copilot attempt (default: 180)."),
+      maxAttempts: z.number().int().min(1).max(5).optional().describe("Copilot attempts per task before recording failure and continuing (default: 3)."),
+    },
+  }, async (input, extras) => {
+    const gitStatus = await git.run([
+      "status",
+      "--short",
+      "--untracked-files=all",
+      "--",
+      ".",
+      BATCH_ARTIFACT_EXCLUDE_PATHSPEC,
+    ], extras.signal);
+    if (gitStatus.exitCode !== 0) {
+      throw new Error(`Unable to inspect odsp-web worktree: ${gitStatus.output}`);
+    }
+    if (gitStatus.output.trim()) {
+      throw new Error(`Cannot start ow-batch with a dirty odsp-web worktree:\n${gitStatus.output}`);
+    }
+
+    const timestamp: string = compactTimestamp();
+    const batchDir: string = `${OW.odspWebRoot}/.aero/batch-${timestamp}`;
+    const supervisorWindow: string = `batch-${timestamp}`;
+    const tasks: string[] = input.tasks.map((task) => task.trim());
+    const store: BatchStateStore = BatchStateStore.create({
+      batchDir,
+      repositoryRoot: OW.odspWebRoot,
+      tasks,
+      taskTimeoutMinutes: input.taskTimeoutMinutes ?? 180,
+      maxAttempts: input.maxAttempts ?? 3,
+      supervisorWindow,
+    });
+    try {
+      const target: string = await startBatchSupervisor(tmux, store.read(), extras.signal);
+      return successResultWithDebug(logger, "ow-batch-start", {
+        batchDir,
+        statePath: store.statePath,
+        summaryPath: `${batchDir}/summary.md`,
+        logPath: `${batchDir}/batch.log`,
+        tmuxTarget: target,
+        taskCount: tasks.length,
+        message: "Durable batch supervisor started. The batch continues if this Copilot session exits.",
+      });
+    } catch (error) {
+      store.stop(`Failed to start supervisor: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  });
+
+  // ── 3. ow-batch-status ────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-batch-status", {
+    description: "Read persisted ow-batch state. Defaults to the most recent durable batch.",
+    inputSchema: {
+      batchDir: z.string().optional().describe("Absolute batch directory. Omit to inspect the latest durable batch."),
+    },
+  }, async (input, extras) => {
+    const batchDir: string | undefined = input.batchDir ?? findLatestBatchDir();
+    if (!batchDir) {
+      throw new Error("No durable ow-batch state found.");
+    }
+    const store = new BatchStateStore(batchDir);
+    const state: BatchState = store.read();
+    const windows = await tmux.listWindows(extras.signal);
+    const supervisorActive: boolean = windows.some((window) => window.name === state.supervisorWindow);
+    const logTail: string[] = fs.existsSync(state.logPath)
+      ? fs.readFileSync(state.logPath, "utf8").trimEnd().split("\n").slice(-20)
+      : [];
+    return successResultWithDebug(logger, "ow-batch-status", {
+      state,
+      supervisorActive,
+      logTail,
+    });
+  });
+
+  // ── 4. ow-batch-resume ────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-batch-resume", {
+    description: "Restart a missing durable batch supervisor from its persisted state. Safe to call repeatedly.",
+    inputSchema: {
+      batchDir: z.string().optional().describe("Absolute batch directory. Omit to resume the latest durable batch."),
+    },
+  }, async (input, extras) => {
+    const batchDir: string | undefined = input.batchDir ?? findLatestBatchDir();
+    if (!batchDir) {
+      throw new Error("No durable ow-batch state found.");
+    }
+    const store = new BatchStateStore(batchDir);
+    const state: BatchState = store.read();
+    if (state.status !== "running") {
+      return successResultWithDebug(logger, "ow-batch-resume", {
+        batchDir,
+        resumed: false,
+        status: state.status,
+      });
+    }
+    const windows = await tmux.listWindows(extras.signal);
+    const existing = windows.find((window) => window.name === state.supervisorWindow);
+    if (existing) {
+      return successResultWithDebug(logger, "ow-batch-resume", {
+        batchDir,
+        resumed: false,
+        status: state.status,
+        tmuxTarget: existing.target,
+      });
+    }
+    const target: string = await startBatchSupervisor(tmux, state, extras.signal);
+    store.appendLog("♻️ Missing supervisor restarted from persisted state");
+    return successResultWithDebug(logger, "ow-batch-resume", {
+      batchDir,
+      resumed: true,
+      status: state.status,
+      tmuxTarget: target,
+    });
+  });
+
+  // ── 5. ow-batch-stop ──────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-batch-stop", {
+    description: "Stop a durable batch supervisor and persist the stopped state.",
+    inputSchema: {
+      batchDir: z.string().optional().describe("Absolute batch directory. Omit to stop the latest durable batch."),
+      reason: z.string().optional().describe("Reason recorded in state and batch log."),
+    },
+  }, async (input, extras) => {
+    const batchDir: string | undefined = input.batchDir ?? findLatestBatchDir();
+    if (!batchDir) {
+      throw new Error("No durable ow-batch state found.");
+    }
+    const store = new BatchStateStore(batchDir);
+    const stopReason: string = input.reason ?? "Stopped by user";
+    let state: BatchState = store.requestStop(stopReason);
+    const stopDeadline: number = Date.now() + 5_000;
+    while (Date.now() < stopDeadline && state.supervisorPid > 0) {
+      const activeTask: BatchTaskState | undefined = state.tasks.find((task) => task.childPid > 0);
+      if (activeTask) {
+        const childIdentity: string = activeTask.childIdentity || getProcessIdentity(activeTask.childPid);
+        const childCommandLine: string = getProcessCommandLine(activeTask.childPid);
+        if (
+          !activeTask.childIdentity
+          && childIdentity
+          && childCommandLine
+          && !childCommandLine.toLowerCase().includes("copilot")
+        ) {
+          throw new Error(`Refusing to terminate unverified process ${activeTask.childPid}.`);
+        }
+        await terminateProcessGroup(activeTask.childPid, childIdentity);
+        store.setChildProcess(activeTask.index, 0, "");
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      state = store.read();
+    }
+    await tmux.killWindow(state.supervisorWindow, extras.signal);
+    state = store.read();
+    const remainingTask: BatchTaskState | undefined = state.tasks.find((task) => task.childPid > 0);
+    if (remainingTask) {
+      await terminateProcessGroup(
+        remainingTask.childPid,
+        remainingTask.childIdentity || getProcessIdentity(remainingTask.childPid),
+      );
+      store.setChildProcess(remainingTask.index, 0, "");
+    }
+    const lockDeadline: number = Date.now() + 5_000;
+    while (!store.tryAcquireLock()) {
+      if (Date.now() >= lockDeadline) {
+        throw new Error("Timed out waiting for the batch supervisor to release its lifecycle lock.");
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    }
+    try {
+      store.stop(stopReason);
+    } finally {
+      store.releaseLock();
+    }
+    store.appendLog(`⏹️ Batch stopped — ${stopReason}`);
+    return successResultWithDebug(logger, "ow-batch-stop", {
+      batchDir,
+      status: "stopped",
+    });
+  });
+
+  // ── 6. ow-rush ────────────────────────────────────────────────────────────
   registerMcpTool(server, "ow-rush", {
     description: "Run any rush command with structured output and error parsing.",
     inputSchema: {

@@ -210,6 +210,6 @@ Append `[HH:MM:SS] ✅ Workflow complete` after `final.md` is written.
 
 ## Notes
 
-- One feature/bug per run. For multiple, use `ow-batch`; it runs this pipeline serially in the main session and checkpoints between tasks.
+- One feature/bug per run. For multiple, use `ow-batch`; its detached supervisor runs isolated AUTO sessions serially with persisted state, timeouts, retries, and per-task checkpoints.
 - Specs/plans stay local (`.aero/`), never committed, never referenced from code.
 - If the user says "skip the review" / "don't make a PR" / "just code it" — follow them. The user is in control.
