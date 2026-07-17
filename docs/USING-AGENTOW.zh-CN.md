@@ -117,6 +117,8 @@ Whenever a request discusses <项目名>:
 - Copilot CLI：`$HOME/.copilot/copilot-instructions.md`，或 `$HOME/.copilot/instructions/*.instructions.md`
 - Claude Code：可由 dotfiles 将相同规则安装到个人级 `CLAUDE.md`
 
+如何创建和配置个人 dotfiles，参见 ODSP-Web Wiki：[Using dotfiles for personal customization](https://dev.azure.com/onedrive/ODSP-Web/_wiki/wikis/ODSP-Web.wiki/141505/Using-dotfiles-for-personal-customization)。
+
 推荐在 dotfiles 中保存一份项目指令，再由安装脚本复制或链接到对应 CLI 的个人指令目录。Context 本身仍然放在独立 repository 或 odsp-web 中；Memory 只保存入口路径和读取规则。
 
 启动新 Codespace 后，可以在 Copilot CLI 中运行 `/instructions` 或 `/env`，确认个人指令已经加载。
