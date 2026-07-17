@@ -200,51 +200,7 @@ Auto 模式不会等待需求澄清或计划审批。Agent 会把必要假设记
 
 agentOW 应先从 ADO 获取每个 Work Item 的最新描述、讨论、验收标准和关联项，再生成 Batch 任务。Batch 中的每一项都应当可以独立验证、独立创建 PR。不要把相互依赖的多个步骤伪装成独立任务；这类工作应先合并为一个 Spec，或明确依赖顺序。
 
-## 6. 两种推荐用法
-
-### 用法一：批量处理 Bug List
-
-这里的 Bug List 指 **Azure DevOps 中的 Bug Query 或一组 Bug Work Item**，而不是本地 Markdown 列表。将 ADO Query URL 或 Work Item IDs 交给 agentOW，让它读取当前仍然符合筛选条件的 Bug。
-
-为了支持零交互执行，每个 ADO Bug 最好包含：
-
-- 问题现象、影响范围和复现步骤；
-- Expected Behavior 和验收标准；
-- 相关组件、截图、Design 或 Spec 链接；
-- 已知限制和明确不处理的范围；
-- 依赖和关联 Work Items。
-
-运行示例：
-
-```text
-/ow-batch
-读取并处理以下 ADO Query 中的所有 Active Bug：
-https://dev.azure.com/<organization>/<project>/_queries/query/<query-id>
-```
-
-agentOW 会把 Query 结果中的每个 Bug 作为独立任务，并通过 Work Item ID 获取最新内容。单个任务失败不会阻止后续任务，最终 Summary 会列出 Work Item、状态、PR 和失败原因；创建 PR 时也应关联对应的 Work Item。
-
-### 用法二：执行 ADO 中的 TODO Work Items
-
-这里的 TODO 指 **ADO 中用来跟踪待办工作的 Work Item**，例如 Task、Bug 或 User Story。Context 可以保存相关 Query 和筛选规则，但任务内容和状态仍以 ADO 为 Source of Truth。
-
-单个 TODO 可以直接使用 Auto：
-
-```text
-/agentow --auto
-读取并完成 ADO Work Item 1234567。先读取其中的关联项和项目 Context，再按照验收标准实现并创建 Draft PR。
-```
-
-多个 TODO 可以通过 ADO Query 交给 Batch：
-
-```text
-/ow-batch
-读取 <ADO Query URL> 中所有 State=Ready 的 Work Items，并按照 Query 顺序逐个完成。
-```
-
-开始前，agentOW 应检查 Work Item 的状态、依赖、关联 PR 和验收标准。多个互不依赖的 Ready Work Items 可以批量执行；如果存在依赖关系，应先按依赖顺序生成 Batch 列表，不要让多个任务同时修改相同区域。
-
-## 7. 验证和运行产物
+## 6. 验证和运行产物
 
 agentOW 的目标不是“生成代码”，而是“产生可审查的交付结果”。一次完整运行会保留计划、实现记录、评估、Review 和最终状态。
 
@@ -266,7 +222,7 @@ agentOW 的目标不是“生成代码”，而是“产生可审查的交付结
 
 Batch 运行还会生成 `summary.md` 和每个任务的独立日志。
 
-## 8. 推荐的日常工作流
+## 7. 推荐的日常工作流
 
 1. 在 Context 中创建或更新 Spec、设计以及 ADO Work Item 入口。
 2. 确认 Memory 能让新 Session 自动找到 Context。
