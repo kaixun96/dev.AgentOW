@@ -46,7 +46,7 @@ project-context/
 ├── decisions.md           # 已确认的决策及原因
 ├── terminology.md         # 业务和代码术语
 ├── status.md              # 当前进展、负责人、已完成工作
-├── todo.md                # 可执行任务列表
+├── work-items.md          # ADO Query、Area Path 和任务跟踪入口
 └── lessons.md             # 实际运行后发现的问题和经验
 ```
 
@@ -56,7 +56,7 @@ project-context/
 2. 哪些文件必须先读；
 3. 不同类型的问题应查阅哪个文件；
 4. 信息冲突时的优先级；
-5. 当前状态和 TODO 在哪里。
+5. 当前状态以及对应的 ADO Query 或 Work Item 在哪里。
 
 ### 可以放入 Context 的内容
 
@@ -67,8 +67,10 @@ project-context/
 - 已确认的技术决策、限制条件和不做事项；
 - 相关 PR、Work Item、实验结果和历史背景；
 - 团队成员已经完成或正在进行的工作；
-- 可以独立执行的 TODO 和 Bug 列表；
+- ADO Bug List、TODO Work Items 的 Query 和筛选规则；
 - agentOW 运行后暴露出的错误假设和新知识。
+
+任务的标题、状态、负责人、验收标准和依赖关系应以 ADO Work Item 为准。Context 只需要记录稳定的项目背景以及如何找到这些 Work Items，不要复制一份容易过期的本地任务列表。
 
 链接本身不一定能被 Agent 访问。对于有权限限制的 Figma、PM 文档或会议记录，应在 Context 中保存必要的文字摘要、截图或导出内容，并标明原始来源和更新时间。
 
@@ -103,7 +105,7 @@ project-context/
 Whenever a request discusses <项目名>:
 1. Read <Context repository or directory>/README.md first.
 2. Follow its reading order and treat the referenced project context as the source of truth.
-3. Check status.md and todo.md before planning changes so you account for work completed by other contributors.
+3. Check status.md and the referenced ADO Work Items before planning changes so you account for current state and work completed by other contributors.
 4. If the request conflicts with the context, surface the conflict instead of silently choosing one.
 5. After discovering durable new project knowledge, update the appropriate context document.
 ```
@@ -120,8 +122,6 @@ Whenever a request discusses <项目名>:
 如何创建和配置个人 dotfiles，参见 ODSP-Web Wiki：[Using dotfiles for personal customization](https://dev.azure.com/onedrive/ODSP-Web/_wiki/wikis/ODSP-Web.wiki/141505/Using-dotfiles-for-personal-customization)。
 
 推荐在 dotfiles 中保存一份项目指令，再由安装脚本复制或链接到对应 CLI 的个人指令目录。Context 本身仍然放在独立 repository 或 odsp-web 中；Memory 只保存入口路径和读取规则。
-
-启动新 Codespace 后，可以在 Copilot CLI 中运行 `/instructions` 或 `/env`，确认个人指令已经加载。
 
 这对多人协作尤其重要：
 
@@ -175,7 +175,7 @@ Copilot CLI 需要先完成 `copilot auth`。
 
 ```text
 /agentow --auto
-按照 project-context/todo.md 中 TODO-017 的描述和验收标准完成任务。
+读取 ADO Work Item 1234567，并按照其中的描述和验收标准完成任务。
 ```
 
 Auto 模式不会等待需求澄清或计划审批。Agent 会把必要假设记录到运行产物中，因此任务描述必须能够定位到明确的 Spec 和验收标准。
@@ -183,60 +183,66 @@ Auto 模式不会等待需求澄清或计划审批。Agent 会把必要假设记
 ### Batch：批量处理独立任务
 
 ```text
-/ow-batch project-context/bugs.md
+/ow-batch
+读取这个 ADO Bug Query 中的所有 Active Bug 并逐个处理：
+<ADO Query URL>
 ```
 
 或直接输入：
 
 ```text
 /ow-batch
-1. 修复 PhotoGrid 在 mobile 下的 elevation background
-2. 修复 empty state 的错误 aria-label
-3. 删除 sp-pages 中本次迁移遗留的 unused imports
+依次处理以下 ADO Work Items：
+1234567
+1234568
+1234569
 ```
 
-Batch 中的每一项都应当是可以独立验证、独立创建 PR 的任务。不要把相互依赖的多个步骤伪装成独立任务；这类工作应先合并为一个 Spec，或明确依赖顺序。
+agentOW 应先从 ADO 获取每个 Work Item 的最新描述、讨论、验收标准和关联项，再生成 Batch 任务。Batch 中的每一项都应当可以独立验证、独立创建 PR。不要把相互依赖的多个步骤伪装成独立任务；这类工作应先合并为一个 Spec，或明确依赖顺序。
 
 ## 6. 两种推荐用法
 
 ### 用法一：批量处理 Bug List
 
-在 `bugs.md` 中为每个 Bug 提供：
+这里的 Bug List 指 **Azure DevOps 中的 Bug Query 或一组 Bug Work Item**，而不是本地 Markdown 列表。将 ADO Query URL 或 Work Item IDs 交给 agentOW，让它读取当前仍然符合筛选条件的 Bug。
 
-- 问题现象和影响范围；
-- 复现步骤；
-- 预期行为；
-- 相关组件、Work Item 或截图；
-- 验收标准；
-- 已知限制或明确不处理的范围。
+为了支持零交互执行，每个 ADO Bug 最好包含：
 
-然后运行：
+- 问题现象、影响范围和复现步骤；
+- Expected Behavior 和验收标准；
+- 相关组件、截图、Design 或 Spec 链接；
+- 已知限制和明确不处理的范围；
+- 依赖和关联 Work Items。
+
+运行示例：
 
 ```text
-/ow-batch project-context/bugs.md
+/ow-batch
+读取并处理以下 ADO Query 中的所有 Active Bug：
+https://dev.azure.com/<organization>/<project>/_queries/query/<query-id>
 ```
 
-agentOW 会为每个任务建立独立执行过程。单个任务失败不会阻止后续任务，最终 Summary 会列出状态、PR 和失败原因。
+agentOW 会把 Query 结果中的每个 Bug 作为独立任务，并通过 Work Item ID 获取最新内容。单个任务失败不会阻止后续任务，最终 Summary 会列出 Work Item、状态、PR 和失败原因；创建 PR 时也应关联对应的 Work Item。
 
-### 用法二：执行 Context 中的 TODO
+### 用法二：执行 ADO 中的 TODO Work Items
 
-`todo.md` 不应只是模糊的愿望清单。每个可自动执行的 TODO 至少应包含：
+这里的 TODO 指 **ADO 中用来跟踪待办工作的 Work Item**，例如 Task、Bug 或 User Story。Context 可以保存相关 Query 和筛选规则，但任务内容和状态仍以 ADO 为 Source of Truth。
 
-```markdown
-## TODO-017 — Add PhotoGrid loading state
+单个 TODO 可以直接使用 Auto：
 
-Status: Ready
-Depends on: None
-Spec: product-spec.md#photo-loading
-Design: design.md#photo-grid-loading
-
-Acceptance criteria:
-- Loading begins before the first photo request.
-- Existing empty and error states remain unchanged.
-- BEFORE and AFTER screenshots cover desktop and mobile.
+```text
+/agentow --auto
+读取并完成 ADO Work Item 1234567。先读取其中的关联项和项目 Context，再按照验收标准实现并创建 Draft PR。
 ```
 
-单个任务可使用 Auto；多个互不依赖的 Ready 任务可交给 Batch。若 TODO 存在依赖关系，应先按依赖顺序生成 Batch 列表，不要让多个 Agent 同时修改相同区域。
+多个 TODO 可以通过 ADO Query 交给 Batch：
+
+```text
+/ow-batch
+读取 <ADO Query URL> 中所有 State=Ready 的 Work Items，并按照 Query 顺序逐个完成。
+```
+
+开始前，agentOW 应检查 Work Item 的状态、依赖、关联 PR 和验收标准。多个互不依赖的 Ready Work Items 可以批量执行；如果存在依赖关系，应先按依赖顺序生成 Batch 列表，不要让多个任务同时修改相同区域。
 
 ## 7. 验证和运行产物
 
@@ -262,7 +268,7 @@ Batch 运行还会生成 `summary.md` 和每个任务的独立日志。
 
 ## 8. 推荐的日常工作流
 
-1. 在 Context 中创建或更新 Spec、设计和 TODO。
+1. 在 Context 中创建或更新 Spec、设计以及 ADO Work Item 入口。
 2. 确认 Memory 能让新 Session 自动找到 Context。
 3. 第一次处理新领域时使用 Interactive 模式。
 4. 将对话产生的稳定知识写回 Context。
