@@ -44,6 +44,7 @@ The dispatcher gives you:
 - `finalValidationMode` — optional. If `pr-cdn-fic`, this is final PR validation and screenshots must use the PR SP-Client Validation CDN debug query, not localhost.
 - `prId` / `prUrl` — optional PR identity for fetching SP-Client Validation debug query.
 - `contextDocuments` — optional feature/domain docs. Domain-specific execution guards live there.
+- `planPath` / `implementationArtifactPath` — the main session's plan and current implementation report. Use them to verify required context evidence was actually produced, not merely cited.
 
 ## Procedure
 
@@ -55,6 +56,17 @@ Use `view` / `grep` to confirm the changed code matches the intent and the accep
 If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You may skip screenshots only when `surfaceTrace` is explicitly `Pattern: skip` with a non-UI/server-side reason, or `Pattern: D` has been probed and confirmed unreachable. If unsure whether the change is visible, treat it as visible and attempt screenshots.
 
 If `contextDocuments` are provided, read them before UI verification and apply the documented domain-specific guards. Cite the doc path/section in the report.
+
+### Context compliance evidence (hard gate)
+
+For each routed context guard, verify the planner/plan/implementation artifacts contain the required evidence. A statement such as "read the context" is not evidence.
+
+For UI root/wrapper replacements, require a layout ownership audit that:
+- opens every removed/replaced root class/style definition;
+- classifies replacement-component internal chrome separately from external parent/sibling layout;
+- gives every external `margin`, parent `gap`, wrapping, alignment, width, and positioning declaration a destination.
+
+If required context evidence is missing, return `FAIL` with `failureKind: "product"` and blocker `context-compliance-evidence-missing`. Do not infer the missing audit on the implementer's behalf.
 
 ### Evidence scope and environment discovery (hard gate)
 
@@ -122,6 +134,20 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
 8. Run `file -- "<beforePath>" "<afterPath>"` with the shell tool and quote its PNG dimension output in `evaluator-report.md`. Verify both primary PNG dimensions equal the configured viewport dimensions and visually inspect both images for surrounding page context. If either primary image is component-width, clipped, missing page context, or otherwise not the full viewport, return `failureKind: "evaluator-spec"` with blocker `primary-screenshot-not-full-viewport`.
 9. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
 
+### Repeated/dense UI geometry (hard gate when required)
+
+If the plan/context marks the surface as repeated or dense (Cards, tiles, rows, list items, table rows), close-up and geometry evidence are mandatory:
+
+1. Capture same-scale BEFORE and AFTER crops containing at least two adjacent repeated items. Store them only in `beforeCropPath` / `afterCropPath`; full viewport remains primary.
+2. Measure at least two adjacent items in each branch with `getBoundingClientRect()`. If browser MCP lacks DOM evaluation, use a temporary repo Playwright spec through the FIC fallback.
+3. Record item rectangles and the computed adjacent gap:
+   - vertical: `next.top - current.bottom`
+   - horizontal: `next.left - current.right`
+4. Compare BEFORE and AFTER. A non-zero BEFORE gap becoming zero/negative AFTER is `FAIL` unless the routed context explicitly requires that change.
+5. Inspect collection wrapping/alignment and first/last outer spacing when the plan identifies them.
+
+Full-page screenshots alone cannot satisfy this gate. "Looks right" is not evidence.
+
 ### FIC fallback when Playwright MCP/browser tools are unavailable
 
 Playwright MCP is convenient, but it is not the only screenshot path. If `browser_*` / `sp_navigate` tools are missing or the MCP server is not loaded, run a temporary repo Playwright spec through Heft so FIC auth is initialized:
@@ -163,6 +189,12 @@ If pattern is `D`, do not skip immediately. First probe reachability (app entry 
 ## Visual validation
 - <captured / skipped / failed> — <before/after paths or reason>
 
+## Layout geometry
+- Required: <true|false>
+- BEFORE: <selector, item rects, computed gap>
+- AFTER: <selector, item rects, computed gap>
+- Verdict: <PASS|FAIL|not-applicable>
+
 ## Blockers (if FAIL)
 - <what failed> — Suggested fix: <specific file:line + change>
 ```
@@ -174,10 +206,11 @@ A criterion is PASS only with concrete evidence. "Looks right" is not evidence. 
 Write `artifactPath` with the full report. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start|playwright-mcp","captureMethod":"page","viewport":{"width":1440,"height":1000},"beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<optional component crop>","afterCropPath":"<optional component crop>","dimensionEvidence":"<verbatim file output>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
+{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","contextGuardStatus":"complete|not-applicable|failure","layoutGeometry":{"required":true,"selector":"<repeated item selector>","axis":"vertical|horizontal","beforeRects":[{"top":0,"right":0,"bottom":0,"left":0}],"afterRects":[{"top":0,"right":0,"bottom":0,"left":0}],"beforeGap":0,"afterGap":0,"verdict":"PASS|FAIL"},"visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start|playwright-mcp","captureMethod":"page","viewport":{"width":1440,"height":1000},"beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<required for repeated/dense UI; otherwise optional>","afterCropPath":"<required for repeated/dense UI; otherwise optional>","dimensionEvidence":"<verbatim file output>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
 ```
 
 For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured`, `captureMethod` is `page`, both primary paths are populated, both PNG dimensions match `visualValidation.viewport`, and visual inspection confirms surrounding page context. Component-only crops are never valid primary paths.
+When `layoutGeometry.required` is true, `verdict` must also be `FAIL` unless both crop paths are populated, at least two BEFORE and AFTER rectangles are recorded, and `layoutGeometry.verdict` is `PASS`.
 Omit `coverageManifest` only when the verdict makes no claim about auth, FIC, tenants, sites, fixtures, or environment availability.
 
 Append the final progress line before returning:

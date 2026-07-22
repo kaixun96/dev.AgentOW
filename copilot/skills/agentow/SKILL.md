@@ -69,6 +69,8 @@ Append the refined request to `progress.log` before dispatching the planner.
 
 Before dispatching, append `[HH:MM:SS] 📋 Planner started`.
 
+If the request names a feature area with external context docs (for example a dotfiles knowledge-center entry), route and read those docs now. Feature-specific rules and execution guards live in those context docs, not in this skill. Pass every relevant path to all downstream agents.
+
 Dispatch `@agentow-copilot:planner` with:
 
 ```yaml
@@ -78,13 +80,15 @@ sessionDir: /workspaces/odsp-web/.aero/<session>
 reportFile: /workspaces/odsp-web/.aero/<session>/report.json
 progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
 artifactPath: /workspaces/odsp-web/.aero/<session>/planning/planner-report.md
+contextDocuments:
+  - <every routed feature/domain context document>
 ```
 
-Wait for its findings report (classification, root cause, files to change, patterns, tests, visual surface trace). If `planning/planner-report.md` or the planner NDJSON line is missing, treat planner as failed.
+Wait for its findings report (classification, root cause, files to change, patterns, tests, visual surface trace, context guards, and any required root/wrapper layout ownership audit). If `planning/planner-report.md` or the planner NDJSON line is missing, treat planner as failed.
+
+If routed context requires an audit/table/measurement and the planner report does not contain it, treat planner as failed. "Read the context" is not compliance evidence.
 
 Read the findings. If the planner reports it could not locate the root cause or surface, decide: ask the user for a pointer (interactive), or proceed with its best understanding and record the gap (auto).
-
-If the request names a feature area with external context docs (for example a dotfiles knowledge-center entry), read the routed docs before planning/implementation and pass the relevant doc paths to the planner/evaluator. agentOW is the routing and execution layer; feature-specific rules and execution guards live in those context docs, not in this skill.
 
 ## Step 3: Plan + approval
 
@@ -93,6 +97,9 @@ Using the planner's findings, write a short plan:
 - Acceptance criteria (clear pass/fail)
 - Tasks (exact files, what changes)
 - Visual surface trace (from the planner, for the evaluator later)
+- Context compliance checklist (each routed guard and its required artifact)
+- Root/wrapper layout ownership table when any JSX root/wrapper is replaced
+- Repeated-item geometry target (selector, axis, metric) when Cards/rows/tiles/items repeat
 
 Save it locally to `/workspaces/odsp-web/.aero/<session>/plan.md` (a local working doc, not committed).
 
@@ -109,6 +116,9 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 
 1. **Branch.** If on `main`, create `user/<alias>/<feature>` from `origin/main` (use `ow-git`). `<alias>` from `whoami`.
 2. **Write the code** yourself, following the planner's "patterns to follow". Surgical changes only — every line traces to the request.
+   - Complete every context compliance item before build.
+   - For every removed/replaced root class/style, preserve or move consumer-owned external layout while leaving replacement-component internal chrome to the component defaults.
+   - Do not proceed if any layout declaration in the planner's ownership table has no disposition.
 3. **rush update** (via `ow-rush`) if you changed any `package.json`.
 4. **Build:** `ow-build` on the affected project. If it fails:
    - Classify: rush infra error (`shrinkwrap-deps.json` missing, `inputsSnapshot not found`) → run `ow-rush install` once, retry. Auth/network error → stop and report. Code error → fix and rebuild (max 3 attempts).
@@ -127,6 +137,7 @@ Write `/workspaces/odsp-web/.aero/<session>/implementation/iter<N>.md` after eac
 - dev server/debug link
 - commit SHA
 - remaining blockers, if any
+- context compliance evidence, including the completed root/wrapper layout ownership table and post-change disposition
 
 Append a generator/implementation NDJSON line to `report.json`.
 
@@ -134,15 +145,19 @@ Append a generator/implementation NDJSON line to `report.json`.
 
 Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
 
-Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, cycle number, debug link, `sessionDir`, `reportFile`, `progressLog`, and `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for PASS/FAIL + blockers.
+Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, cycle number, debug link, routed `contextDocuments`, `planPath`, `implementationArtifactPath`, `sessionDir`, `reportFile`, `progressLog`, and `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for PASS/FAIL + blockers.
 
 For UI-visible changes, visual validation is mandatory and the evaluator owns it:
 - BEFORE and AFTER screenshot paths must be present in the evaluator result.
 - Primary `beforePath` / `afterPath` must be full browser-page/viewport screenshots that include the surrounding page context, not Drawer/Dialog/component-only crops. Their dimensions must match the evaluator's recorded viewport.
 - Optional close-up crops belong only in `beforeCropPath` / `afterCropPath`; they are supplemental evidence.
+- When the plan/context marks a repeated or dense UI surface, close-up BEFORE/AFTER crops are mandatory supplemental evidence, not optional. They must contain at least two adjacent items at the same scale.
+- For repeated Cards/rows/tiles/items, the evaluator must record BEFORE/AFTER `getBoundingClientRect()` data and computed adjacent gap. A non-zero BEFORE gap becoming zero/negative AFTER is a product FAIL unless explicitly required.
 - If screenshots are missing, visual validation failed, or the evaluator says Playwright/browser tools were unavailable, treat the evaluator result as **FAIL** even if code inspection passed.
 - Before accepting PASS, independently `view` both primary images and run `file -- "<beforePath>" "<afterPath>"`; do not trust filenames, `captureMethod`, `dimensionEvidence`, or the evaluator's dimension claim without this cross-check.
 - If either primary image lacks surrounding page context or its actual PNG dimensions do not match the recorded viewport, classify it as `evaluator-spec` and re-dispatch the evaluator once in the same implementation cycle.
+- If repeated-item crops or geometry evidence are required but missing/malformed, classify it as `evaluator-spec` and re-dispatch the evaluator once in the same implementation cycle.
+- Before accepting repeated-item PASS, independently `view` both crops and inspect the numeric geometry evidence; do not accept "looks right".
 - Screenshots created manually by the main session do **not** satisfy evaluator validation. If the main session writes a temporary spec to unblock an investigation, move that logic into the evaluator retry prompt and re-dispatch the evaluator.
 - Surface the exact failure reason to the user and record it in `progress.log`, `report.json`, and `final.md` if the run stops.
 - Do not claim the UI was verified without screenshot evidence.
@@ -185,6 +200,11 @@ sessionDir: /workspaces/odsp-web/.aero/<session>
 reportFile: /workspaces/odsp-web/.aero/<session>/report.json
 progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
 artifactPath: /workspaces/odsp-web/.aero/<session>/review.md
+contextDocuments:
+  - <every routed feature/domain context document>
+planPath: /workspaces/odsp-web/.aero/<session>/plan.md
+implementationArtifactPath: /workspaces/odsp-web/.aero/<session>/implementation/iter<N>.md
+evaluatorArtifactPath: /workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md
 ```
 
 Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat reviewer as failed.

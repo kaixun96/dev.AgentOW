@@ -87,6 +87,10 @@ If Playwright MCP/browser tools are unavailable, the evaluator must first try th
 
 Primary PR screenshots must show the full browser page/viewport, including surrounding page context. Drawer/Dialog/component crops are supplemental only and must not be stored in `visualValidation.beforePath` / `afterPath` or embedded as the primary BEFORE/AFTER table. Before accepting evaluator PASS, the main session must independently view both primary images and compare their actual PNG dimensions with the recorded viewport.
 
+Routed feature context is a hard execution contract, not background reading. If a context document requires a table, disposition, crop, or measurement, planner/implementation/evaluator/reviewer artifacts must contain that evidence. Missing evidence blocks PASS.
+
+For root/wrapper replacements, every removed class/style must be opened and classified. The replacement component owns its internal chrome; consumers own external relationships such as margin between siblings, parent gap, wrapping, alignment, and parent-facing sizing/positioning. Repeated Cards/rows/tiles/items additionally require same-scale close-up BEFORE/AFTER crops and numeric adjacent-item bounding-box/gap evidence. Full-page screenshots alone cannot prove repeated-item spacing.
+
 Environment claims have a second hard gate: one failed URL, credential, tenant, or site is resource-local evidence, not proof that all FIC environments are unsuitable. Before `fixtureGap`, the evaluator must enumerate available fresh/cached pools, deduplicate tenants, discover alternate candidates, apply source-cited capability predicates, and emit a complete `coverageManifest`. Missing or incomplete coverage triggers evaluator-only environment discovery in the same implementation cycle and cannot be auto-shipped.
 
 ## The pipeline

@@ -23,6 +23,8 @@ The dispatcher gives you:
 - `reportFile` — shared NDJSON report file
 - `progressLog` — user-visible progress log
 - `artifactPath` — `review.md`
+- `contextDocuments` — routed feature/domain docs that define mandatory guards
+- `planPath`, `implementationArtifactPath`, `evaluatorArtifactPath` — evidence artifacts to cross-check against the diff
 
 ## Get the diff
 
@@ -46,6 +48,16 @@ Read each changed file in full for context, not just the hunks.
 - No leftover `console.log` / debugger.
 - Consistent with surrounding style.
 
+**Context compliance**
+- Read every routed `contextDocuments` file and verify its required artifacts/checks exist in the plan, implementation report, and evaluator report.
+- "Context read" without the required table, measurement, or disposition is non-compliance.
+
+**Root/wrapper replacement**
+- For every removed/replaced JSX root carrying `className`, `style`, or `styles`, open the class/style definition.
+- Account for each layout declaration. Legacy internal chrome may be dropped in favor of the replacement component's defaults; external parent/sibling layout (`margin`, parent `gap`, wrapping, alignment, parent-facing width/positioning) must have an explicit destination.
+- If a mixed legacy class is copied wholesale onto the replacement component, flag the internal-style override. If it is dropped wholesale and external layout disappears, flag the regression.
+- For repeated Cards/rows/tiles/items, require evaluator close-up crops and adjacent-item bounding-box/gap evidence. Full-page screenshots alone are insufficient.
+
 **Testing**
 - Tests exist for new/changed behavior; `.test.ts` in `src/`, not `.test.js` in `lib-commonjs/`.
 
@@ -59,6 +71,7 @@ Read each changed file in full for context, not just the hunks.
 ## Severity
 
 - **Critical** — bug, security, data loss. Must fix before merge.
+- A visible layout regression caused by lost wrapper margin/gap, or missing mandatory repeated-item geometry evidence for a root replacement, is **Critical**.
 - **Important** — architecture / missing functionality. Should fix.
 - **Minor** — style / naming. Note only.
 

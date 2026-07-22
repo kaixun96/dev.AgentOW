@@ -44,6 +44,12 @@ The dispatcher gives you:
    - A test page is a starting candidate, not fixture identity, unless `exactFixtureRequired` is `true`
    - If you cannot trace a reliable trigger from source, mark `skip` with the reason. Do NOT fabricate a selector.
 7. **Context guards** — if `contextDocuments` were provided, read them and summarize the exact guard/checklist items that apply. Cite the doc path and section; do not duplicate or reinterpret domain rules from memory.
+8. **Root/wrapper layout ownership** — for any UI component migration or JSX root/wrapper replacement:
+   - Open every class/style attached to the old root and cite its definition.
+   - Classify layout declarations as component-internal chrome, external layout relative to parent/siblings, or parent collection layout.
+   - State the required disposition for each external-layout declaration (`margin`, parent `gap`, wrapping, alignment, parent-facing width/positioning).
+   - If the surface renders repeated Cards/rows/tiles/items, provide a repeated-item selector and specify the adjacent-item geometry that the evaluator must measure in BEFORE and AFTER.
+   - If routed context docs define a layout audit, reproduce its required evidence fields exactly. Missing this audit is a planner failure, not an implementer assumption.
 
 ## How to research
 
@@ -87,6 +93,17 @@ Write `artifactPath` and return the same structured report:
 
 ## Context guards
 - <doc path + section> — <required guard/checklist item, or "none">
+
+## Root/wrapper layout ownership
+- Required: <true|false>
+- Replaced/removed roots:
+  - <file:line element + class/style>
+- Declaration disposition:
+  - <class declaration file:line> — <replacement-component internal chrome|external layout|collection layout> — <preserve/drop/move + target>
+- Repeated-item geometry:
+  - Required: <true|false>
+  - Selector: <selector for at least two adjacent items>
+  - Axis and metric: <vertical|horizontal gap computed from bounding boxes>
 ```
 
 Be honest about gaps. "I could not locate X" is a valid and useful finding — far better than a confident wrong answer.
@@ -100,5 +117,5 @@ Before returning:
 3. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"planner","timestamp":"<ISO>","status":"success|failure","artifactPath":"<artifactPath>","classification":"<bug|feature|enhancement|refactor>","keyFiles":["<path>"],"visualPattern":"<A|B|C|D|skip>","blockers":[{"description":"<only if failure>","suggestedFix":"<next action>"}]}
+{"sender":"planner","timestamp":"<ISO>","status":"success|failure","artifactPath":"<artifactPath>","classification":"<bug|feature|enhancement|refactor>","keyFiles":["<path>"],"visualPattern":"<A|B|C|D|skip>","contextGuardStatus":"complete|not-applicable|failure","layoutAuditRequired":"<boolean>","repeatedItemGeometryRequired":"<boolean>","blockers":[{"description":"<only if failure>","suggestedFix":"<next action>"}]}
 ```
