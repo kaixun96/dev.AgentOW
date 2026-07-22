@@ -85,8 +85,10 @@ Loop through `{tasks}`. For task `i` (1-indexed):
 sessionName=batch-${batchTimestamp}-task${i}-<short-kebab-from-task>
 sessionDir=/workspaces/odsp-web/.aero/${sessionName}
 mkdir -p ${sessionDir}/plans
+mkdir -p ${sessionDir}/context/candidates ${sessionDir}/context/apply
 touch ${sessionDir}/report.json
 touch ${sessionDir}/progress.log
+touch ${sessionDir}/context/evidence.ndjson
 
 teamName=ow-${sessionName}
 ```
@@ -108,7 +110,10 @@ echo "[$(date +%H:%M:%S)] ▶️  Task ${i}/${N} starting: ${taskDescription}" >
 | `{evaluatorRuleMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-rule.md` |
 | `{evaluatorVisionMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-vision.md` |
 | `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
+| `{contextMaintainerMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-context-maintainer.md` |
 | `{behaviorGuidelines}` | `${CLAUDE_PLUGIN_ROOT}/docs/BEHAVIORAL-GUIDELINES.md` |
+
+For each task, resolve `${sessionDir}/context/link.json` using `${CLAUDE_PLUGIN_ROOT}/docs/context-maintenance.md`, storing library identity only. Write request routes to immutable `${sessionDir}/context/routing.v1.json`; after planning, write the next routing revision when discovered source paths add routes. This is non-interactive. The linked library policy controls automatic apply, patch-only, or disabled maintenance.
 
 ### 2d. (no team setup needed)
 
@@ -116,7 +121,7 @@ There is no `TeamCreate` step. As of Claude Code 2.1.x the `TeamCreate`/`TeamDel
 
 ### 2e. Spawn agents (idle first, orchestrator last)
 
-For each idle agent (`ow-planner`, `ow-generator`, `ow-evaluator`, `ow-evaluator-rule`, `ow-evaluator-vision`, `ow-review-agent`):
+For each idle agent (`ow-planner`, `ow-generator`, `ow-evaluator`, `ow-evaluator-rule`, `ow-evaluator-vision`, `ow-review-agent`, `ow-context-maintainer`):
 
 ```
 Agent({
@@ -176,12 +181,17 @@ Agent({
       User task:    {taskDescription}
       autoMode:     true
       batchMode:    true
+      contextLinkPath: {sessionDir}/context/link.json
+      contextDocuments: <document paths from latest routing.vN.json>
 
     Team members (already spawned):
       - ow-planner
       - ow-generator
       - ow-evaluator
+      - ow-evaluator-rule
+      - ow-evaluator-vision
       - ow-review-agent
+      - ow-context-maintainer
 
     AUTO MODE: skip plan approval, skip review-critical confirmation.
 
@@ -327,7 +337,7 @@ Append the appropriate batch.log entry:
 
 ### 2h. Kill the team
 
-Send `{"type":"shutdown_request"}` to all 5 agents via SendMessage. This frees memory before the next task starts.
+After the orchestrator sends its final `BATCH_RESULT`, it is complete and is not part of shutdown acknowledgement. Send `{"type":"shutdown_request"}` to the 7 remaining idle agents via SendMessage. Wait until all 7 return `shutdown_response` before spawning the next task's team. If a member does not acknowledge, retry that member once and record the missing acknowledgement in `batch.log`; do not create an overlapping team with duplicate names.
 
 ### 2i. Append to summary
 

@@ -24,6 +24,7 @@ Create a durable session folder:
 ├── planning/
 ├── implementation/
 ├── evaluation/
+├── context/
 ├── progress.log
 └── report.json
 ```
@@ -40,6 +41,8 @@ Use the shared progress event contract from `AGENTS.md`. At minimum, write:
 [HH:MM:SS] ✅ Planner completed — <summary>
 [HH:MM:SS] 📋 Plan ready — <N> tasks
 [HH:MM:SS] ✅ Plan approved (auto|user)
+[HH:MM:SS] 🧠 Context linked — <library id|unlinked>
+[HH:MM:SS] 🧠 Context plan update — <result>
 [HH:MM:SS] 🔨 Implementation started (cycle N)
 [HH:MM:SS] ✅ Build passed / ❌ Build failed — <reason>
 [HH:MM:SS] 🧪 Tests passed|skipped|failed — <scope>
@@ -50,6 +53,7 @@ Use the shared progress event contract from `AGENTS.md`. At minimum, write:
 [HH:MM:SS] ✅ Evaluation PASS / ❌ Evaluation FAIL — <reason>
 [HH:MM:SS] 📝 Reviewer started
 [HH:MM:SS] ✅ Review APPROVE / ⚠️ Review REQUEST_CHANGES — <summary>
+[HH:MM:SS] 🧠 Context as-built update — <result>
 [HH:MM:SS] 🚀 Creating PR...
 [HH:MM:SS] ✅ PR created — <url>
 [HH:MM:SS] ✅ Workflow complete
@@ -64,6 +68,16 @@ Use the shared progress event contract from `AGENTS.md`. At minimum, write:
 Compose a refined one-paragraph statement of what to build.
 
 Append the refined request to `progress.log` before dispatching the planner.
+
+## Step 1.5: Resolve the context library
+
+Read `${CLAUDE_PLUGIN_ROOT}/docs/context-maintenance.md`. Create `<sessionDir>/context/{candidates,apply}` plus empty `evidence.ndjson`.
+
+Resolve the linked context library using the documented discovery order. Write an immutable `<sessionDir>/context/link.json` even when the result is `status: "unlinked"`. Snapshot library identity, source/context revisions, manifest digest, and writability. Write request-based routes and document digests to immutable `context/routing.v1.json`. Append `[HH:MM:SS] 🧠 Context linked — <library id|unlinked>`.
+
+After the planner reports source paths, route them through the same manifest. If they add routes or documents, write `context/routing.v2.json` rather than modifying revision 1, then pass revision 2 downstream. Feature-specific terms, globs, guards, and update targets come only from the library manifest. Existing ad-hoc `contextDocuments` remain a compatible read-only link.
+
+agentOW is the routing and execution layer; feature-specific rules and execution guards live in those context docs, not in this skill.
 
 ## Step 2: Research (dispatch planner)
 
@@ -82,6 +96,7 @@ progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
 artifactPath: /workspaces/odsp-web/.aero/<session>/planning/planner-report.md
 contextDocuments:
   - <every routed feature/domain context document>
+contextLinkPath: /workspaces/odsp-web/.aero/<session>/context/link.json
 ```
 
 Wait for its findings report (classification, root cause, files to change, patterns, tests, visual surface trace, context guards, and any required root/wrapper layout ownership audit). If `planning/planner-report.md` or the planner NDJSON line is missing, treat planner as failed.
@@ -110,6 +125,22 @@ Append `[HH:MM:SS] 📋 Plan ready — <N> tasks` after writing the plan.
 
 Append `[HH:MM:SS] ✅ Plan approved (auto|user)` before implementation starts.
 
+## Step 3.5: Maintain context from the plan
+
+If the context link is resolved:
+
+1. Append a `plan` event to `context/evidence.ndjson` with the approved plan digest, cited decisions, assumptions, and open questions. Planned behavior must be labeled as intent.
+2. Dispatch `@agentow-copilot:context-maintainer` with `mode: plan-intent`, the immutable link, evidence path, plan path, and an immutable candidate path under `context/candidates/`.
+3. Verify the returned patch digest, unchanged context HEAD/manifest/target-document digests, clean worktree outside the generated patch, allowed target, and absence of path/symlink escape.
+4. Follow the manifest policy without asking the user:
+   - `auto-commit`: apply, commit, and push only as instructed by that context repository.
+   - `patch-only`: preserve the candidate/patch without editing the library.
+   - `disabled`: preserve evidence only.
+5. Stage only candidate target paths. On dirty worktree, read-only/auth failure, or stale base export a patch/conflict; never silently rebase. Context failure never blocks implementation.
+6. Write `context/state.json` and `context/apply/<id>.json`, then append `[HH:MM:SS] 🧠 Context plan update — <result>`.
+
+If plan maintenance changed a routed context document, re-read it before implementation. Do not rerun planning unless the context update introduces a new mandatory guard that invalidates the approved plan.
+
 ## Step 4: Implement (you write the code)
 
 Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
@@ -126,6 +157,8 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 5. **Test:** `ow-test` scoped to the changed modules (not the full suite). If no tests exist for the modules, note it; don't run 600 unrelated tests.
 6. **Dev server / debug link:** follow the feature context docs for the surface's verification contract. For UI-visible changes, prefer `ow-start` + `ow-debuglink` before PR validation builds finish; if the context docs require additional guards, execute those guards and record the result.
 7. **Commit** (don't push yet).
+
+After commit, append a `code` event to `context/evidence.ndjson` containing the commit SHA, changed files, diff digest, and grounded implementation outcomes. Do not copy unrestricted source into the context artifacts.
 
 Write progress events for branch/build/test/dev-server/debug-link/commit using the exact event contract. If any step fails, log the failure before attempting recovery.
 
@@ -216,7 +249,19 @@ Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat r
 
 **APPROVE / COMMENT / Important-or-Minor only:** continue.
 
-## Step 8: Ship
+## Step 8: Maintain context from the as-built result
+
+This phase never pauses the product workflow.
+
+1. Append `evaluation` and `review` evidence events with artifact digests, outcomes, blockers, and citations.
+2. Dispatch `@agentow-copilot:context-maintainer` with `mode: as-built`, the actual commit/diff, approved plan, evaluator artifact, reviewer artifact, and prior candidate.
+3. The new immutable candidate must correct or supersede plan intent that the code did not implement.
+4. Verify and apply it using the same manifest policy and stale-base/read-only safeguards as Step 3.5.
+5. Write the result artifacts and append `[HH:MM:SS] 🧠 Context as-built update — <result>`.
+
+No-update, patch-only, disabled, dirty-worktree, read-only, auth, or conflict outcomes are recorded but never block PR creation.
+
+## Step 9: Ship
 
 1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no auto-generated "Testing" section).
 2. **Visual validation for UI changes:** prefer evaluator screenshots from the local `rush start` debug link because it is available immediately after implementation. If local debug validation captures BEFORE/AFTER successfully, attach those screenshots to the PR description. Only fall back to `ow-pr-debug-query` / `finalValidationMode=pr-cdn-fic` when local debug validation fails for environment/tooling reasons (for example localhost cert/assembly-load failure, missing browser MCP, or a surface that only reproduces against PR CDN).
@@ -225,6 +270,8 @@ Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat r
 4. **Report** the PR URL to the user.
 
 Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status, PR URL if any, screenshot paths if captured, and any remaining blockers.
+
+Include the context library ID, plan-stage result, as-built result, latest candidate path, applied context commit/PR if any, and pending patch/conflict path. Append a compact reference entry to `~/.config/agentow/runs.ndjson` keyed by run ID and PR URL so `/ow-context-feedback` can resume the provenance chain later.
 
 Append `[HH:MM:SS] ✅ Workflow complete` after `final.md` is written.
 

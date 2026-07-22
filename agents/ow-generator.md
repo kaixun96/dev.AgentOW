@@ -42,6 +42,8 @@ You receive a message from the orchestrator containing:
 - `branch` — current feature branch
 - `cycle` — iteration number (1 = first attempt, 2+ = fix cycle after evaluator feedback)
 - `blockers` — (cycle 2+) array of blocker objects from evaluator with `description` and `suggestedFix`
+- `contextLinkPath` — immutable linked context library identity
+- `contextDocuments` — latest routed feature/domain documents
 
 ## Two-Phase Reporting
 
@@ -59,6 +61,8 @@ This means Steps 7–11 run concurrently with the evaluator and review-agent.
 Read {planPath}
 ```
 Parse all tasks, acceptance criteria, and key files.
+
+Read every `contextDocuments` file and complete its required guards/artifacts. Do not infer feature-specific rules from agentOW itself.
 
 If `cycle > 1`, also read the evaluator's blockers and prioritize fixing those issues.
 

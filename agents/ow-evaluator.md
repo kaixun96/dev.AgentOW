@@ -56,6 +56,8 @@ This two-mode design allows code inspection to run **in parallel** with the buil
 - `reportFile` — path to shared NDJSON report file
 - `cycle` — iteration number
 - `mode` — `"code_inspection"`
+- `contextLinkPath` — immutable linked context library identity
+- `contextDocuments` — latest routed feature/domain documents
 
 ### For `ui_verification` mode (follow-up message):
 - `mode` — `"ui_verification"`
@@ -63,6 +65,9 @@ This two-mode design allows code inspection to run **in parallel** with the buil
 - `buildStatus` — must be `"success"`
 - `rushStartTarget` — tmux session name for dev server
 - `debugUrl` — debug URL from generator
+- `contextLinkPath` and `contextDocuments`
+
+Read routed context documents and verify their required checks. A claim that context was read is not evidence unless the required artifact, measurement, or disposition exists.
 
 ## Default Test Page
 

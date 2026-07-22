@@ -52,6 +52,7 @@ SendMessage to team-lead:
 | `ow-evaluator-rule` | Verify (UI rule half): probe parsing, aria-diff, pixel-diff, structural-diff, axe, hard gates. Has code/plan/probe access. |
 | `ow-evaluator-vision` | Verify (UI vision half): cold-eye review of AFTER PNG with NO code/plan/probe access. Catches occlusion, overflow, alignment. |
 | `ow-review-agent` | Review: pre-PR code review (optional, on user request) |
+| `ow-context-maintainer` | Maintain linked context from plan, code, evaluation, review, and later feedback |
 
 ## Pipeline Architecture
 
@@ -167,6 +168,8 @@ featureName: <feature-name>
 userRequest: <the refined user request from session context — already brainstormed>
 reportFile: <reportFile>
 planDir: <planDir>
+contextLinkPath: <contextLinkPath>
+contextDocuments: <latest routed document paths>
 ```
 
 The planner runs autonomously through its phases and sends a completion message containing the full plan.
@@ -209,7 +212,20 @@ echo "[$(date +%H:%M:%S)] ✅ Plan approved" >> {progressLog}
 
 After user approval, read `reportFile` and parse the planner's NDJSON line.
 - If `status: "failure"` → inform user and stop.
-- If `status: "success"` → extract `planPath`, proceed to **Step 1.5 (plan dry-run)** before invoking the generator.
+- If `status: "success"` → extract `planPath`, update source-path routing as a new immutable routing revision, run **Step 1c**, then proceed to **Step 1.5 (plan dry-run)**.
+
+#### Step 1c: Non-blocking Plan Context Maintenance
+
+If `contextLinkPath` is linked:
+
+1. Append a `plan` evidence event with the approved plan digest, decisions, assumptions, open questions, and citations. Label all planned behavior as intent.
+2. Send `mode: plan-intent`, `contextLinkPath`, evidence path, `planPath`, and an immutable candidate path to `ow-context-maintainer`.
+3. Wait for its response, then verify the candidate digest, unchanged context HEAD/manifest/target-document digests, clean worktree outside the generated patch, and allowed target.
+4. Follow the context manifest policy without asking the user: `auto-commit`, `patch-only`, or `disabled`.
+5. Stage only candidate target paths. On dirty worktree, read-only/auth failure, or a moved base export a conflict patch; never silently rebase. Always continue the product pipeline.
+6. Write context state/apply artifacts and progress `🧠 Context plan update — <result>`.
+
+If a routed context document changed, re-read it before generator dispatch. Revisit the plan only when the update introduces a new mandatory guard that invalidates it.
 
 #### Step 1.5: evaluator plan dry-run (negotiated contract)
 
@@ -225,6 +241,8 @@ SendMessage to ow-evaluator:
   planPath: <planPath>
   reportFile: <reportFile>
   cycle: 0
+  contextLinkPath: <contextLinkPath>
+  contextDocuments: <latest routed document paths>
 ```
 
 The evaluator (see `ow-evaluator.md` §Plan Dry-Run mode) reads the plan and returns NDJSON with verdict `READY | REVISE` plus a list of `concerns` it found. Examples of REVISE-triggering concerns:
@@ -266,6 +284,8 @@ planPath: <planPath>
 reportFile: <reportFile>
 cycle: <N>
 blockers: <blockers from evaluator, or empty array>
+contextLinkPath: <contextLinkPath>
+contextDocuments: <latest routed document paths>
 ```
 
 The generator implements the plan, commits code, then sends a **`code_done`** message while it continues building in the background.
@@ -294,12 +314,16 @@ planPath: <planPath>
 reportFile: <reportFile>
 cycle: <N>
 mode: code_inspection
+contextLinkPath: <contextLinkPath>
+contextDocuments: <latest routed document paths>
 ```
 
 **To `ow-review-agent`:**
 ```
 reportFile: <reportFile>
 branch: <branch>
+contextLinkPath: <contextLinkPath>
+contextDocuments: <latest routed document paths>
 ```
 
 Now **wait and collect THREE responses** (they arrive in any order):
@@ -371,6 +395,8 @@ SendMessage to ow-evaluator-rule:
   planPath: <planPath>
   outDir: {sessionDir}/evaluation/iter<N>
   reportFile: <reportFile>
+  contextLinkPath: <contextLinkPath>
+  contextDocuments: <latest routed document paths>
 
   # CROSS-CYCLE ARTIFACTS (treat prior cycle as adversarial input, not memory):
   #   {sessionDir}/evaluation/iter<N-1>/rule-findings.json
@@ -498,6 +524,14 @@ echo "[$(date +%H:%M:%S)] ⚠️  Review REQUEST_CHANGES (critical: {N}) — sta
 echo "[$(date +%H:%M:%S)] ✅ ALL PASS — evaluation + review complete" >> {progressLog}
 ```
 Proceed to Step 7.
+
+#### Step 6.5: Non-blocking As-built Context Maintenance
+
+Before PR creation, append separate `code`, `evaluation`, and `review` evidence events. The code event must cite the actual committed diff and commit SHA rather than the generator summary.
+
+Send `mode: as-built`, the immutable context link, evidence, approved plan, actual commit/diff, evaluator artifacts, reviewer artifact, and prior candidate to `ow-context-maintainer`. The resulting immutable revision must correct or supersede plan intent that was not implemented.
+
+Verify and apply the candidate using the same manifest policy, target-digest, clean-worktree, path-limited staging, and stale-base/read-only safeguards as Step 1c. Write `🧠 Context as-built update — <result>`. Context maintenance never asks the user and never blocks the product PR.
 
 #### Step 7a: Deep Review (superpowers, optional)
 
@@ -677,6 +711,8 @@ Write progress:
 echo "[$(date +%H:%M:%S)] ✅ Workflow complete" >> {progressLog}
 ```
 
+Before Workflow complete, append a compact reference to `~/.config/agentow/runs.ndjson` containing run ID, session path, source remote, branch, commit, PR URL, context library ID, latest candidate, and apply result. This index enables `/ow-context-feedback`; it contains references only, not source excerpts.
+
 **If `batchMode` is true (CRITICAL — required for batch dispatcher to detect completion):**
 
 Send a final SendMessage to `team-lead` with the result. This is mandatory — without it, the batch dispatcher cannot tell whether you finished or are still running, and the entire batch will deadlock.
@@ -735,6 +771,7 @@ The codespace may have additional MCP plugins installed. Leverage them when avai
 - **Read is restricted to session files only:** `report.json`, `progress.log`, plan files under `{planDir}`, and evaluation reports. Never Read source code (`.ts`, `.tsx`, `.js`, `.json` under `/workspaces/odsp-web/sp-client/`, `/workspaces/odsp-web/odsp-next/`, etc.).
 - **NEVER** build, test, or run rush commands yourself.
 - **ONLY** use: `ow-status`, `ow-session-list`, `Read` (session files only), `Bash` (for mkdir/echo/cat/tail on session files).
+- Context repository operations are the only exception to the session-only Bash rule. They must follow `docs/context-maintenance.md`, the snapshotted manifest, allowed targets, and compare-and-swap base checks.
 - Always read `reportFile` after each agent completes to get structured output.
 - Parse NDJSON by reading the last line of the report file.
 - Keep the user informed at each stage — brief status updates, not verbose logs.

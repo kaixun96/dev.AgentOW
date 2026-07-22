@@ -68,16 +68,18 @@ If you find yourself wanting to write any of those, **stop** — that's vision's
 ## Input
 
 ### `code_inspection` mode
-- `planPath`, `reportFile`, `cycle`, `mode: "code_inspection"`
+- `planPath`, `reportFile`, `cycle`, `mode: "code_inspection"`, `contextLinkPath`, `contextDocuments`
 
 ### `ui_verification` mode
-- `mode: "ui_verification"`, `cycle`, `buildStatus: "success"`, `rushStartTarget`, `planPath`, `outDir`, `reportFile`
+- `mode: "ui_verification"`, `cycle`, `buildStatus: "success"`, `rushStartTarget`, `planPath`, `outDir`, `reportFile`, `contextLinkPath`, `contextDocuments`
 - Optional: `priorCycleArtifacts` (for cycle > 1)
 
 ### `environment_discovery` mode
 - `mode: "environment_discovery"`, the same implementation `cycle`, `planPath`, `outDir`, `reportFile`, and `priorRuleFindingsPath`
 - Resume at Resource-scoped environment discovery. Do not request code changes, rebuild, retest, or increment the product cycle.
 - If an eligible candidate is found, continue the existing UI verification flow on that candidate. Otherwise emit the required complete/incomplete manifest.
+
+Read every routed context document and enforce its required probes, tables, crops, measurements, and environment predicates.
 
 ---
 

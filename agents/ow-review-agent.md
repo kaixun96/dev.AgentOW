@@ -35,6 +35,10 @@ You are the **review** agent in the odsp-web agent team. Your job is to perform 
 You receive a message from the orchestrator containing:
 - `reportFile` — path to shared NDJSON report file
 - `branch` — current feature branch
+- `contextLinkPath` — immutable linked context library identity
+- `contextDocuments` — latest routed feature/domain documents
+
+Read every routed context document and verify the diff and run artifacts satisfy its mandatory guards.
 
 ## Steps
 

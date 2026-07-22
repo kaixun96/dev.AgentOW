@@ -36,6 +36,12 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 │       ├── evaluator-report.md
 │       ├── before-*.png
 │       └── after-*.png
+├── context/
+│   ├── link.json
+│   ├── evidence.ndjson
+│   ├── state.json
+│   ├── candidates/
+│   └── apply/
 ├── review.md
 └── final.md
 ```
@@ -43,6 +49,9 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 - `progress.log` is mandatory and user-visible. Append a timestamped line before every state transition. Treat it as a first-class product surface, not debug noise.
 - `report.json` is NDJSON. Append one JSON object for planner, each implementation cycle, evaluator, reviewer, and final status.
 - `planning/planner-report.md`, `implementation/iter<N>.md`, `evaluation/iter<N>/evaluator-report.md`, `review.md`, and `final.md` are mandatory unless the run stops before that phase.
+- `context/link.json` is mandatory and records either a resolved context library or `status: "unlinked"`.
+- Context evidence is append-only. Plan intent, actual code, evaluation, review, and later feedback must remain distinguishable.
+- Context maintenance is non-blocking. It follows the linked library's `auto-commit`, `patch-only`, or `disabled` policy and never adds a user prompt to interactive, AUTO, or batch execution.
 
 ## Progress log event contract
 
@@ -71,6 +80,9 @@ Use this exact style. Each line starts with `[HH:MM:SS]`, one emoji, and a short
 [HH:MM:SS] 📝 Reviewer started
 [HH:MM:SS] ✅ Review APPROVE
 [HH:MM:SS] ⚠️ Review REQUEST_CHANGES — <count> critical
+[HH:MM:SS] 🧠 Context linked — <library id|unlinked>
+[HH:MM:SS] 🧠 Context plan update — <applied|no-update|patch-only|conflict|disabled>
+[HH:MM:SS] 🧠 Context as-built update — <applied|no-update|patch-only|conflict|disabled>
 [HH:MM:SS] 🔁 Fix cycle N+1 — <reason>
 [HH:MM:SS] 🚀 Creating PR...
 [HH:MM:SS] ✅ PR created — <url>
@@ -89,6 +101,10 @@ Primary PR screenshots must show the full browser page/viewport, including surro
 
 Routed feature context is a hard execution contract, not background reading. If a context document requires a table, disposition, crop, or measurement, planner/implementation/evaluator/reviewer artifacts must contain that evidence. Missing evidence blocks PASS.
 
+The linked context library is also maintained from run evidence. Read `docs/context-maintenance.md` before resolving, recording, proposing, or applying context updates. agentOW remains generic: the library manifest owns routes, destinations, domain guards, and commit/push policy. Never hard-code a feature name or personal repository path into agentOW.
+
+Plan-stage context updates describe intent and open decisions only. After implementation and verification, an as-built update must inspect the actual committed diff and may supersede inaccurate plan intent. A read-only library or stale base produces an exported patch/conflict artifact without blocking the product PR.
+
 For root/wrapper replacements, every removed class/style must be opened and classified. The replacement component owns its internal chrome; consumers own external relationships such as margin between siblings, parent gap, wrapping, alignment, and parent-facing sizing/positioning. Repeated Cards/rows/tiles/items additionally require same-scale close-up BEFORE/AFTER crops and numeric adjacent-item bounding-box/gap evidence. Full-page screenshots alone cannot prove repeated-item spacing.
 
 Environment claims have a second hard gate: one failed URL, credential, tenant, or site is resource-local evidence, not proof that all FIC environments are unsuitable. Before `fixtureGap`, the evaluator must enumerate available fresh/cached pools, deduplicate tenants, discover alternate candidates, apply source-cited capability predicates, and emit a complete `coverageManifest`. Missing or incomplete coverage triggers evaluator-only environment discovery in the same implementation cycle and cannot be auto-shipped.
@@ -103,7 +119,8 @@ Environment claims have a second hard gate: one failed URL, credential, tenant, 
 5. Verify       → dispatch @evaluator → mandatory screenshots for UI changes
 6. Fix loop     → classify FAIL: environment discovery stays evaluator-only; product defects return to YOU. Max 5 product cycles.
 7. Review       → dispatch @reviewer → surface findings
-8. Ship         → ow-pr-create (draft PR), then ow-pr-attach for screenshots if captured
+8. Maintain     → update linked context from as-built evidence without a user gate
+9. Ship         → ow-pr-create (draft PR), then ow-pr-attach for screenshots if captured
 ```
 
 The `agentow` skill walks you through this in detail. It auto-loads when the user asks to implement a feature or fix a bug in odsp-web.

@@ -119,7 +119,126 @@ const checks = [
     file: "README.md",
     snippets: [
       "agentOW is a routing/execution layer.",
-      "Feature-specific rules and execution guards should live in the routed context docs"
+      "Feature-specific rules and execution guards should live in the routed context docs",
+      "Context maintenance never adds a user gate.",
+      "`/ow-context-feedback`"
+    ]
+  },
+  {
+    file: "docs/context-maintenance.md",
+    snippets: [
+      "auto-commit",
+      "patch-only",
+      "Plan-stage candidates capture intended decisions",
+      "target-document digest at candidate creation",
+      "The user's feedback is the trigger to run maintenance; no second confirmation is required.",
+      "never silently rebase",
+      "target-document digest",
+      "Require a clean context worktree",
+      "Stage and commit only the candidate's target paths",
+      "cannot block build, evaluation, PR creation, or the next batch task"
+    ]
+  },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: [
+      "Step 3.5: Maintain context from the plan",
+      "Step 8: Maintain context from the as-built result",
+      "This phase never pauses the product workflow.",
+      "`~/.config/agentow/runs.ndjson`"
+    ]
+  },
+  {
+    file: "copilot/agents/context-maintainer.agent.md",
+    snippets: [
+      "planned behavior as intent, not fact",
+      "inspect the actual commit/diff",
+      "Do not invent feature-specific destinations.",
+      "targetDocumentDigest"
+    ]
+  },
+  {
+    file: "agents/ow-orchestrator.md",
+    snippets: [
+      "Non-blocking Plan Context Maintenance",
+      "Non-blocking As-built Context Maintenance",
+      "Context maintenance never asks the user",
+      "run **Step 1c**, then proceed to **Step 1.5",
+      "contextLinkPath: <contextLinkPath>",
+      "contextDocuments: <latest routed document paths>",
+      "clean worktree outside the generated patch",
+      "never blocks the product PR"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-context-feedback/SKILL.md",
+    snippets: [
+      "User feedback is already the trigger.",
+      "without asking another question",
+      "supersedes"
+    ]
+  },
+  {
+    file: "skills/ow-context-feedback/SKILL.md",
+    snippets: [
+      "spawn one bounded `general-purpose` agent",
+      "target-document digest",
+      "Stage only candidate target paths."
+    ]
+  },
+  {
+    file: "skills/ow-batch/SKILL.md",
+    snippets: [
+      "`ow-context-maintainer`",
+      "routing.v1.json",
+      "next routing revision"
+    ]
+  },
+  {
+    file: "agents/ow-generator.md",
+    snippets: ["`contextLinkPath`", "`contextDocuments`"]
+  },
+  {
+    file: "agents/ow-planner.md",
+    snippets: [
+      "`contextLinkPath`",
+      "`contextDocuments`",
+      "Read every `contextDocuments` file"
+    ]
+  },
+  {
+    file: "agents/ow-evaluator.md",
+    snippets: [
+      "`contextLinkPath`",
+      "`contextDocuments`",
+      "Read routed context documents"
+    ]
+  },
+  {
+    file: "agents/ow-evaluator-rule.md",
+    snippets: ["`contextLinkPath`, `contextDocuments`"]
+  },
+  {
+    file: "agents/ow-review-agent.md",
+    snippets: ["`contextLinkPath`", "`contextDocuments`"]
+  },
+  {
+    file: "skills/ow-team/SKILL.md",
+    snippets: [
+      "Spawn all 7 idle agents FIRST",
+      "orchestrator last",
+      "Spawn all idle agents first and the orchestrator last",
+      "routing.v1.json",
+      "Reroute `{refinedRequest}`",
+      "Never rewrite an earlier revision."
+    ]
+  },
+  {
+    file: "skills/ow-batch/SKILL.md",
+    snippets: [
+      "not part of shutdown acknowledgement",
+      "Wait until all 7 return `shutdown_response`",
+      "do not create an overlapping team"
     ]
   }
 ];
@@ -136,6 +255,33 @@ const forbiddenChecks = [
   {
     file: "agents/ow-planner.md",
     snippets: ["- Pattern D (external product dependency)"]
+  },
+  {
+    file: "docs/context-maintenance.md",
+    snippets: [
+      "awaiting_approval",
+      "Context approval is a separate user decision",
+      "requiredForRun"
+    ]
+  },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: ["requiredForRun"]
+  },
+  {
+    file: "agents/ow-orchestrator.md",
+    snippets: ["requiredForRun"]
+  },
+  {
+    file: "skills/ow-team/SKILL.md",
+    snippets: ["Spawn the orchestrator **first**"]
+  },
+  {
+    file: "copilot/skills/ow-context-feedback/SKILL.md",
+    snippets: [
+      "On approval",
+      "Approval must"
+    ]
   },
   {
     file: "copilot/skills/agentow/SKILL.md",

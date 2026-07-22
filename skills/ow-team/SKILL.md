@@ -61,8 +61,11 @@ Record the user's exact request as `userPrompt`. Derive a kebab-case slug (under
 slug=<kebab-case-of-request>          # e.g. add-loading-spinner
 sessionName=${slug}-$(date +%H%M%S)   # e.g. add-loading-spinner-143022
 mkdir -p /workspaces/odsp-web/.aero/${sessionName}/plans
+mkdir -p /workspaces/odsp-web/.aero/${sessionName}/context/candidates
+mkdir -p /workspaces/odsp-web/.aero/${sessionName}/context/apply
 touch /workspaces/odsp-web/.aero/${sessionName}/report.json
 touch /workspaces/odsp-web/.aero/${sessionName}/progress.log
+touch /workspaces/odsp-web/.aero/${sessionName}/context/evidence.ndjson
 ```
 
 > The `-$(date +%H%M%S)` suffix is mandatory. The folder MUST be unique per run. Never reuse or hardcode a bare slug.
@@ -76,6 +79,7 @@ Record variables:
 | `{reportFile}` | `{sessionDir}/report.json` |
 | `{progressLog}` | `{sessionDir}/progress.log` |
 | `{planDir}` | `{sessionDir}/plans/` |
+| `{contextLinkPath}` | `{sessionDir}/context/link.json` |
 | `{teamName}` | `ow-{sessionName}` |
 | `{userPrompt}` | user's exact request |
 
@@ -96,6 +100,16 @@ echo "watcher pid: $!" >> {progressLog}
 ```
 
 The watcher exits cleanly when the user kills the team or session. It's idempotent — safe to start multiple times (subsequent starts re-tail from the saved offset).
+
+---
+
+## Step 1.25: Resolve Linked Context
+
+Read `${CLAUDE_PLUGIN_ROOT}/docs/context-maintenance.md` and resolve the context library using its discovery order. Write `{contextLinkPath}` for both linked and unlinked runs, snapshotting only library identity, source/context revisions, manifest digest, and writability. Write request-based routes, documents, reasons, and document digests to immutable `{sessionDir}/context/routing.v1.json`.
+
+Append `🧠 Context linked — <library id|unlinked>` to the progress log. This step never asks the user a question. The context library manifest owns feature routing and its `auto-commit`, `patch-only`, or `disabled` maintenance policy.
+
+After interactive brainstorming, reroute `{refinedRequest}` and write the next immutable routing revision if clarification adds routes or documents. After planning discovers source paths, write another revision when needed. Never rewrite an earlier revision. Pass documents from the latest routing revision plus `{contextLinkPath}` to every downstream agent except the intentionally tool-isolated cold-eye vision evaluator.
 
 ---
 
@@ -126,6 +140,8 @@ Write progress:
 echo "[$(date +%H:%M:%S)] 💡 Brainstorm completed — user intent confirmed" >> {progressLog}
 ```
 
+Reroute `{refinedRequest}` through the linked context manifest now. If it changes the route set, write the next `context/routing.v<N>.json` revision and use that revision for all subsequent agents.
+
 ---
 
 ## Step 2: Read All Agent MD Files + Behavioral Guidelines
@@ -141,9 +157,10 @@ Read all agent MD files plus the shared behavioral guidelines using the `Read` t
 | `{evaluatorRuleMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-rule.md` |
 | `{evaluatorVisionMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-evaluator-vision.md` |
 | `{reviewMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-review-agent.md` |
+| `{contextMaintainerMd}` | `${CLAUDE_PLUGIN_ROOT}/agents/ow-context-maintainer.md` |
 | `{behaviorGuidelines}` | `${CLAUDE_PLUGIN_ROOT}/docs/BEHAVIORAL-GUIDELINES.md` |
 
-Read all 8 in parallel. Do not proceed until all reads are complete. `{behaviorGuidelines}` is the shared behavioral baseline inlined into every agent below.
+Read all 9 in parallel. Do not proceed until all reads are complete. `{behaviorGuidelines}` is the shared behavioral baseline inlined into every agent below.
 
 ---
 
@@ -157,13 +174,13 @@ There is **no setup step** to create a team. As of Claude Code 2.1.x the `TeamCr
 
 ## Step 4: Spawn the Agents
 
-Spawn all 5 agents using the `Agent` tool. Use `subagent_type: general-purpose` for all.
+Spawn all 8 agents using the `Agent` tool. Use `subagent_type: general-purpose` for all.
 
 > **Why general-purpose:** Custom `subagent_type` values like `agentOW:*` are not supported for team member spawning. Agent behavior comes entirely from the `prompt` parameter — each agent receives its full definition inlined.
 
-### Agents 1–6 — idle members (spawn FIRST, before orchestrator)
+### Agents 1–7 — idle members (spawn FIRST, before orchestrator)
 
-Spawn all 6 idle agents FIRST so they are ready to receive messages when the orchestrator starts.
+Spawn all 7 idle agents FIRST so they are ready to receive messages when the orchestrator starts.
 
 | `name` | MD variable |
 |--------|-------------|
@@ -173,6 +190,7 @@ Spawn all 6 idle agents FIRST so they are ready to receive messages when the orc
 | `ow-evaluator-rule` | `{evaluatorRuleMd}` |
 | `ow-evaluator-vision` | `{evaluatorVisionMd}` |
 | `ow-review-agent` | `{reviewMd}` |
+| `ow-context-maintainer` | `{contextMaintainerMd}` |
 
 ```
 subagent_type: general-purpose
@@ -203,7 +221,7 @@ prompt:
   Then stop all work.
 ```
 
-### Agent 7 — ow-orchestrator (active, spawn LAST)
+### Agent 8 — ow-orchestrator (active, spawn LAST)
 
 > **Why last:** The orchestrator immediately sends SendMessage to ow-planner on startup. If planner hasn't been spawned yet, the message is lost and the pipeline deadlocks. Spawning idle agents first ensures all teammates are ready.
 
@@ -228,6 +246,8 @@ prompt:
     reportFile:   {reportFile}
     progressLog:  {progressLog}
     planDir:      {planDir}
+    contextLinkPath: {contextLinkPath}
+    contextDocuments: <document paths from latest routing.vN.json>
     User task:    {refinedRequest}
     autoMode:     {autoMode}
 
@@ -250,6 +270,7 @@ prompt:
     - ow-evaluator-rule
     - ow-evaluator-vision
     - ow-review-agent
+    - ow-context-maintainer
 
   CRITICAL: After sending SendMessage to a teammate, you MUST wait for
   their response message before doing anything else. The full pipeline
@@ -275,6 +296,7 @@ Team "{teamName}" is live.
   ow-evaluator-rule    — idle (UI verification: rule half)
   ow-evaluator-vision  — idle (UI verification: cold-eye vision half)
   ow-review-agent      — idle (waiting for orchestrator)
+  ow-context-maintainer — idle (waiting for evidence checkpoints)
 
 Session workspace: {sessionDir}
 Progress log:      {progressLog}
@@ -321,7 +343,7 @@ If the message is a status/progress update (not a question): optionally summariz
 - **You are a launcher + user-relay, never the orchestrator.** Never plan, build, coordinate, or read the report file yourself.
 - **Do not use the `Agent` tool after Step 4.**
 - Read all agent MD files (Step 2) before spawning any agent.
-- Spawn the orchestrator **first** so it is running before the idle agents join.
+- Spawn all idle agents first and the orchestrator last, exactly as Step 4 specifies, so its first message cannot be lost.
 - If the user asks for a status update, use `SendMessage` to query `ow-orchestrator` by name — the orchestrator is the single source of truth.
 - If the user asks to shut down, send `{"type": "shutdown_request"}` via `SendMessage` to `ow-orchestrator` first; it will relay the shutdown to its team members.
 - Team members must NEVER message each other directly — all communication is brokered through `ow-orchestrator`.

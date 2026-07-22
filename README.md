@@ -180,6 +180,10 @@ Each `/ow-team` run creates `/workspaces/odsp-web/.aero/<session-name>/` with:
 | `review.md` | review-agent | Code review findings |
 | `report.json` | all agents | NDJSON status records |
 | `progress.log` | orchestrator | Real-time pipeline progress (visible via Monitor) |
+| `context/link.json` | launcher | Immutable link to the run's external context library |
+| `context/evidence.ndjson` | pipeline | Plan, code, evaluation, review, and feedback provenance |
+| `context/candidates/` | context-maintainer | Immutable context update revisions |
+| `context/apply/` | orchestrator | Applied, patch-only, read-only, or conflict results |
 
 ---
 
@@ -215,6 +219,9 @@ Operational notes:
 - MCP tool timeout is not automatically a Rush failure. Long `rush build -t @msinternal/sp-pages` / `rush start` runs can outlive the MCP request; agents should track the underlying process and read Rush summaries before deciding.
 - Local `rush start` debug links are the preferred fast path for evaluator screenshots. PR SP-Client Validation CDN query is the fallback when localhost validation fails or the user explicitly asks for PR CDN screenshots.
 - agentOW is a routing/execution layer. Feature-specific rules and execution guards should live in the routed context docs (for example dotfiles knowledge centers), not in agentOW prompts.
+- Each run resolves at most one external context library using `docs/context-maintenance.md`. The library manifest owns routes, update targets, and `auto-commit` / `patch-only` / `disabled` policy.
+- Context maintenance never adds a user gate. Plan intent is recorded during the run; the committed diff and evaluator/reviewer results produce an as-built revision before shipping. Read-only or stale libraries leave a patch/conflict artifact without blocking the product PR.
+- Later user or PR feedback can invoke `/ow-context-feedback`, resume by run ID/session/PR URL, verify the current code, and apply a superseding context revision using the same library policy.
 
 ### Agents
 
@@ -227,6 +234,7 @@ Operational notes:
 | `ow-evaluator-rule` | UI verification half: runs Playwright, parses probes, computes aria/pixel/structural diffs |
 | `ow-evaluator-vision` | UI verification half: cold-eye review of AFTER PNG with no code/plan/probe access |
 | `ow-review-agent` | Pre-PR code review |
+| `ow-context-maintainer` | Evidence-grounded context update candidate synthesis |
 
 All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cycle 2 retains full context from cycle 1.
 
@@ -244,6 +252,7 @@ All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cy
 | `ow-dev-pr` | PR, az repos |
 | `ow-ref-monorepo` | monorepo structure, Rush/Heft |
 | `ow-ref-external-tools` | killswitch, GUID, Bluebird, ADO work items |
+| `ow-context-feedback` | Resume a completed run and update linked context from later feedback |
 | `search-odspweb-wiki` | wiki, documentation |
 
 ---

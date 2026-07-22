@@ -39,6 +39,10 @@ You receive a message from the orchestrator containing:
 - `reportFile` — path to shared NDJSON report file
 - `planDir` — directory to write the plan file (e.g. `/workspaces/odsp-web/.aero/<fruit>/plans/`)
 - `branch` — current feature branch (from initiator report)
+- `contextLinkPath` — immutable linked context library identity
+- `contextDocuments` — latest routed feature/domain documents
+
+Read every `contextDocuments` file before finalizing the plan. Treat its guards as mandatory and cite the document section. Routes and domain rules come from the linked library, not from this prompt.
 
 ## Phases
 

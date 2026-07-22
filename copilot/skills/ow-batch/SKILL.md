@@ -153,14 +153,15 @@ After agentOW finishes:
 
 1. Read its `final.md`.
 2. Capture status, PR URL, branch, commit, build/tests, visual verification, screenshots, and remaining blockers.
-3. Check worktree cleanliness:
+3. Capture context library ID, plan-stage maintenance result, as-built maintenance result, applied context commit/PR, and any exported patch/conflict.
+4. Check worktree cleanliness:
 
    ```bash
    git -C /workspaces/odsp-web status --porcelain
    ```
 
-4. If uncommitted changes remain, stash them as `agentow-batch-task<i>-leftovers` and record the stash before the next task.
-5. Find the PR URL in `final.md`, the task log, or the recent agentOW `progress.log`. Support both URL forms:
+5. If uncommitted changes remain, stash them as `agentow-batch-task<i>-leftovers` and record the stash before the next task.
+6. Find the PR URL in `final.md`, the task log, or the recent agentOW `progress.log`. Support both URL forms:
 
    ```regex
    https://dev\.azure\.com/onedrive/ODSP-Web/_git/odsp-web/pullrequest/[0-9]+
@@ -191,6 +192,8 @@ Write `/workspaces/odsp-web/.aero/batch-<timestamp>/task<i>.checkpoint.md`:
 - Build/tests: <concise result>
 - Visual verification: <concise result>
 - Remaining blockers: <none or concise list>
+- Context maintenance: <library id; plan result; as-built result>
+- Context artifact: <applied commit/PR, exported patch, conflict, or none>
 - Stash: <name or none>
 - Next task: <i+1 task text or batch complete>
 ```
@@ -237,6 +240,7 @@ Logs: /workspaces/odsp-web/.aero/batch-<timestamp>/task*.log
 ## Rules
 
 - Run tasks serially against `/workspaces/odsp-web`.
+- Context maintenance follows each linked library's policy and never pauses a batch task.
 - The main session runs every complete agentOW task directly.
 - Only planner, evaluator, and reviewer are delegated.
 - Never launch nested `copilot -p`, `/clear`, or `/new`.
