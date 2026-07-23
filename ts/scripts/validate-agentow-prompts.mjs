@@ -121,7 +121,18 @@ const checks = [
       "agentOW is a routing/execution layer.",
       "Feature-specific rules and execution guards should live in the routed context docs",
       "Context maintenance never adds a user gate.",
-      "`/ow-context-feedback`"
+      "`/ow-context-feedback`",
+      "### Recommended first run: initialize prerequisites",
+      "CODESPACES=false az login"
+    ]
+  },
+  {
+    file: "copilot/README.md",
+    snippets: [
+      "### Recommended first run",
+      "copilot -p \"/ow-init\"",
+      "This does not start planning or modify product code.",
+      "CODESPACES=false az login"
     ]
   },
   {

@@ -162,9 +162,9 @@ Copilot CLI 需要先完成 `copilot auth`。
 
 新插件和 Agent Teams 设置需要重启 Claude/Copilot 或 terminal 才能加载。Bootstrap 会停止在 Planning 之前并明确告知重启。登录、Figma OAuth、AAD consent、Playwright 首次登录和 tenant fixture 仍需用户完成。结果保存在 `.aero/<session>/capabilities.json`，同一个 terminal session 后续运行不会重复安装。
 
-如果 Azure 未登录，初始化会明确提示用户在**当前 Codespace terminal** 中运行 `CODESPACES=false az login`；登录完成后重新运行 `/ow-init` 或原 agentOW 命令。
+### 推荐：第一次运行先执行 `ow-init`
 
-也可以在第一次执行任务前主动运行一次完整初始化：
+安装 agentOW 后，建议在第一次执行产品任务前主动运行一次完整初始化：
 
 ```text
 Claude Code: /ow-init
@@ -172,6 +172,14 @@ Copilot CLI: copilot -p "/ow-init"
 ```
 
 `ow-init` 会一次性检查并安装基础 MCP、Figma/ADO opt-in MCP 和 UI 图像依赖，但不会进入 Planning 或修改产品代码。若输出要求重启，请重启对应 CLI 后再运行 agentOW。后续出现缺失或损坏时使用 `/ow-doctor` 强制诊断和修复。
+
+如果 Azure 未登录，初始化会明确提示用户在**当前 Codespace terminal** 中运行：
+
+```bash
+CODESPACES=false az login
+```
+
+登录完成后重新运行 `/ow-init`。
 
 ## 5. 选择运行模式
 

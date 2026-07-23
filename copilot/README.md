@@ -54,6 +54,16 @@ copilot plugin marketplace add kaixun96/dev.AgentOW
 copilot plugin install agentow-copilot@agentOW
 ```
 
+### Recommended first run
+
+Initialize all trusted prerequisites before the first product task:
+
+```bash
+copilot -p "/ow-init"
+```
+
+This does not start planning or modify product code. Restart Copilot CLI if requested. If Azure authentication is missing, run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init`.
+
 Then:
 
 ```bash
