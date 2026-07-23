@@ -47,7 +47,7 @@ The TypeScript MCP server (`../ts/`) is **reused unchanged** — Copilot CLI has
 
 Prereqs: Copilot CLI ([install](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli)) + `copilot auth`. The MCP bundle is shipped inside this plugin at `ts/dist/`; maintainers refresh it with `cd ../ts && npm install && npm run build` before publishing.
 
-On the first agentOW invocation in a terminal session, bootstrap checks and installs trusted local Playwright/ODSP/review plugins plus task-triggered Figma/ADO tooling. Run `copilot -p "/ow-init"` for an explicit one-time comprehensive initialization before the first task. Newly installed plugins require restarting Copilot CLI; OAuth, browser login, and consent remain manual. Results are written to `.aero/<session>/capabilities.json`.
+On the first agentOW invocation in a terminal session, bootstrap checks and installs trusted local Playwright/ODSP/review plugins plus task-triggered Figma/ADO tooling. Enter `/ow-init` for an explicit one-time comprehensive initialization before the first task. Newly installed plugins require restarting Copilot CLI; OAuth, browser login, and consent remain manual. Results are written to `.aero/<session>/capabilities.json`.
 
 ```bash
 copilot plugin marketplace add kaixun96/dev.AgentOW
@@ -59,7 +59,7 @@ copilot plugin install agentow-copilot@agentOW
 Initialize all trusted prerequisites before the first product task:
 
 ```bash
-copilot -p "/ow-init"
+/ow-init
 ```
 
 This does not start planning or modify product code. Restart Copilot CLI if requested. If Azure authentication is missing, run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init`.

@@ -130,7 +130,7 @@ const checks = [
     file: "copilot/README.md",
     snippets: [
       "### Recommended first run",
-      "copilot -p \"/ow-init\"",
+      "Enter `/ow-init`",
       "This does not start planning or modify product code.",
       "CODESPACES=false az login"
     ]

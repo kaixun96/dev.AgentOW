@@ -166,9 +166,10 @@ Copilot CLI 需要先完成 `copilot auth`。
 
 安装 agentOW 后，建议在第一次执行产品任务前主动运行一次完整初始化：
 
+在 Claude Code 或 Copilot CLI 的交互会话中直接输入：
+
 ```text
-Claude Code: /ow-init
-Copilot CLI: copilot -p "/ow-init"
+/ow-init
 ```
 
 `ow-init` 会一次性检查并安装基础 MCP、Figma/ADO opt-in MCP 和 UI 图像依赖，但不会进入 Planning 或修改产品代码。若输出要求重启，请重启对应 CLI 后再运行 agentOW。后续出现缺失或损坏时使用 `/ow-doctor` 强制诊断和修复。

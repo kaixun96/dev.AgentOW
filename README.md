@@ -103,8 +103,7 @@ copilot plugin install agentow-copilot@agentOW
 Before the first product task, run one comprehensive initialization:
 
 ```text
-Claude Code: /ow-init
-Copilot CLI: copilot -p "/ow-init"
+/ow-init
 ```
 
 `ow-init` installs or enables trusted Playwright, ODSP, review, Figma/ADO, and image-diff prerequisites without starting planning or changing product code. Restart Claude/Copilot if requested. If Azure authentication is missing, run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init`.
