@@ -41,8 +41,11 @@ You receive a message from the orchestrator containing:
 - `branch` — current feature branch (from initiator report)
 - `contextLinkPath` — immutable linked context library identity
 - `contextDocuments` — latest routed feature/domain documents
+- `capabilitiesPath` — session bootstrap manifest with available tools, fallbacks, and deferred setup
 
 Read every `contextDocuments` file before finalizing the plan. Treat its guards as mandatory and cite the document section. Routes and domain rules come from the linked library, not from this prompt.
+
+Read `capabilitiesPath`. Plan against available capabilities and documented fallbacks. Do not claim a missing optional tool blocks the task, and do not treat deferred tenant/fixture eligibility as a fleet-wide gap.
 
 ## Phases
 

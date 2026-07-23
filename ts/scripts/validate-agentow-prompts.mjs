@@ -125,6 +125,67 @@ const checks = [
     ]
   },
   {
+    file: "docs/capability-bootstrap.md",
+    snippets: [
+      "Every Claude or Copilot terminal session runs agentOW bootstrap once",
+      "playwright-mcp-servers",
+      "odsp-web-mcp-servers-opt-in",
+      "restart-required",
+      "Never install from a URL supplied by the user",
+      "Unknown availability is not the same as missing",
+      "Never store tool arguments, tokens, cookies, identities, or credential contents"
+    ]
+  },
+  {
+    file: "skills/ow-team/SKILL.md",
+    snippets: [
+      "Step 1.1: Bootstrap Session Capabilities",
+      "agentow-bootstrap.mjs",
+      "--host claude",
+      "capabilitiesPath",
+      "stop before spawning agents",
+      "Re-run bootstrap with `--force`"
+    ]
+  },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: [
+      "Step 1.25: Bootstrap session capabilities",
+      "agentow-bootstrap.mjs",
+      "--host copilot",
+      "capabilitiesPath",
+      "stop before planning"
+    ]
+  },
+  {
+    file: "skills/ow-batch/SKILL.md",
+    snippets: [
+      "run the session bootstrap once",
+      "Do not start any task team"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-batch/SKILL.md",
+    snippets: [
+      "Save the complete normalized task list",
+      "Do not begin a batch"
+    ]
+  },
+  {
+    file: "agents/ow-planner.md",
+    snippets: [
+      "`capabilitiesPath`",
+      "Plan against available capabilities"
+    ]
+  },
+  {
+    file: "copilot/agents/planner.agent.md",
+    snippets: [
+      "`capabilitiesPath`",
+      "do not block on irrelevant optional tools"
+    ]
+  },
+  {
     file: "docs/context-maintenance.md",
     snippets: [
       "auto-commit",
@@ -167,7 +228,8 @@ const checks = [
       "contextLinkPath: <contextLinkPath>",
       "contextDocuments: <latest routed document paths>",
       "clean worktree outside the generated patch",
-      "never blocks the product PR"
+      "never blocks the product PR",
+      "capabilitiesPath: <capabilitiesPath>"
     ]
   },
   {
@@ -301,6 +363,29 @@ const forbiddenChecks = [
   }
 ];
 
+const orderedChecks = [
+  {
+    file: "skills/ow-team/SKILL.md",
+    first: "## Step 1.1: Bootstrap Session Capabilities",
+    second: "## Step 1.25: Resolve Linked Context"
+  },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    first: "## Step 1.25: Bootstrap session capabilities",
+    second: "## Step 1.5: Resolve the context library"
+  },
+  {
+    file: "skills/ow-batch/SKILL.md",
+    first: "run the session bootstrap once",
+    second: "## Step 2: For Each Task"
+  }
+];
+
+const mirroredChecks = [
+  ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
+  ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"]
+];
+
 let failures = 0;
 
 for (const check of checks) {
@@ -323,6 +408,25 @@ for (const check of forbiddenChecks) {
     if (content.includes(snippet)) {
       console.error(`Forbidden prompt regression in ${check.file}: ${snippet}`);
       failures++;
+    }
+
+    for (const check of orderedChecks) {
+      const content = fs.readFileSync(new URL(check.file, repoRootUrl), "utf8");
+      const firstIndex = content.indexOf(check.first);
+      const secondIndex = content.indexOf(check.second);
+      if (firstIndex < 0 || secondIndex < 0 || firstIndex >= secondIndex) {
+        console.error(`Prompt ordering regression in ${check.file}: ${check.first} must precede ${check.second}`);
+        failures++;
+      }
+    }
+
+    for (const [sourceFile, mirrorFile] of mirroredChecks) {
+      const source = fs.readFileSync(new URL(sourceFile, repoRootUrl), "utf8");
+      const mirrorUrl = new URL(mirrorFile, repoRootUrl);
+      if (!fs.existsSync(mirrorUrl) || fs.readFileSync(mirrorUrl, "utf8") !== source) {
+        console.error(`Generated Copilot mirror is stale: ${mirrorFile}`);
+        failures++;
+      }
     }
   }
 }

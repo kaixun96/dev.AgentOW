@@ -25,6 +25,7 @@ Create a durable session folder:
 ├── implementation/
 ├── evaluation/
 ├── context/
+├── capabilities.json
 ├── progress.log
 └── report.json
 ```
@@ -37,6 +38,8 @@ Use the shared progress event contract from `AGENTS.md`. At minimum, write:
 [HH:MM:SS] 🚀 Session started: <session>
 [HH:MM:SS] 💬 USER PROMPT: <prompt>
 [HH:MM:SS] 🤖 Mode: AUTO|INTERACTIVE
+[HH:MM:SS] 🩺 Bootstrap started
+[HH:MM:SS] ✅ Bootstrap ready / ⚠️ Bootstrap restart required / ❌ Bootstrap blocked
 [HH:MM:SS] 📋 Planner started
 [HH:MM:SS] ✅ Planner completed — <summary>
 [HH:MM:SS] 📋 Plan ready — <N> tasks
@@ -69,6 +72,29 @@ Compose a refined one-paragraph statement of what to build.
 
 Append the refined request to `progress.log` before dispatching the planner.
 
+## Step 1.25: Bootstrap session capabilities
+
+This step runs before context routing or planning. Read `${CLAUDE_PLUGIN_ROOT}/docs/capability-bootstrap.md`.
+
+1. Write the exact request to `<sessionDir>/request.txt` with a quoted heredoc.
+2. Append `[HH:MM:SS] 🩺 Bootstrap started`.
+3. Run:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/tools/agentow-bootstrap.mjs" \
+     --host copilot \
+     --session-dir "<sessionDir>" \
+     --request-file "<sessionDir>/request.txt"
+   ```
+
+4. Read `<sessionDir>/capabilities.json`.
+5. Merge current tool-catalog evidence into the artifact: if `browser_*` tools are visible, mark Playwright MCP loaded; if Figma tools are visible, mark Figma loaded. Never store tool arguments, tokens, cookies, identities, or credential contents.
+6. If `overall` is `restart-required`, append `⚠️ Bootstrap restart required`, tell the user which plugins/settings were installed and to restart Copilot CLI or the terminal, then stop before planning. The next session re-probes.
+7. If `overall` is `blocked`, report the fixed prerequisite and stop. If `setup-required`, stop only when the missing capability is required for this request and has no fallback.
+8. Otherwise append `✅ Bootstrap ready` and continue.
+
+The bootstrap marker is per terminal/CLI process, so later agentOW runs in the same session do not repeat baseline installs. A later Figma/ADO/UI task may still install a newly required task-specific capability.
+
 ## Step 1.5: Resolve the context library
 
 Read `${CLAUDE_PLUGIN_ROOT}/docs/context-maintenance.md`. Create `<sessionDir>/context/{candidates,apply}` plus empty `evidence.ndjson`.
@@ -97,6 +123,7 @@ artifactPath: /workspaces/odsp-web/.aero/<session>/planning/planner-report.md
 contextDocuments:
   - <every routed feature/domain context document>
 contextLinkPath: /workspaces/odsp-web/.aero/<session>/context/link.json
+capabilitiesPath: /workspaces/odsp-web/.aero/<session>/capabilities.json
 ```
 
 Wait for its findings report (classification, root cause, files to change, patterns, tests, visual surface trace, context guards, and any required root/wrapper layout ownership audit). If `planning/planner-report.md` or the planner NDJSON line is missing, treat planner as failed.

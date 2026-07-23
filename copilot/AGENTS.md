@@ -42,6 +42,7 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 │   ├── state.json
 │   ├── candidates/
 │   └── apply/
+├── capabilities.json
 ├── review.md
 └── final.md
 ```
@@ -52,6 +53,7 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 - `context/link.json` is mandatory and records either a resolved context library or `status: "unlinked"`.
 - Context evidence is append-only. Plan intent, actual code, evaluation, review, and later feedback must remain distinguishable.
 - Context maintenance is non-blocking. It follows the linked library's `auto-commit`, `patch-only`, or `disabled` policy and never adds a user prompt to interactive, AUTO, or batch execution.
+- Session bootstrap runs before planning. It installs only fixed packages from the trusted local odsp-web marketplace, redacts evidence, and stops once when newly installed MCP/settings require a host restart.
 
 ## Progress log event contract
 
@@ -61,6 +63,8 @@ Use this exact style. Each line starts with `[HH:MM:SS]`, one emoji, and a short
 [HH:MM:SS] 🚀 Session started: <session>
 [HH:MM:SS] 💬 USER PROMPT: <one-line or heredoc marker>
 [HH:MM:SS] 🤖 Mode: AUTO|INTERACTIVE
+[HH:MM:SS] 🩺 Bootstrap started
+[HH:MM:SS] ✅ Bootstrap ready / ⚠️ Bootstrap restart required / ❌ Bootstrap blocked
 [HH:MM:SS] 📋 Planner started
 [HH:MM:SS] ✅ Planner completed — <classification>, <N> files, visual <pattern>
 [HH:MM:SS] 📋 Plan ready — <N> tasks

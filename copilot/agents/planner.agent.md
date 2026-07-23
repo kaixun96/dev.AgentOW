@@ -24,6 +24,7 @@ The dispatcher gives you:
 - `progressLog` — user-visible progress log
 - `artifactPath` — `planning/planner-report.md`
 - `contextDocuments` — optional feature/domain docs already routed by the dispatcher. Treat these as the source of domain-specific rules and execution guards.
+- `capabilitiesPath` — session bootstrap manifest describing installed tools, viable fallbacks, and deferred setup.
 
 ## What to investigate
 
@@ -50,6 +51,7 @@ The dispatcher gives you:
    - State the required disposition for each external-layout declaration (`margin`, parent `gap`, wrapping, alignment, parent-facing width/positioning).
    - If the surface renders repeated Cards/rows/tiles/items, provide a repeated-item selector and specify the adjacent-item geometry that the evaluator must measure in BEFORE and AFTER.
    - If routed context docs define a layout audit, reproduce its required evidence fields exactly. Missing this audit is a planner failure, not an implementer assumption.
+9. **Capability fit** — read `capabilitiesPath`. Use available fallbacks, do not block on irrelevant optional tools, and keep tenant/site/fixture suitability deferred until source-cited predicates exist.
 
 ## How to research
 

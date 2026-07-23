@@ -64,6 +64,17 @@ Started: {ISO timestamp}
 |---|------|--------|-----|---------|
 ```
 
+Before task 1, save the complete task list to `${batchDir}/request.txt` and run the session bootstrap once:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/agentow-bootstrap.mjs" \
+  --host claude \
+  --session-dir "${batchDir}" \
+  --request-file "${batchDir}/request.txt"
+```
+
+If plugins/settings were installed, report them and stop the batch with restart instructions. After restart, the next invocation reuses installed capabilities. Do not start any task team until `${batchDir}/capabilities.json` is ready.
+
 Tell the user:
 ```
 🌙 BATCH MODE — running {N} tasks autonomously.
@@ -183,6 +194,7 @@ Agent({
       batchMode:    true
       contextLinkPath: {sessionDir}/context/link.json
       contextDocuments: <document paths from latest routing.vN.json>
+      capabilitiesPath: {batchDir}/capabilities.json
 
     Team members (already spawned):
       - ow-planner

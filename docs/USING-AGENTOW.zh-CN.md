@@ -152,6 +152,16 @@ copilot plugin install agentow-copilot@agentOW
 
 Copilot CLI 需要先完成 `copilot auth`。
 
+首次在一个 Claude/Copilot terminal session 中运行 agentOW 时，会先执行自动 Bootstrap：
+
+- 自动安装本地可信 marketplace 中缺失的 Playwright、ODSP 基础 MCP 和 Review 插件；
+- 任务引用 Figma、ADO、Bluebird、Wiki 或 Learn 时，自动安装 opt-in MCP；
+- UI 任务自动安装截图合成和 pixel diff 依赖；
+- Claude 自动补齐 Agent Teams 设置；
+- Azure CLI 已存在时自动安装 Azure DevOps extension。
+
+新插件和 Agent Teams 设置需要重启 Claude/Copilot 或 terminal 才能加载。Bootstrap 会停止在 Planning 之前并明确告知重启。登录、Figma OAuth、AAD consent、Playwright 首次登录和 tenant fixture 仍需用户完成。结果保存在 `.aero/<session>/capabilities.json`，同一个 terminal session 后续运行不会重复安装。
+
 ## 5. 选择运行模式
 
 | 场景 | Claude Code | Copilot CLI | 交互 |

@@ -78,6 +78,8 @@ You can run it in two modes — see [Quick Start](#quick-start).
 
 - **Auto-accept mode on** — the orchestrator and teammates run unattended; if Claude Code stops to ask permission for every tool, the pipeline stalls. Turn on auto-accept mode (cycle permission modes with **Shift+Tab** until it shows auto-accept) before starting a run, especially for `--auto` and `/ow-batch`.
 
+agentOW now bootstraps the remaining prerequisites on the first invocation in each terminal session. It installs trusted local Playwright/ODSP/review plugins, task-triggered Figma/ADO tooling, image-diff dependencies, the Azure DevOps extension, and the Claude Agent Teams setting. Plugin/settings changes require one Claude/Copilot restart; authentication and browser/Figma consent remain manual.
+
 ---
 
 ## Installation
@@ -180,6 +182,7 @@ Each `/ow-team` run creates `/workspaces/odsp-web/.aero/<session-name>/` with:
 | `review.md` | review-agent | Code review findings |
 | `report.json` | all agents | NDJSON status records |
 | `progress.log` | orchestrator | Real-time pipeline progress (visible via Monitor) |
+| `capabilities.json` | launcher | Redacted prerequisite probes, installations, fallbacks, and restart/manual actions |
 | `context/link.json` | launcher | Immutable link to the run's external context library |
 | `context/evidence.ndjson` | pipeline | Plan, code, evaluation, review, and feedback provenance |
 | `context/candidates/` | context-maintainer | Immutable context update revisions |
@@ -253,6 +256,7 @@ All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cy
 | `ow-ref-monorepo` | monorepo structure, Rush/Heft |
 | `ow-ref-external-tools` | killswitch, GUID, Bluebird, ADO work items |
 | `ow-context-feedback` | Resume a completed run and update linked context from later feedback |
+| `ow-doctor` | Force a capability recheck and repair missing trusted prerequisites |
 | `search-odspweb-wiki` | wiki, documentation |
 
 ---

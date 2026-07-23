@@ -170,6 +170,7 @@ reportFile: <reportFile>
 planDir: <planDir>
 contextLinkPath: <contextLinkPath>
 contextDocuments: <latest routed document paths>
+capabilitiesPath: <capabilitiesPath>
 ```
 
 The planner runs autonomously through its phases and sends a completion message containing the full plan.

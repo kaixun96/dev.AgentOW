@@ -80,6 +80,7 @@ Record variables:
 | `{progressLog}` | `{sessionDir}/progress.log` |
 | `{planDir}` | `{sessionDir}/plans/` |
 | `{contextLinkPath}` | `{sessionDir}/context/link.json` |
+| `{capabilitiesPath}` | `{sessionDir}/capabilities.json` |
 | `{teamName}` | `ow-{sessionName}` |
 | `{userPrompt}` | user's exact request |
 
@@ -100,6 +101,30 @@ echo "watcher pid: $!" >> {progressLog}
 ```
 
 The watcher exits cleanly when the user kills the team or session. It's idempotent — safe to start multiple times (subsequent starts re-tail from the saved offset).
+
+---
+
+## Step 1.1: Bootstrap Session Capabilities
+
+Run this before context routing or brainstorming. Read `${CLAUDE_PLUGIN_ROOT}/docs/capability-bootstrap.md`.
+
+1. Write `{userPrompt}` verbatim to `{sessionDir}/request.txt` using a quoted heredoc.
+2. Append `🩺 Bootstrap started` to the progress log.
+3. Run:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/tools/agentow-bootstrap.mjs" \
+     --host claude \
+     --session-dir "{sessionDir}" \
+     --request-file "{sessionDir}/request.txt"
+   ```
+
+4. Read `{capabilitiesPath}` and merge tool-catalog evidence without recording tool arguments or secrets.
+5. `restart-required` means the script installed plugins or enabled Agent Teams. Tell the user exactly what changed and to restart Claude/terminal, append `⚠️ Bootstrap restart required`, and stop before spawning agents.
+6. `blocked` stops before planning. `setup-required` stops only for a task-required capability with no fallback.
+7. Otherwise append `✅ Bootstrap ready` and continue.
+
+The marker is scoped to the current Claude process. Later `/ow-team` calls in the same terminal reuse it, while newly required task-specific capabilities can still be installed.
 
 ---
 
@@ -141,6 +166,8 @@ echo "[$(date +%H:%M:%S)] 💡 Brainstorm completed — user intent confirmed" >
 ```
 
 Reroute `{refinedRequest}` through the linked context manifest now. If it changes the route set, write the next `context/routing.v<N>.json` revision and use that revision for all subsequent agents.
+
+Re-run bootstrap with `--force` against the refined request if brainstorming introduced a new UI, Figma, ADO, Bluebird, Wiki, Learn, or killswitch requirement. Apply the same restart/setup rules before reading agent definitions.
 
 ---
 
@@ -247,6 +274,7 @@ prompt:
     progressLog:  {progressLog}
     planDir:      {planDir}
     contextLinkPath: {contextLinkPath}
+    capabilitiesPath: {capabilitiesPath}
     contextDocuments: <document paths from latest routing.vN.json>
     User task:    {refinedRequest}
     autoMode:     {autoMode}

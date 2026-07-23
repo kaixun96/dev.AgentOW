@@ -75,6 +75,17 @@ Started: <ISO timestamp>
 |---|------|--------|----|-------|
 ```
 
+Save the complete normalized task list to `<batchDir>/request.txt`, append `🩺 Bootstrap started`, and run:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/agentow-bootstrap.mjs" \
+  --host copilot \
+  --session-dir "<batchDir>" \
+  --request-file "<batchDir>/request.txt"
+```
+
+Read `<batchDir>/capabilities.json`. If the result is `restart-required`, report the installed items and restart instruction, then stop before task 1. Do not begin a batch with missing task-required capabilities that have no fallback.
+
 Append concise timestamped state transitions to `batch.log`:
 
 ```text
@@ -135,9 +146,10 @@ Invoke the `agentow` skill if it is not already loaded, then execute its complet
 1. The current session performs request refinement, plan synthesis, implementation, build/test, fix cycles, and shipping.
 2. Dispatch the agentOW planner, evaluator, and reviewer only for their bounded roles.
 3. Use a new agentOW `.aero/<session>` directory for this task.
-4. Run in AUTO mode: record assumptions instead of asking the user.
-5. Complete or update the task's draft PR.
-6. Do not end the batch after obtaining the PR URL. Continue to result capture and checkpointing.
+4. Pass the batch `capabilities.json` to the task planner and downstream pipeline.
+5. Run in AUTO mode: record assumptions instead of asking the user.
+6. Complete or update the task's draft PR.
+7. Do not end the batch after obtaining the PR URL. Continue to result capture and checkpointing.
 
 Write concise task-level state transitions to:
 

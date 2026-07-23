@@ -34,6 +34,14 @@ function copyMatchingFiles(source, destination, predicate) {
 }
 
 copyDirectoryContents(distDir, path.join(repoRoot, "copilot", "ts", "dist"));
+copyMatchingFiles(path.join(repoRoot, "tools"), path.join(repoRoot, "copilot", "tools"), (name) =>
+  name.endsWith(".mjs") || name === "package.json" || name === "package-lock.json"
+);
+fs.mkdirSync(path.join(repoRoot, "copilot", "docs"), { recursive: true });
+fs.copyFileSync(
+  path.join(repoRoot, "docs", "capability-bootstrap.md"),
+  path.join(repoRoot, "copilot", "docs", "capability-bootstrap.md"),
+);
 console.log("copilot MCP dist synced");
 
 const pluginJson = JSON.parse(
