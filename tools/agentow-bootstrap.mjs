@@ -15,7 +15,7 @@ const UI_PATTERN =
 const FIGMA_PATTERN = /\bfigma\b|设计稿/i;
 const ADO_PATTERN = /\b(ado|azure devops|work item|dev\.azure\.com|visualstudio\.com)\b|工作项/i;
 const OPT_IN_PATTERN = /\b(bluebird|wiki|microsoft learn)\b/i;
-const KILLSWITCH_PATTERN = /\b(killswitch|kill switch|guid)\b|熔断/i;
+const KILLSWITCH_PATTERN = /\b(killswitch(?:es)?|kill switches?|guid)\b|熔断/i;
 const SENSITIVE_LINE_PATTERN = /^\s*(authorization|proxy-authorization|cookie|set-cookie|token|password|passwd|secret|client_secret)\s*[:=].*$/gim;
 const SENSITIVE_VALUE_PATTERN = /\b(token|password|passwd|secret|cookie|authorization|client_secret)\s*[:=]\s*[^\r\n]+/gi;
 const BEARER_PATTERN = /\bbearer\s+[a-z0-9._~+/=-]+/gi;

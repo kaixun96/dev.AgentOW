@@ -78,7 +78,7 @@ You can run it in two modes — see [Quick Start](#quick-start).
 
 - **Auto-accept mode on** — the orchestrator and teammates run unattended; if Claude Code stops to ask permission for every tool, the pipeline stalls. Turn on auto-accept mode (cycle permission modes with **Shift+Tab** until it shows auto-accept) before starting a run, especially for `--auto` and `/ow-batch`.
 
-agentOW now bootstraps the remaining prerequisites on the first invocation in each terminal session. It installs trusted local Playwright/ODSP/review plugins, task-triggered Figma/ADO tooling, image-diff dependencies, the Azure DevOps extension, and the Claude Agent Teams setting. Plugin/settings changes require one Claude/Copilot restart; authentication and browser/Figma consent remain manual.
+agentOW now bootstraps the remaining prerequisites on the first invocation in each terminal session. It installs trusted local Playwright/ODSP/review plugins, task-triggered Figma/ADO tooling, image-diff dependencies, the Azure DevOps extension, and the Claude Agent Teams setting. Run `/ow-init` for an explicit one-time comprehensive initialization before the first task. Plugin/settings changes require one Claude/Copilot restart; authentication and browser/Figma consent remain manual.
 
 ---
 
@@ -256,6 +256,7 @@ All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cy
 | `ow-ref-monorepo` | monorepo structure, Rush/Heft |
 | `ow-ref-external-tools` | killswitch, GUID, Bluebird, ADO work items |
 | `ow-context-feedback` | Resume a completed run and update linked context from later feedback |
+| `ow-init` | Run one comprehensive prerequisite initialization without starting a task |
 | `ow-doctor` | Force a capability recheck and repair missing trusted prerequisites |
 | `search-odspweb-wiki` | wiki, documentation |
 

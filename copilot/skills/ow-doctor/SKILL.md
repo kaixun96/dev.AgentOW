@@ -1,6 +1,6 @@
 ---
 name: ow-doctor
-description: "Check and repair agentOW prerequisites. Use for doctor, setup, missing MCP, Playwright MCP, Figma MCP, agentOW prerequisites, or bootstrap problems."
+description: "Diagnose and repair agentOW prerequisite problems. Use for ow-doctor, doctor, troubleshooting, missing MCP, broken Playwright MCP, broken Figma MCP, or bootstrap failures."
 ---
 
 # agentOW doctor

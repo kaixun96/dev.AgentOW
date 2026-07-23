@@ -137,6 +137,26 @@ const checks = [
     ]
   },
   {
+    file: "skills/ow-init/SKILL.md",
+    snippets: [
+      "This command performs setup only.",
+      "Initialize agentOW for UI screenshots, Figma designs, Azure DevOps work items, a killswitch, and code review.",
+      "--host claude",
+      "--force",
+      "Exit code `20` means initialization succeeded but Claude must be restarted."
+    ]
+  },
+  {
+    file: "copilot/skills/ow-init/SKILL.md",
+    snippets: [
+      "This command performs setup only.",
+      "Initialize agentOW for UI screenshots, Figma designs, Azure DevOps work items, a killswitch, and code review.",
+      "--host copilot",
+      "--force",
+      "Exit code `20` means initialization succeeded but Copilot CLI must be restarted."
+    ]
+  },
+  {
     file: "skills/ow-team/SKILL.md",
     snippets: [
       "Step 1.1: Bootstrap Session Capabilities",
