@@ -18,3 +18,4 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/agentow-bootstrap.mjs" \
 ```
 
 Report installed items, restart requirements, authentication/manual setup, fallbacks, and remaining blockers from `capabilities.json`. Never expose tokens, cookies, identities, credential contents, or raw tenant IDs.
+If `ado.auth` is unavailable, explicitly tell the user to run `CODESPACES=false az login` in the current Codespace terminal and then rerun `/ow-doctor`.

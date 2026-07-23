@@ -32,4 +32,6 @@ This command performs setup only. Do not start planning, create a team, edit pro
    - authentication, OAuth, consent, browser-login, or fixture steps that remain manual;
    - any required capability with no viable fallback.
 
+If `ado.auth` is unavailable, explicitly tell the user: run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init`.
+
 Exit code `20` means initialization succeeded but Claude must be restarted. Never expose tokens, cookies, identities, credential contents, or raw tenant IDs.

@@ -59,4 +59,4 @@ az rest --method POST \
 - The `--resource` parameter is the Azure DevOps resource ID — always include it for auth.
 - Wiki paths use `/` separators (e.g. `/Architecture/Overview`).
 - Large wiki pages may need pagination — check `continuationToken` in response.
-- If `az rest` fails with auth error, ensure you're logged in: `az login`.
+- If `az rest` fails with auth error, run `CODESPACES=false az login` in the current Codespace terminal.

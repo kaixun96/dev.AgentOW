@@ -143,6 +143,7 @@ const checks = [
       "Initialize agentOW for UI screenshots, Figma designs, Azure DevOps work items, a killswitch, and code review.",
       "--host claude",
       "--force",
+      "run `CODESPACES=false az login` in the current Codespace terminal",
       "Exit code `20` means initialization succeeded but Claude must be restarted."
     ]
   },
@@ -153,6 +154,7 @@ const checks = [
       "Initialize agentOW for UI screenshots, Figma designs, Azure DevOps work items, a killswitch, and code review.",
       "--host copilot",
       "--force",
+      "run `CODESPACES=false az login` in the current Codespace terminal",
       "Exit code `20` means initialization succeeded but Copilot CLI must be restarted."
     ]
   },

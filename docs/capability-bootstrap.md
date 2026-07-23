@@ -55,7 +55,8 @@ The bootstrap reports but cannot safely complete:
 
 - restarting Claude/Copilot so newly installed MCP servers load;
 - Claude auto-accept mode;
-- `copilot auth`, Azure login, Figma OAuth, AAD consent;
+- `copilot auth`, Figma OAuth, AAD consent;
+- Azure authentication: explicitly tell the user to run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init` or the original agentOW command;
 - first Playwright browser login or expired cookies;
 - tenant/site/fixture eligibility and seeded test data;
 - context-repository push permission.

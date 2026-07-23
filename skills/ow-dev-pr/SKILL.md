@@ -80,7 +80,7 @@ az repos pr show \
 | "TF401035: not found" | Wrong repository ID — use `3829bdd7-1ab6-420c-a8ec-c30955da3205` |
 | "--draft is not recognized" | Use `--draft true` (with explicit `true`), not bare `--draft` |
 | "branch not found on remote" | Push first: `git push -u origin <branch>` |
-| Auth failure | Run `az login` or check PAT token |
+| Auth failure | In the current Codespace terminal, run `CODESPACES=false az login`, or check the PAT token |
 
 ## Gotchas
 

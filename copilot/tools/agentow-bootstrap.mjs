@@ -699,7 +699,7 @@ if (azAvailable) {
       cliFallbackAvailable ? "Azure DevOps CLI fallback is authenticated and ready" : auth.ok ? "Azure DevOps extension is unavailable" : auth.output,
       [],
       false,
-      "Run az login in an interactive terminal",
+      "In this Codespace terminal, run `CODESPACES=false az login`, then rerun `/ow-init` or the agentOW command",
     ),
   );
 } else {
@@ -711,7 +711,7 @@ if (azAvailable) {
       "Azure CLI authentication is unavailable",
       [],
       false,
-      "Install Azure CLI and run az login in an interactive terminal",
+      "Install Azure CLI, run `CODESPACES=false az login` in this Codespace terminal, then rerun `/ow-init` or the agentOW command",
     ),
   );
 }
