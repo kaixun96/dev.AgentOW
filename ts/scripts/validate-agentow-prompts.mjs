@@ -163,6 +163,12 @@ const checks = [
       "`APPROVE`: zero findings and complete, current-diff coverage.",
       "Draft PR status, AUTO mode, and retry limits do not turn unresolved blocking findings into approval.",
       "non-empty consumer and test evidence",
+      "Reviewability gate",
+      "Reading every file, spending more time, or finding several defects is not evidence that the review is exhaustive.",
+      "generated/mechanical claims cannot override this hard ceiling",
+      "At 2,000 or more substantive changed lines, the change is always `must-split`.",
+      "splitBoundaries",
+      "--diff-numstat",
       "validate-review-report.mjs"
     ]
   },
@@ -185,7 +191,10 @@ const checks = [
       "Any Critical or Important → `REQUEST_CHANGES`.",
       "artifactJsonPath",
       "Never APPROVE without complete evidence.",
-      "sp-client-review-profile.md"
+      "sp-client-review-profile.md",
+      "do not equate reading every line with reliable exhaustive review",
+      "`preliminary-non-exhaustive` completeness claim",
+      "git diff --no-renames"
     ]
   },
   {
@@ -195,6 +204,7 @@ const checks = [
       "classify it as `reviewer-spec`",
       "REQUEST_CHANGES with any Critical or Important finding",
       "Draft status and AUTO mode do not bypass the review quality gate.",
+      "--diff-numstat",
       "When changed files include `sp-client/`, add a concise `Buddy Test Cases` section",
       "Never invent a manual result."
     ]
@@ -207,7 +217,10 @@ const checks = [
       "Critical or Important present → `REQUEST_CHANGES`.",
       "review.json",
       "Never APPROVE without complete evidence.",
-      "sp-client-review-profile.md"
+      "sp-client-review-profile.md",
+      "reading all files does not prove the review is reliable or exhaustive",
+      "`preliminary-non-exhaustive`",
+      "git diff --no-renames"
     ]
   },
   {
@@ -221,6 +234,7 @@ const checks = [
       "Dispatch review only after final evaluation artifacts exist.",
       "actual planPath returned by ow-planner",
       "Review validation is an explicit read-only Bash exception",
+      "--diff-numstat",
       "For `sp-client/` changes, include a concise `Buddy Test Cases` section",
       "Never claim an unexecuted manual result."
     ]

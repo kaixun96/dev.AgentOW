@@ -518,12 +518,14 @@ Wait for the reviewer response, then read `${CLAUDE_PLUGIN_ROOT}/docs/review-con
 
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
-git diff --name-only "$mergeBase"...HEAD > {sessionDir}/review-changed-files.txt
+git diff --no-renames --name-only "$mergeBase"...HEAD > {sessionDir}/review-changed-files.txt
+git diff --no-renames --numstat "$mergeBase"...HEAD > {sessionDir}/review-numstat.txt
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   {sessionDir}/review.json \
   --expected-head "$(git rev-parse HEAD)" \
-  --expected-diff-digest "$(git diff "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
-  --changed-files {sessionDir}/review-changed-files.txt
+  --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
+  --changed-files {sessionDir}/review-changed-files.txt \
+  --diff-numstat {sessionDir}/review-numstat.txt
 ```
 
 Missing artifacts, stale diff identity, incomplete coverage, or validator failure is `reviewer-spec`. Re-dispatch only `ow-review-agent` once against the unchanged implementation cycle with the validation errors. If retry validation fails, stop; never create a PR from an unsupported review.
@@ -783,7 +785,7 @@ The codespace may have additional MCP plugins installed. Leverage them when avai
 - **Read is restricted to session files only:** `report.json`, `progress.log`, plan files under `{planDir}`, and evaluation reports. Never Read source code (`.ts`, `.tsx`, `.js`, `.json` under `/workspaces/odsp-web/sp-client/`, `/workspaces/odsp-web/odsp-next/`, etc.).
 - **NEVER** build, test, or run rush commands yourself.
 - **ONLY** use: `ow-status`, `ow-session-list`, `Read` (session files only), `Bash` (for mkdir/echo/cat/tail on session files).
-- Review validation is an explicit read-only Bash exception: `git merge-base`, `git rev-parse`, `git diff --name-only`, `git diff`, `sha256sum`, `cut`, and `node .../validate-review-report.mjs` are allowed only for the mandatory review gate.
+- Review validation is an explicit read-only Bash exception: `git merge-base`, `git rev-parse`, `git diff --name-only`, `git diff --numstat`, `git diff`, `sha256sum`, `cut`, and `node .../validate-review-report.mjs` are allowed only for the mandatory review gate.
 - Context repository operations are the only exception to the session-only Bash rule. They must follow `docs/context-maintenance.md`, the snapshotted manifest, allowed targets, and compare-and-swap base checks.
 - Always read `reportFile` after each agent completes to get structured output.
 - Parse NDJSON by reading the last line of the report file.

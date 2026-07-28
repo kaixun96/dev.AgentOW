@@ -23,6 +23,8 @@ const SEVERITIES = new Set(["Critical", "Important", "Minor"]);
 const VERDICTS = new Set(["APPROVE", "COMMENT", "REQUEST_CHANGES"]);
 const HASH_40 = /^[0-9a-f]{40}$/;
 const HASH_64 = /^[0-9a-f]{64}$/;
+const HARD_CHURN_LIMIT = 5000;
+const LARGE_CHURN_LIMIT = 2000;
 const DIMENSION_TERMS = {
   behavior: /\b(?:behavior|logic|flow|output|state)\b/i,
   designMaintainability: /\b(?:design|maintainability|deprecated|hardcod|duplicate|naming|todo|comment)\b/i,
@@ -114,6 +116,34 @@ function readLines(filePath) {
     .sort();
 }
 
+function readNumstat(filePath) {
+  const entries = fs
+    .readFileSync(filePath, "utf8")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const [added, deleted, ...pathParts] = line.split("\t");
+      return {
+        additions: added === "-" ? 0 : Number.parseInt(added, 10),
+        deletions: deleted === "-" ? 0 : Number.parseInt(deleted, 10),
+        path: pathParts.join("\t"),
+      };
+    });
+  if (
+    entries.some(
+      (entry) =>
+        !Number.isInteger(entry.additions) ||
+        entry.additions < 0 ||
+        !Number.isInteger(entry.deletions) ||
+        entry.deletions < 0 ||
+        !nonEmpty(entry.path),
+    )
+  ) {
+    throw new Error("invalid Git numstat");
+  }
+  return entries;
+}
+
 function sameStrings(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
@@ -192,10 +222,11 @@ function validate(report, options) {
   }
 
   const changedFilesPath = options.get("--changed-files");
+  let expectedFiles = [];
   if (!changedFilesPath || !fs.existsSync(changedFilesPath)) {
     errors.push("--changed-files must reference a readable Git-generated file list");
   } else {
-    const expectedFiles = readLines(changedFilesPath);
+    expectedFiles = readLines(changedFilesPath);
     if (expectedFiles.length === 0) errors.push("Git changed-file list must not be empty");
     const riskFiles = [...riskPaths].sort();
     const coverageFiles = [...coveredPaths].sort();
@@ -206,6 +237,170 @@ function validate(report, options) {
       !report.preReview?.profiles?.includes("sp-client")
     ) {
       errors.push("sp-client changes require the sp-client review profile");
+    }
+  }
+
+  const diffNumstatPath = options.get("--diff-numstat");
+  let additions = 0;
+  let deletions = 0;
+  let numstatEntries = [];
+  if (!diffNumstatPath || !fs.existsSync(diffNumstatPath)) {
+    errors.push("--diff-numstat must reference a readable Git-generated numstat");
+  } else {
+    try {
+      numstatEntries = readNumstat(diffNumstatPath);
+      const numstatFiles = numstatEntries.map((entry) => entry.path).sort();
+      if (!sameStrings(expectedFiles, numstatFiles)) errors.push("Git numstat paths do not match changed files");
+      additions = numstatEntries.reduce((total, entry) => total + entry.additions, 0);
+      deletions = numstatEntries.reduce((total, entry) => total + entry.deletions, 0);
+    } catch {
+      errors.push("--diff-numstat must contain valid Git numstat output");
+    }
+  }
+
+  const reviewability = report.preReview?.reviewability;
+  const validUnits =
+    Array.isArray(reviewability?.independentBehaviorUnits) &&
+    reviewability.independentBehaviorUnits.length > 0 &&
+    reviewability.independentBehaviorUnits.every(
+      (unit) =>
+        isObject(unit) &&
+        nonEmpty(unit.name) &&
+        Array.isArray(unit.paths) &&
+        unit.paths.length > 0 &&
+        unit.paths.every((unitPath) => nonEmpty(unitPath) && expectedFiles.includes(unitPath)),
+    );
+  const behaviorUnitPaths = new Set(
+    (reviewability?.independentBehaviorUnits ?? []).flatMap((unit) =>
+      Array.isArray(unit?.paths) ? unit.paths : [],
+    ),
+  );
+  const validDomains =
+    Array.isArray(reviewability?.highRiskDomains) &&
+    reviewability.highRiskDomains.every(nonEmpty);
+  const generatedOrMechanicalLines = reviewability?.generatedOrMechanicalLines;
+  const mechanicalBreakdown = reviewability?.mechanicalBreakdown;
+  const churnByPath = new Map(
+    numstatEntries.map((entry) => [entry.path, entry.additions + entry.deletions]),
+  );
+  const mechanicalLinesByPath = new Map();
+  for (const entry of mechanicalBreakdown ?? []) {
+    if (isObject(entry) && nonEmpty(entry.path) && Number.isInteger(entry.lines)) {
+      mechanicalLinesByPath.set(entry.path, (mechanicalLinesByPath.get(entry.path) ?? 0) + entry.lines);
+    }
+  }
+  const validMechanicalEvidence =
+    Number.isInteger(generatedOrMechanicalLines) &&
+    generatedOrMechanicalLines >= 0 &&
+    generatedOrMechanicalLines <= additions + deletions &&
+    Array.isArray(mechanicalBreakdown) &&
+    mechanicalBreakdown.every(
+      (entry) =>
+        isObject(entry) &&
+        expectedFiles.includes(entry.path) &&
+        Number.isInteger(entry.lines) &&
+        entry.lines > 0 &&
+        specific(entry.rationale) &&
+        Array.isArray(entry.evidence) &&
+        entry.evidence.length > 0 &&
+        entry.evidence.every(evidenceReference),
+    ) &&
+    mechanicalBreakdown.reduce((total, entry) => total + entry.lines, 0) === generatedOrMechanicalLines &&
+    [...mechanicalLinesByPath].every(
+      ([entryPath, lines]) => churnByPath.has(entryPath) && lines <= churnByPath.get(entryPath),
+    ) &&
+    (generatedOrMechanicalLines > 0 || mechanicalBreakdown.length === 0);
+  const metricsMatch =
+    reviewability?.changedFileCount === expectedFiles.length &&
+    reviewability?.additions === additions &&
+    reviewability?.deletions === deletions;
+  if (
+    !isObject(reviewability) ||
+    !["reviewable", "must-split"].includes(reviewability.status) ||
+    !metricsMatch ||
+    !validUnits ||
+    !validDomains ||
+    !validMechanicalEvidence ||
+    !specific(reviewability.rationale) ||
+    !["exhaustive", "preliminary-non-exhaustive"].includes(reviewability.completenessClaim)
+  ) {
+    errors.push("preReview.reviewability requires exact Git metrics, behavior units, risk domains, evidence, rationale, and completeness");
+  } else {
+    const totalChurn = additions + deletions;
+    const substantiveChurn = totalChurn - generatedOrMechanicalLines;
+    const structurallyLargeChange =
+      expectedFiles.length >= 40 ||
+      reviewability.independentBehaviorUnits.length >= 3 ||
+      reviewability.highRiskDomains.length >= 4;
+    const exception = reviewability.largeChangeException;
+    const validException =
+      isObject(exception) &&
+      exception.singleCoherentChange === true &&
+      reviewability.independentBehaviorUnits.length === 1 &&
+      reviewability.highRiskDomains.length <= 2 &&
+      generatedOrMechanicalLines > 0 &&
+      sameStrings([...mechanicalLinesByPath.keys()].sort(), expectedFiles) &&
+      specific(exception.rationale) &&
+      Array.isArray(exception.evidence) &&
+      exception.evidence.length > 0 &&
+      exception.evidence.every(evidenceReference);
+    if (!sameStrings([...behaviorUnitPaths].sort(), expectedFiles)) {
+      errors.push("behavior units must cover every Git changed file");
+    }
+    const mustSplit =
+      totalChurn >= HARD_CHURN_LIMIT ||
+      substantiveChurn >= LARGE_CHURN_LIMIT ||
+      (structurallyLargeChange && !validException);
+    if (mustSplit && reviewability.status !== "must-split") {
+      errors.push("oversized or multi-surface change must be classified as must-split");
+    }
+    if (!mustSplit && reviewability.status !== "reviewable") {
+      errors.push("reviewability status must match the measured change");
+    }
+    if (
+      reviewability.status === "must-split" &&
+      (reviewability.completenessClaim !== "preliminary-non-exhaustive" ||
+        !/\b(?:preliminary|non-exhaustive|not exhaustive)\b/i.test(report.summary) ||
+        !Array.isArray(reviewability.splitBoundaries) ||
+        reviewability.splitBoundaries.length < 2 ||
+        !reviewability.splitBoundaries.every(
+          (boundary) =>
+            isObject(boundary) &&
+            specific(boundary.name) &&
+            specific(boundary.rationale) &&
+            Array.isArray(boundary.paths) &&
+            boundary.paths.length > 0 &&
+            boundary.paths.every((boundaryPath) => expectedFiles.includes(boundaryPath)) &&
+            Array.isArray(boundary.evidence) &&
+            boundary.evidence.length > 0 &&
+            boundary.evidence.every(evidenceReference),
+        ) ||
+        new Set(reviewability.splitBoundaries.map((boundary) => boundary.name)).size !==
+          reviewability.splitBoundaries.length ||
+        !sameStrings(
+          [...new Set(reviewability.splitBoundaries.flatMap((boundary) => boundary.paths))].sort(),
+          expectedFiles,
+        ) ||
+        (expectedFiles.length > 1 &&
+          reviewability.splitBoundaries.flatMap((boundary) => boundary.paths).length !==
+            new Set(reviewability.splitBoundaries.flatMap((boundary) => boundary.paths)).size) ||
+        !report.findings?.some(
+          (finding) =>
+            finding.category === "reviewability" &&
+            (finding.severity === "Critical" || finding.severity === "Important"),
+        ))
+    ) {
+      errors.push("must-split reviews require a blocking reviewability finding and non-exhaustive claim");
+    }
+    if (reviewability.status === "reviewable" && reviewability.completenessClaim !== "exhaustive") {
+      errors.push("reviewable changes require an exhaustive completeness claim");
+    }
+    if (
+      reviewability.status === "reviewable" &&
+      Array.isArray(reviewability.splitBoundaries) &&
+      reviewability.splitBoundaries.length > 0
+    ) {
+      errors.push("reviewable changes must not declare split boundaries");
     }
   }
 
@@ -311,7 +506,7 @@ function validate(report, options) {
 
 const { reportPath, options } = parseArgs(process.argv);
 if (!reportPath) {
-  console.error("usage: validate-review-report.mjs <review.json> [--expected-head SHA] [--expected-diff-digest SHA256] [--changed-files PATH]");
+  console.error("usage: validate-review-report.mjs <review.json> [--expected-head SHA] [--expected-diff-digest SHA256] [--changed-files PATH] [--diff-numstat PATH]");
   process.exit(2);
 }
 

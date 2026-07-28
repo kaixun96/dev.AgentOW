@@ -32,13 +32,16 @@ The dispatcher gives you:
 
 First inspect the request, actual plan, available PR title/description, linked work item/design, and bug repro evidence. Record the intended outcome, whether the change is necessary and scoped appropriately, and whether the implementation matches that intent. Missing optional context must be reported, not invented.
 
+Run the contract's reviewability gate before detailed review. Enumerate independent behavior units and high-risk domains; do not equate reading every line with reliable exhaustive review. A `must-split` change still gets a preliminary risk scan, but must include an Important `reviewability` finding, explicit split boundaries, and a `preliminary-non-exhaustive` completeness claim.
+
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
 reviewedHead=$(git rev-parse HEAD)
-git diff "$mergeBase"...HEAD
-git diff "$mergeBase"...HEAD --stat
-git diff "$mergeBase"...HEAD --name-only
-git diff "$mergeBase"...HEAD | sha256sum
+git diff --no-renames "$mergeBase"...HEAD
+git diff --no-renames "$mergeBase"...HEAD --stat
+git diff --no-renames "$mergeBase"...HEAD --name-only
+git diff --no-renames "$mergeBase"...HEAD --numstat
+git diff --no-renames "$mergeBase"...HEAD | sha256sum
 ```
 
 Enumerate every changed file from Git and read it in full; for deleted files, read the merge-base version. Build a low/medium/high risk map with specific rationale. Identify affected contracts, direct callers/consumers, tests, configuration, generated artifacts, and applicable repository/context instructions.

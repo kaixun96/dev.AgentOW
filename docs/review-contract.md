@@ -13,6 +13,23 @@ Spend a short, bounded orientation pass on the request, plan, PR title/descripti
 
 Missing optional context is not itself a defect, but the reviewer must state what was unavailable and must not invent intent. A change that materially mismatches its stated purpose is blocking.
 
+### Reviewability gate
+
+Before detailed review, decide whether the change can be reviewed reliably as one unit. This is not the same as whether an agent can read every line. Measure Git numstat, then enumerate independent behavior units and high-risk domains (for example security, permissions, destructive writes, privacy/telemetry, shared UI, migration compatibility, or performance).
+
+- At 5,000 or more total changed lines, the change is always `must-split`; generated/mechanical claims cannot override this hard ceiling.
+- At 2,000 or more substantive changed lines, the change is always `must-split`.
+- At 40 or more files, three or more independent behavior units, or four or more high-risk domains, presume `must-split`.
+- A structurally large change below 2,000 substantive lines may remain reviewable only when it is one coherent behavior unit spanning at most two high-risk domains and every changed path has numstat-bound mechanical/generated evidence.
+- Reading every file, spending more time, or finding several defects is not evidence that the review is exhaustive.
+
+A `must-split` review still performs a preliminary risk scan so known defects are not lost, but it must:
+
+1. add an Important `reviewability` finding;
+2. state that findings are preliminary and non-exhaustive;
+3. propose at least two distinct, evidenced, independently reviewable split boundaries;
+4. never APPROVE or imply that no additional defects remain.
+
 ## Required two-pass method
 
 ### Pass 1: risk and scope inventory
@@ -109,7 +126,20 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
     "evidence": ["artifact:<plan/request/work-item evidence>"],
     "necessityAndScope": "<why the change is necessary and appropriately scoped>",
     "intentMatch": "<whether implementation matches the stated intent>",
-    "profiles": ["global", "sp-client when any changed path is under sp-client/"]
+    "profiles": ["global", "sp-client when any changed path is under sp-client/"],
+    "reviewability": {
+      "status": "reviewable|must-split",
+      "changedFileCount": 1,
+      "additions": 10,
+      "deletions": 2,
+      "generatedOrMechanicalLines": 0,
+      "mechanicalBreakdown": [],
+      "independentBehaviorUnits": [{ "name": "<behavior unit>", "paths": ["src/example.ts"] }],
+      "highRiskDomains": ["<applicable risk domain>"],
+      "rationale": "<why one review is or is not reliable>",
+      "completenessClaim": "exhaustive|preliminary-non-exhaustive",
+      "splitBoundaries": [{ "name": "<independent split>", "paths": ["src/example.ts"], "rationale": "<why this is independently reviewable>", "evidence": ["src/example.ts:1"] }]
+    }
   },
   "riskMap": [
     {
@@ -150,6 +180,8 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
 }
 ```
 
+Every behavior unit path must be Git-changed, and their union must cover every changed file. Every non-zero `generatedOrMechanicalLines` claim requires `mechanicalBreakdown` entries with a changed path, exact line count, specific rationale, and cited generation/mechanical evidence. Entry lines must sum exactly to the claim, and the aggregate claimed for each path cannot exceed that path's Git numstat churn. A structural large-change exception requires mechanical evidence for every changed path. A `must-split` report requires at least two distinct `splitBoundaries`, each with a specific name, changed paths, rationale, and evidence. Their union must cover every changed file; multi-file changes cannot assign a path to multiple splits. Its summary must explicitly say the scan is preliminary or non-exhaustive.
+
 The complete set of dimension keys is enforced by `tools/validate-review-report.mjs`.
 
 `preReview.profiles` records the applied standards. It always includes `global`; when any changed file is under `sp-client/`, it must also include `sp-client` and the reviewer must read `docs/sp-client-review-profile.md`.
@@ -159,12 +191,14 @@ The complete set of dimension keys is enforced by `tools/validate-review-report.
 Before accepting the verdict, the orchestrator runs:
 
 ```bash
-git diff --name-only <mergeBase>...HEAD > <sessionDir>/review-changed-files.txt
+git diff --no-renames --name-only <mergeBase>...HEAD > <sessionDir>/review-changed-files.txt
+git diff --no-renames --numstat <mergeBase>...HEAD > <sessionDir>/review-numstat.txt
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   <sessionDir>/review.json \
   --expected-head "$(git rev-parse HEAD)" \
-  --expected-diff-digest "$(git diff <mergeBase>...HEAD | sha256sum | cut -d' ' -f1)" \
-  --changed-files <sessionDir>/review-changed-files.txt
+  --expected-diff-digest "$(git diff --no-renames <mergeBase>...HEAD | sha256sum | cut -d' ' -f1)" \
+  --changed-files <sessionDir>/review-changed-files.txt \
+  --diff-numstat <sessionDir>/review-numstat.txt
 ```
 
 Malformed, incomplete, or stale review output is a reviewer-spec failure. Re-dispatch the reviewer once against the unchanged implementation. It does not consume a product fix cycle. If validation still fails, stop rather than shipping an unsupported approval.

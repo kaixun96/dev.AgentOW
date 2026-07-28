@@ -275,12 +275,14 @@ After the reviewer returns, independently recompute the merge base, HEAD, diff d
 
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
-git diff --name-only "$mergeBase"...HEAD > <sessionDir>/review-changed-files.txt
+git diff --no-renames --name-only "$mergeBase"...HEAD > <sessionDir>/review-changed-files.txt
+git diff --no-renames --numstat "$mergeBase"...HEAD > <sessionDir>/review-numstat.txt
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   <sessionDir>/review.json \
   --expected-head "$(git rev-parse HEAD)" \
-  --expected-diff-digest "$(git diff "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
-  --changed-files <sessionDir>/review-changed-files.txt
+  --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
+  --changed-files <sessionDir>/review-changed-files.txt \
+  --diff-numstat <sessionDir>/review-numstat.txt
 ```
 
 If `review.md`, `review.json`, or the reviewer NDJSON line is missing, or validation fails, classify it as `reviewer-spec`. Re-dispatch the reviewer once against the unchanged implementation cycle with the validation errors. Do not edit code, rebuild, retest, or consume a product fix cycle. If the retry still fails validation, stop; never ship an unsupported review.

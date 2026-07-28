@@ -39,13 +39,16 @@ Treat review as collaborative defect prevention, not blame. Educational-only com
 
 Before reading the diff, inspect the request, actual plan, available PR title/description, linked work item/design, and bug repro evidence. Record intent, necessity/scope, and whether the implementation matches the stated change. Report unavailable optional context instead of inventing it.
 
+Run the contract's reviewability gate before detailed review. Enumerate independent behavior units and high-risk domains; reading all files does not prove the review is reliable or exhaustive. A `must-split` change still gets a preliminary risk scan, but requires an Important `reviewability` finding, explicit split boundaries, and `preliminary-non-exhaustive`.
+
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
 reviewedHead=$(git rev-parse HEAD)
-git diff "$mergeBase"...HEAD
-git diff "$mergeBase"...HEAD --stat
-git diff "$mergeBase"...HEAD --name-only
-git diff "$mergeBase"...HEAD | sha256sum
+git diff --no-renames "$mergeBase"...HEAD
+git diff --no-renames "$mergeBase"...HEAD --stat
+git diff --no-renames "$mergeBase"...HEAD --name-only
+git diff --no-renames "$mergeBase"...HEAD --numstat
+git diff --no-renames "$mergeBase"...HEAD | sha256sum
 ```
 
 Enumerate changed files from Git, not from summaries. Read every changed file in full; for deleted files, read the merge-base version. Build a low/medium/high risk map with rationale. Identify direct callers/consumers, tests, public/data contracts, configuration, generated files, applicable repository instructions, and every routed context document.
