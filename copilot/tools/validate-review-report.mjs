@@ -37,6 +37,14 @@ const SP_CLIENT_PROFILE_TERMS = {
   spClientLargeCollections: /\b(?:collection|pagination|continuation|progressive|virtualization|render)\b/i,
   spClientAutomatedTests: /\b(?:test|coverage|assertion|regression)\b/i,
 };
+const ROLLOUT_STATES = {
+  killswitch: ["ks-not-activated", "ks-activated"],
+  flight: ["flight-enabled", "flight-disabled"],
+  "killswitch+flight": [
+    "ks-not-activated-and-flight-enabled",
+    "ks-activated-or-flight-disabled",
+  ],
+};
 const HARD_CHURN_LIMIT = 5000;
 const LARGE_CHURN_LIMIT = 2000;
 const DIMENSION_TERMS = {
@@ -119,6 +127,156 @@ function testEvidenceReference(value) {
   return evidencePath !== undefined
     ? /(?:^|\/)(?:__tests__|tests?|specs?)(?:\/|$)|(?:\.test|\.spec)\.[^/]+$/i.test(evidencePath)
     : boundedNoMatchSearch(value, /\b(?:test|spec)\b/i);
+}
+
+function isSpClientRuntimePath(filePath) {
+  return (
+    filePath.startsWith("sp-client/") &&
+    /\.(?:ts|tsx|js|jsx|css|scss|less|resx)$/i.test(filePath) &&
+    !/(?:^|\/)(?:__tests__|tests?|specs?)(?:\/|$)|(?:\.test|\.spec)\.[^/]+$|\.snap$/i.test(
+      filePath,
+    )
+  );
+}
+
+function hasBlockingRolloutFinding(report) {
+  return report.findings?.some(
+    (finding) =>
+      finding.category === "rolloutProtection" &&
+      (finding.severity === "Critical" || finding.severity === "Important"),
+  );
+}
+
+function validateRolloutPathCoverage(pathCoverage, runtimePaths) {
+  if (!Array.isArray(pathCoverage)) return false;
+  const coveragePaths = pathCoverage.map((entry) => entry?.path).sort();
+  if (!sameStrings(coveragePaths, runtimePaths)) return false;
+  return pathCoverage.every(
+    (entry) =>
+      isObject(entry) &&
+      Array.isArray(entry.changedEvidence) &&
+      entry.changedEvidence.length > 0 &&
+      entry.changedEvidence.every(
+        (reference) =>
+          evidenceReference(reference) &&
+          path.posix.normalize(fileEvidencePath(reference) ?? "") ===
+            path.posix.normalize(entry.path),
+      ) &&
+      Array.isArray(entry.gateEvidence) &&
+      entry.gateEvidence.length > 0 &&
+      entry.gateEvidence.every(evidenceReference) &&
+      Array.isArray(entry.fallbackEvidence) &&
+      entry.fallbackEvidence.length > 0 &&
+      entry.fallbackEvidence.every(evidenceReference) &&
+      specific(entry.conclusion),
+  );
+}
+
+function validateRolloutProtection(report, expectedFiles, errors) {
+  const rollout = report.preReview?.rolloutProtection;
+  const runtimePaths = expectedFiles.filter(isSpClientRuntimePath).sort();
+  if (!isObject(rollout) || !Array.isArray(rollout.runtimePaths)) {
+    errors.push("sp-client reviews require structured rolloutProtection evidence");
+    return;
+  }
+  if (!sameStrings([...rollout.runtimePaths].sort(), runtimePaths)) {
+    errors.push("rolloutProtection runtime paths must exactly match Git runtime changes");
+  }
+  if (runtimePaths.length === 0) {
+    if (
+      rollout.protectionStatus !== "not-applicable" ||
+      rollout.gateType !== "not-applicable" ||
+      !specific(rollout.notApplicableReason) ||
+      !specific(rollout.conclusion)
+    ) {
+      errors.push("non-runtime sp-client changes require a specific rollout not-applicable disposition");
+    }
+    return;
+  }
+
+  if (!["existing-pr", "pre-pr"].includes(rollout.reviewContext)) {
+    errors.push("rolloutProtection reviewContext must identify existing-pr or pre-pr");
+  }
+  const validDescriptionStatus =
+    rollout.reviewContext === "existing-pr"
+      ? ["documented", "missing"].includes(rollout.descriptionStatus)
+      : ["planned", "missing"].includes(rollout.descriptionStatus);
+  if (!validDescriptionStatus) {
+    errors.push("rolloutProtection description status does not match the review context");
+  }
+  if (
+    rollout.descriptionStatus !== "missing" &&
+    (!Array.isArray(rollout.descriptionEvidence) ||
+      rollout.descriptionEvidence.length === 0 ||
+      !rollout.descriptionEvidence.every(evidenceReference))
+  ) {
+    errors.push("documented or planned rollout metadata requires description evidence");
+  }
+
+  if (rollout.protectionStatus === "unprotected") {
+    if (
+      rollout.gateType !== "unprotected" ||
+      !hasBlockingRolloutFinding(report) ||
+      !specific(rollout.conclusion)
+    ) {
+      errors.push("unprotected runtime changes require a blocking rolloutProtection finding");
+    }
+    return;
+  }
+  if (!Object.hasOwn(ROLLOUT_STATES, rollout.gateType)) {
+    errors.push("runtime changes require a killswitch, flight, or killswitch+flight");
+    return;
+  }
+  if (rollout.protectionStatus === "incomplete") {
+    if (
+      !hasBlockingRolloutFinding(report) ||
+      !Array.isArray(rollout.gateIdentifiers) ||
+      rollout.gateIdentifiers.length === 0 ||
+      !rollout.gateIdentifiers.every(nonEmpty) ||
+      !specific(rollout.conclusion)
+    ) {
+      errors.push("incomplete rollout protection requires identified gates and a blocking finding");
+    }
+    return;
+  }
+  if (rollout.protectionStatus !== "protected") {
+    errors.push("runtime rollout protection status is invalid");
+    return;
+  }
+
+  const evidenceArrays = [
+    rollout.entryPointEvidence,
+    rollout.gateCheckEvidence,
+    rollout.newPathEvidence,
+    rollout.fallbackEvidence,
+  ];
+  const protectedEvidenceValid =
+    Array.isArray(rollout.gateIdentifiers) &&
+    rollout.gateIdentifiers.length > 0 &&
+    rollout.gateIdentifiers.every(nonEmpty) &&
+    typeof rollout.existingUpstreamGate === "boolean" &&
+    evidenceArrays.every(
+      (evidence) =>
+        Array.isArray(evidence) &&
+        evidence.length > 0 &&
+        evidence.every(evidenceReference),
+    ) &&
+    Array.isArray(rollout.disabledStateTestEvidence) &&
+    rollout.disabledStateTestEvidence.length > 0 &&
+    rollout.disabledStateTestEvidence.every(testEvidenceReference) &&
+    validateRolloutPathCoverage(rollout.pathCoverage, runtimePaths) &&
+    specific(rollout.conclusion);
+  const [expectedNewState, expectedFallbackState] = ROLLOUT_STATES[rollout.gateType];
+  if (
+    !protectedEvidenceValid ||
+    rollout.newPathState !== expectedNewState ||
+    rollout.fallbackState !== expectedFallbackState
+  ) {
+    errors.push("rolloutProtection requires complete gate coverage, correct direction, fallback, and disabled-state tests");
+  }
+  if (rollout.descriptionStatus === "missing" && !hasBlockingRolloutFinding(report)) {
+    errors.push("missing rollout metadata in the PR description requires a blocking finding");
+  }
 }
 
 function readLines(filePath) {
@@ -285,6 +443,9 @@ function validate(report, options) {
       )
     ) {
       errors.push("sp-client changes require complete scoped profile checks");
+    }
+    if (expectedFiles.some((file) => file.startsWith("sp-client/"))) {
+      validateRolloutProtection(report, expectedFiles, errors);
     }
   }
 

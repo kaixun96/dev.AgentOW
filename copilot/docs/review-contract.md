@@ -127,6 +127,33 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
     "necessityAndScope": "<why the change is necessary and appropriately scoped>",
     "intentMatch": "<whether implementation matches the stated intent>",
     "profiles": ["global", "sp-client when any changed path is under sp-client/"],
+    "rolloutProtection": {
+      "runtimePaths": ["sp-client/src/example.ts"],
+      "reviewContext": "existing-pr|pre-pr",
+      "descriptionStatus": "documented|missing|planned",
+      "descriptionEvidence": ["artifact:pr-description"],
+      "protectionStatus": "protected|incomplete|unprotected|not-applicable",
+      "gateType": "killswitch|flight|killswitch+flight|unprotected|not-applicable",
+      "gateIdentifiers": ["<KS/Flight name or ID>"],
+      "existingUpstreamGate": false,
+      "entryPointEvidence": ["sp-client/src/entry.ts:1"],
+      "gateCheckEvidence": ["sp-client/src/entry.ts:10"],
+      "newPathEvidence": ["sp-client/src/example.ts:1"],
+      "fallbackEvidence": ["sp-client/src/entry.ts:12"],
+      "newPathState": "ks-not-activated|flight-enabled|ks-not-activated-and-flight-enabled",
+      "fallbackState": "ks-activated|flight-disabled|ks-activated-or-flight-disabled",
+      "disabledStateTestEvidence": ["sp-client/src/example.test.ts:1"],
+      "pathCoverage": [
+        {
+          "path": "sp-client/src/example.ts",
+          "changedEvidence": ["sp-client/src/example.ts:1"],
+          "gateEvidence": ["sp-client/src/entry.ts:10"],
+          "fallbackEvidence": ["sp-client/src/entry.ts:12"],
+          "conclusion": "<how this exact changed runtime path is protected>"
+        }
+      ],
+      "conclusion": "<exact gate coverage result>"
+    },
     "profileChecks": [
       {
         "id": "<profile-defined check ID>",
@@ -194,6 +221,8 @@ Every behavior unit path must be Git-changed, and their union must cover every c
 The complete set of dimension keys is enforced by `tools/validate-review-report.mjs`.
 
 `preReview.profiles` records the applied standards. It always includes `global`; when any changed file is under `sp-client/`, it must also include `sp-client` and the reviewer must read `docs/sp-client-review-profile.md`.
+
+For SP-Client, `preReview.rolloutProtection` is mandatory. The validator derives runtime paths from Git and requires exact coverage. `protected` runtime changes require documented/planned gate metadata, identifiers, code citations for entry/gate/new/fallback paths, correct direction, disabled-state test evidence, and one `pathCoverage` entry for every Git-derived runtime path. Each entry must cite that exact changed file plus its gate and fallback. `incomplete` and `unprotected` states let the reviewer report missing coverage, wrong direction, fallback, or tests, but require a Critical or Important `rolloutProtection` finding. A `missing` PR-description status also requires that finding. `not-applicable` is accepted only when Git contains no SP-Client runtime path.
 
 ## Validation and orchestration
 

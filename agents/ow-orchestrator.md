@@ -594,6 +594,7 @@ Invoke `ow-pr-create`:
 ```
 title: <plan spec title>
 description: |
+  Gate: <for SP-Client runtime changes: Flight/KS identifier — enabled/new-path direction; disabled/fallback direction>
   ## Summary
   <from plan spec>
 
@@ -602,6 +603,7 @@ description: |
 ```
 
 **HARD RULE — keep PR description SHORT.** Reviewers TL;DR long descriptions and miss the point. Target:
+- **Gate first:** for SP-Client runtime changes, line 1 identifies the validated Flight/KS and both directions from `preReview.rolloutProtection`.
 - **Summary**: 1-3 sentences. What changes, why. No context dumps, no "investigation history", no test plan.
 - **Changes**: bullet list, ONE line per file or behavior change. No file-level diff explanations, no rationale paragraphs.
 - **Total length**: aim for under 30 lines (excluding the auto-attached Visual Validation section from Step 7c.2).

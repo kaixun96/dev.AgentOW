@@ -175,7 +175,7 @@ const checks = [
   {
     file: "docs/sp-client-review-profile.md",
     snippets: [
-      "Do not mechanically demand a new killswitch, flight, experiment, log, or document for every diff.",
+      "Runtime behavior and styling changes must be protected by a flight or killswitch.",
       "Activated means old/fallback behavior; not activated means new behavior.",
       "never module evaluation",
       "bundle delta of 2 KB or more is a review trigger",
@@ -184,6 +184,8 @@ const checks = [
       "Fluent V9/SPDS primitive",
       "SharePoint theme/Detheme provider flow",
       "spClientRolloutTrace",
+      "PR description first",
+      "preReview.rolloutProtection",
       "Use `Nit:` only for optional education."
     ]
   },
@@ -198,6 +200,8 @@ const checks = [
       "Never APPROVE without complete evidence.",
       "sp-client-review-profile.md",
       "preReview.profileChecks",
+      "inspect the PR description before code",
+      "A nearby gate is not coverage.",
       "do not equate reading every line with reliable exhaustive review",
       "`preliminary-non-exhaustive` completeness claim",
       "git diff --no-renames"
@@ -223,6 +227,8 @@ const checks = [
       "Never APPROVE without complete evidence.",
       "sp-client-review-profile.md",
       "preReview.profileChecks",
+      "inspect the PR description before code",
+      "A nearby gate is not coverage.",
       "reading all files does not prove the review is reliable or exhaustive",
       "`preliminary-non-exhaustive`",
       "git diff --no-renames"

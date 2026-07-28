@@ -112,6 +112,22 @@ function makeReport() {
   };
 }
 
+function addBlockingRolloutFinding(report) {
+  report.findings.push({
+    id: "R-ROLLOUT",
+    severity: "Important",
+    category: "rolloutProtection",
+    path: "sp-client/src/example.ts",
+    line: 1,
+    description: "The runtime change is not fully protected by the declared rollout gate",
+    impact: "Users can enter the new behavior when the gate should preserve the fallback path",
+    suggestedFix: "Gate every runtime entry and add disabled-state regression coverage",
+    evidence: ["sp-client/src/example.ts:1"],
+  });
+  report.counts.important = 1;
+  report.verdict = "REQUEST_CHANGES";
+}
+
 function validate(report) {
   fs.writeFileSync(reportPath, JSON.stringify(report));
   return spawnSync(
@@ -203,6 +219,33 @@ missingSpClientProfile.preReview.profileChecks = [
     conclusion: "Automated regression test coverage exercises the changed behavior and error paths",
   },
 ];
+missingSpClientProfile.preReview.rolloutProtection = {
+  runtimePaths: ["sp-client/src/example.ts"],
+  reviewContext: "existing-pr",
+  descriptionStatus: "documented",
+  descriptionEvidence: ["artifact:pr-description"],
+  protectionStatus: "protected",
+  gateType: "flight",
+  gateIdentifiers: ["ExampleFeatureFlight"],
+  existingUpstreamGate: true,
+  entryPointEvidence: ["sp-client/src/example.ts:1"],
+  gateCheckEvidence: ["sp-client/src/example.ts:2"],
+  newPathEvidence: ["sp-client/src/example.ts:3"],
+  fallbackEvidence: ["sp-client/src/example.ts:4"],
+  newPathState: "flight-enabled",
+  fallbackState: "flight-disabled",
+  disabledStateTestEvidence: ["sp-client/src/example.test.ts:1"],
+  pathCoverage: [
+    {
+      path: "sp-client/src/example.ts",
+      changedEvidence: ["sp-client/src/example.ts:1"],
+      gateEvidence: ["sp-client/src/example.ts:2"],
+      fallbackEvidence: ["sp-client/src/example.ts:4"],
+      conclusion: "This changed runtime file is reached only after the Flight check and Flight off uses fallback",
+    },
+  ],
+  conclusion: "The declared flight protects every runtime entry and Flight off preserves the original fallback path",
+};
 assert.equal(validate(missingSpClientProfile).status, 0, "explicit sp-client profile should satisfy scoped review");
 
 const missingSpClientCheck = structuredClone(missingSpClientProfile);
@@ -214,6 +257,86 @@ for (const check of paddedSpClientChecks.preReview.profileChecks) {
   check.conclusion = "This scoped profile check was reviewed against the implementation evidence";
 }
 assert.equal(validate(paddedSpClientChecks).status, 1, "sp-client checks require concern-specific conclusions");
+
+const missingRolloutEvidence = structuredClone(missingSpClientProfile);
+delete missingRolloutEvidence.preReview.rolloutProtection;
+assert.equal(validate(missingRolloutEvidence).status, 1, "sp-client runtime changes require structured rollout evidence");
+
+const wrongFlightDirection = structuredClone(missingSpClientProfile);
+wrongFlightDirection.preReview.rolloutProtection.newPathState = "flight-disabled";
+assert.equal(validate(wrongFlightDirection).status, 1, "protected rollout evidence must use the correct gate direction");
+
+const missingRuntimePathCoverage = structuredClone(missingSpClientProfile);
+missingRuntimePathCoverage.preReview.rolloutProtection.pathCoverage = [];
+assert.equal(validate(missingRuntimePathCoverage).status, 1, "every runtime changed path needs gate and fallback evidence");
+
+const missingFallbackEvidence = structuredClone(missingSpClientProfile);
+missingFallbackEvidence.preReview.rolloutProtection.fallbackEvidence = [];
+assert.equal(validate(missingFallbackEvidence).status, 1, "protected rollout evidence requires a fallback trace");
+
+const incompleteRollout = structuredClone(missingSpClientProfile);
+incompleteRollout.preReview.rolloutProtection.protectionStatus = "incomplete";
+incompleteRollout.preReview.rolloutProtection.conclusion =
+  "The Flight is identified but one changed runtime entry bypasses the gate";
+addBlockingRolloutFinding(incompleteRollout);
+assert.equal(validate(incompleteRollout).status, 0, "review can report partial gate coverage as a product finding");
+
+const protectedKillswitch = structuredClone(missingSpClientProfile);
+protectedKillswitch.preReview.rolloutProtection.gateType = "killswitch";
+protectedKillswitch.preReview.rolloutProtection.gateIdentifiers = ["isExampleKSActivated"];
+protectedKillswitch.preReview.rolloutProtection.newPathState = "ks-not-activated";
+protectedKillswitch.preReview.rolloutProtection.fallbackState = "ks-activated";
+assert.equal(validate(protectedKillswitch).status, 0, "killswitch direction should place new code in the not-activated state");
+
+const protectedKillswitchAndFlight = structuredClone(missingSpClientProfile);
+protectedKillswitchAndFlight.preReview.rolloutProtection.gateType = "killswitch+flight";
+protectedKillswitchAndFlight.preReview.rolloutProtection.gateIdentifiers = [
+  "isExampleKSActivated",
+  "ExampleFeatureFlight",
+];
+protectedKillswitchAndFlight.preReview.rolloutProtection.newPathState =
+  "ks-not-activated-and-flight-enabled";
+protectedKillswitchAndFlight.preReview.rolloutProtection.fallbackState =
+  "ks-activated-or-flight-disabled";
+assert.equal(validate(protectedKillswitchAndFlight).status, 0, "combined gates require both safe fallback directions");
+
+const runtimePathMismatch = structuredClone(missingSpClientProfile);
+runtimePathMismatch.preReview.rolloutProtection.runtimePaths = ["sp-client/src/different.ts"];
+assert.equal(validate(runtimePathMismatch).status, 1, "reported runtime paths must exactly match Git");
+
+const undocumentedRollout = structuredClone(missingSpClientProfile);
+undocumentedRollout.preReview.rolloutProtection.descriptionStatus = "missing";
+undocumentedRollout.preReview.rolloutProtection.descriptionEvidence = [];
+assert.equal(validate(undocumentedRollout).status, 1, "missing PR rollout metadata requires a finding");
+addBlockingRolloutFinding(undocumentedRollout);
+assert.equal(validate(undocumentedRollout).status, 0, "review can report missing rollout metadata as a product finding");
+
+const unprotectedRuntime = structuredClone(missingSpClientProfile);
+unprotectedRuntime.preReview.rolloutProtection.protectionStatus = "unprotected";
+unprotectedRuntime.preReview.rolloutProtection.gateType = "unprotected";
+unprotectedRuntime.preReview.rolloutProtection.conclusion =
+  "No Flight or killswitch protects the changed runtime entry and fallback behavior";
+assert.equal(validate(unprotectedRuntime).status, 1, "unprotected runtime code requires a finding");
+addBlockingRolloutFinding(unprotectedRuntime);
+assert.equal(validate(unprotectedRuntime).status, 0, "review can report unprotected runtime code as a product finding");
+
+fs.writeFileSync(changedFilesPath, "sp-client/docs/example.md\n");
+fs.writeFileSync(diffNumstatPath, "10\t2\tsp-client/docs/example.md\n");
+const nonRuntimeSpClientChange = structuredClone(missingSpClientProfile);
+nonRuntimeSpClientChange.riskMap[0].path = "sp-client/docs/example.md";
+nonRuntimeSpClientChange.coverage.changedFiles[0].path = "sp-client/docs/example.md";
+nonRuntimeSpClientChange.preReview.reviewability.independentBehaviorUnits[0].paths = [
+  "sp-client/docs/example.md",
+];
+nonRuntimeSpClientChange.preReview.rolloutProtection = {
+  runtimePaths: [],
+  protectionStatus: "not-applicable",
+  gateType: "not-applicable",
+  notApplicableReason: "The Git diff contains only documentation and cannot change runtime behavior or styling",
+  conclusion: "No SP-Client runtime path requires rollout protection",
+};
+assert.equal(validate(nonRuntimeSpClientChange).status, 0, "pure documentation changes can use rollout not-applicable");
+
 fs.writeFileSync(changedFilesPath, "src/example.ts\n");
 fs.writeFileSync(diffNumstatPath, "10\t2\tsrc/example.ts\n");
 
