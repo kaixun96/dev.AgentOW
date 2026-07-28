@@ -5,6 +5,7 @@ import path from "node:path";
 
 const DIMENSIONS = [
   "behavior",
+  "designMaintainability",
   "callersConsumers",
   "tests",
   "typesContracts",
@@ -14,6 +15,7 @@ const DIMENSIONS = [
   "accessibilityUi",
   "localization",
   "compatibilityKillswitch",
+  "telemetry",
   "repoInstructionsContext",
   "dependenciesTooling",
 ];
@@ -23,6 +25,7 @@ const HASH_40 = /^[0-9a-f]{40}$/;
 const HASH_64 = /^[0-9a-f]{64}$/;
 const DIMENSION_TERMS = {
   behavior: /\b(?:behavior|logic|flow|output|state)\b/i,
+  designMaintainability: /\b(?:design|maintainability|deprecated|hardcod|duplicate|naming|todo|comment)\b/i,
   callersConsumers: /\b(?:caller|consumer|usage|call site)\b/i,
   tests: /\b(?:test|coverage|assertion)\b/i,
   typesContracts: /\b(?:type|contract|interface|schema|api)\b/i,
@@ -32,6 +35,7 @@ const DIMENSION_TERMS = {
   accessibilityUi: /\b(?:accessibility|a11y|aria|keyboard|focus|screen reader|ui)\b/i,
   localization: /\b(?:localization|locale|translation|resource|string)\b/i,
   compatibilityKillswitch: /\b(?:compatibility|backward|killswitch|rollback|migration|version)\b/i,
+  telemetry: /\b(?:telemetry|monitor|logging|event|metric|trace)\b/i,
   repoInstructionsContext: /\b(?:instructions?|context|guidelines?|conventions?|documentation)\b/i,
   dependenciesTooling: /\b(?:dependency|tooling|package|build|lockfile|config)\b/i,
 };
@@ -125,6 +129,19 @@ function validate(report, options) {
   if (!HASH_64.test(report.diffDigest ?? "")) errors.push("diffDigest must be a 64-character lowercase SHA-256");
   if (!VERDICTS.has(report.verdict)) errors.push("verdict is invalid");
   if (!nonEmpty(report.summary)) errors.push("summary is required");
+  if (
+    !isObject(report.preReview) ||
+    !specific(report.preReview.intent) ||
+    !Array.isArray(report.preReview.evidence) ||
+    report.preReview.evidence.length === 0 ||
+    !report.preReview.evidence.every(evidenceReference) ||
+    !specific(report.preReview.necessityAndScope) ||
+    !specific(report.preReview.intentMatch) ||
+    !Array.isArray(report.preReview.profiles) ||
+    !report.preReview.profiles.includes("global")
+  ) {
+    errors.push("preReview requires grounded intent, evidence, necessity/scope, and intent-match analysis");
+  }
 
   const expectedHead = options.get("--expected-head");
   if (expectedHead && report.reviewedHead !== expectedHead) errors.push("reviewedHead does not match current HEAD");
@@ -184,6 +201,12 @@ function validate(report, options) {
     const coverageFiles = [...coveredPaths].sort();
     if (!sameStrings(expectedFiles, riskFiles)) errors.push("riskMap paths do not exactly match Git changed files");
     if (!sameStrings(expectedFiles, coverageFiles)) errors.push("coverage.changedFiles paths do not exactly match Git changed files");
+    if (
+      expectedFiles.some((file) => file.startsWith("sp-client/")) &&
+      !report.preReview?.profiles?.includes("sp-client")
+    ) {
+      errors.push("sp-client changes require the sp-client review profile");
+    }
   }
 
   const dimensions = report.coverage?.dimensions;
@@ -253,6 +276,7 @@ function validate(report, options) {
       !Number.isInteger(finding.line) ||
       finding.line < 1 ||
       !nonEmpty(finding.description) ||
+      (finding.severity === "Minor" && !finding.description.startsWith("Nit: ")) ||
       !nonEmpty(finding.impact) ||
       !nonEmpty(finding.suggestedFix) ||
       !Array.isArray(finding.evidence) ||

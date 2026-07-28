@@ -167,6 +167,16 @@ const checks = [
     ]
   },
   {
+    file: "docs/sp-client-review-profile.md",
+    snippets: [
+      "Do not mechanically demand a new killswitch, flight, experiment, log, or document for every diff.",
+      "Activated means old/fallback behavior; not activated means new behavior.",
+      "never module evaluation",
+      "bundle delta of 2 KB or more is a review trigger",
+      "Use `Nit:` only for optional education."
+    ]
+  },
+  {
     file: "copilot/agents/reviewer.agent.md",
     snippets: [
       "Pass 1: immutable scope and risk",
@@ -174,7 +184,8 @@ const checks = [
       "direct callers/consumers",
       "Any Critical or Important → `REQUEST_CHANGES`.",
       "artifactJsonPath",
-      "Never APPROVE without complete evidence."
+      "Never APPROVE without complete evidence.",
+      "sp-client-review-profile.md"
     ]
   },
   {
@@ -183,7 +194,9 @@ const checks = [
       "validate-review-report.mjs",
       "classify it as `reviewer-spec`",
       "REQUEST_CHANGES with any Critical or Important finding",
-      "Draft status and AUTO mode do not bypass the review quality gate."
+      "Draft status and AUTO mode do not bypass the review quality gate.",
+      "When changed files include `sp-client/`, add a concise `Buddy Test Cases` section",
+      "Never invent a manual result."
     ]
   },
   {
@@ -193,7 +206,8 @@ const checks = [
       "Pass 2: adversarial verification",
       "Critical or Important present → `REQUEST_CHANGES`.",
       "review.json",
-      "Never APPROVE without complete evidence."
+      "Never APPROVE without complete evidence.",
+      "sp-client-review-profile.md"
     ]
   },
   {
@@ -206,7 +220,9 @@ const checks = [
       "Only after the evaluator result and artifacts are final",
       "Dispatch review only after final evaluation artifacts exist.",
       "actual planPath returned by ow-planner",
-      "Review validation is an explicit read-only Bash exception"
+      "Review validation is an explicit read-only Bash exception",
+      "For `sp-client/` changes, include a concise `Buddy Test Cases` section",
+      "Never claim an unexecuted manual result."
     ]
   },
   {
@@ -510,6 +526,7 @@ const orderedChecks = [
 const mirroredChecks = [
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
+  ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
   ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"]
 ];
 

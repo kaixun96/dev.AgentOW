@@ -614,7 +614,7 @@ description: |
 
 If the description exceeds 30 lines, cut content. Concrete > comprehensive. Reviewers skim; respect their time.
 
-Do NOT include a "Testing" / "Test plan" section in the description — the team uses its own validation channels and the auto-generated test plan adds noise.
+Do NOT include a generic "Testing" / "Test plan" section in the description — the team uses its own validation channels and an auto-generated plan adds noise. For `sp-client/` changes, include a concise `Buddy Test Cases` section grounded in actual evaluator evidence: Given/When/Then scenarios for the happy path, rollback/disabled state when gated, and a relevant edge case. Never claim an unexecuted manual result.
 
 Capture the returned `prId` and `prUrl`.
 

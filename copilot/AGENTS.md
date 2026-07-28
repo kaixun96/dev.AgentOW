@@ -55,7 +55,7 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 - Context evidence is append-only. Plan intent, actual code, evaluation, review, and later feedback must remain distinguishable.
 - Context maintenance is non-blocking. It follows the linked library's `auto-commit`, `patch-only`, or `disabled` policy and never adds a user prompt to interactive, AUTO, or batch execution.
 - Session bootstrap runs before planning. It installs only fixed packages from the trusted local odsp-web marketplace, redacts evidence, and stops once when newly installed MCP/settings require a host restart.
-- Review follows `docs/review-contract.md`. APPROVE requires validated current-diff identity, every changed file, every canonical coverage dimension, and an adversarial second pass. Critical and Important findings block PR creation in every mode.
+- Review follows `docs/review-contract.md` plus path-scoped profiles such as `docs/sp-client-review-profile.md`. APPROVE requires validated current-diff identity, every changed file, every canonical coverage dimension, and an adversarial second pass. Critical and Important findings block PR creation in every mode.
 
 ## Progress log event contract
 

@@ -11,6 +11,7 @@ fs.writeFileSync(changedFilesPath, "src/example.ts\n");
 
 const dimensionNames = [
   "behavior",
+  "designMaintainability",
   "callersConsumers",
   "tests",
   "typesContracts",
@@ -20,12 +21,14 @@ const dimensionNames = [
   "accessibilityUi",
   "localization",
   "compatibilityKillswitch",
+  "telemetry",
   "repoInstructionsContext",
   "dependenciesTooling",
 ];
 const dimensions = {};
 const dimensionConclusions = {
   behavior: "Behavior and state transitions preserve the intended implementation flow",
+  designMaintainability: "Design and maintainability avoid deprecated APIs, duplication, and hardcoded behavior",
   callersConsumers: "Direct caller and consumer usage preserves the returned value contract",
   tests: "Test coverage asserts both empty and populated result branches",
   typesContracts: "Type and interface contracts remain compatible with existing API usage",
@@ -35,6 +38,7 @@ const dimensionConclusions = {
   accessibilityUi: "Accessibility and UI behavior are unaffected by this non-visual change",
   localization: "Localization resources and user-facing strings remain unchanged",
   compatibilityKillswitch: "Backward compatibility and rollback behavior remain intact",
+  telemetry: "Telemetry and logging preserve stable events without sensitive payloads",
   repoInstructionsContext: "Repository instructions and documented conventions are satisfied",
   dependenciesTooling: "Dependency, build, and tooling configuration remain unchanged",
 };
@@ -54,6 +58,13 @@ function makeReport() {
     diffDigest: "c".repeat(64),
     verdict: "APPROVE",
     summary: "Reviewed the behavior and its direct consumer.",
+    preReview: {
+      intent: "Preserve the public return contract while handling empty results",
+      evidence: ["artifact:planning/planner-report.md"],
+      necessityAndScope: "The focused change is necessary to prevent valid empty results from crashing callers",
+      intentMatch: "The implementation matches the stated behavior and does not expand beyond the affected path",
+      profiles: ["global"],
+    },
     riskMap: [{ path: "src/example.ts", risk: "medium", rationale: "Changes a public return value" }],
     coverage: {
       changedFiles: [
@@ -118,6 +129,25 @@ assert.equal(validate(rubberStamp).status, 1, "incomplete coverage should fail")
 const stale = makeReport();
 stale.reviewedHead = "d".repeat(40);
 assert.equal(validate(stale).status, 1, "stale HEAD should fail");
+
+const missingOrientation = makeReport();
+delete missingOrientation.preReview;
+assert.equal(validate(missingOrientation).status, 1, "missing pre-review intent and scope analysis should fail");
+
+fs.writeFileSync(changedFilesPath, "sp-client/src/example.ts\n");
+const missingSpClientOrientation = makeReport();
+delete missingSpClientOrientation.preReview;
+missingSpClientOrientation.riskMap[0].path = "sp-client/src/example.ts";
+missingSpClientOrientation.coverage.changedFiles[0].path = "sp-client/src/example.ts";
+assert.equal(validate(missingSpClientOrientation).status, 1, "missing sp-client pre-review data should fail without crashing");
+
+const missingSpClientProfile = makeReport();
+missingSpClientProfile.riskMap[0].path = "sp-client/src/example.ts";
+missingSpClientProfile.coverage.changedFiles[0].path = "sp-client/src/example.ts";
+assert.equal(validate(missingSpClientProfile).status, 1, "sp-client changes require the scoped profile");
+missingSpClientProfile.preReview.profiles.push("sp-client");
+assert.equal(validate(missingSpClientProfile).status, 0, "explicit sp-client profile should satisfy scoped review");
+fs.writeFileSync(changedFilesPath, "src/example.ts\n");
 
 const incompleteScope = makeReport();
 incompleteScope.riskMap[0].path = "src/other.ts";
@@ -221,7 +251,7 @@ minor.findings.push({
   category: "maintainability",
   path: "src/example.ts",
   line: 1,
-  description: "Local name obscures the returned value",
+  description: "Nit: Local name obscures the returned value",
   impact: "Small readability cost with no behavioral risk",
   suggestedFix: "Use the domain term already used by callers",
   evidence: ["src/example.ts:1"],
@@ -229,6 +259,22 @@ minor.findings.push({
 minor.counts.minor = 1;
 minor.verdict = "COMMENT";
 assert.equal(validate(minor).status, 0, "Minor-only review should comment");
+
+const mandatoryNit = makeReport();
+mandatoryNit.findings.push({
+  id: "R1",
+  severity: "Minor",
+  category: "maintainability",
+  path: "src/example.ts",
+  line: 1,
+  description: "Local name obscures the returned value",
+  impact: "Small readability cost with no behavioral risk",
+  suggestedFix: "Use the domain term already used by callers",
+  evidence: ["src/example.ts:1"],
+});
+mandatoryNit.counts.minor = 1;
+mandatoryNit.verdict = "COMMENT";
+assert.equal(validate(mandatoryNit).status, 1, "Minor educational comments must use the Nit prefix");
 
 fs.rmSync(tempDir, { recursive: true });
 console.log("review report validator fixtures passed");

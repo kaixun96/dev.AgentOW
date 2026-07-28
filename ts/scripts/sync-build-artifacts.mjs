@@ -46,6 +46,10 @@ fs.copyFileSync(
   path.join(repoRoot, "docs", "review-contract.md"),
   path.join(repoRoot, "copilot", "docs", "review-contract.md"),
 );
+fs.copyFileSync(
+  path.join(repoRoot, "docs", "sp-client-review-profile.md"),
+  path.join(repoRoot, "copilot", "docs", "sp-client-review-profile.md"),
+);
 console.log("copilot MCP dist synced");
 
 const pluginJson = JSON.parse(
