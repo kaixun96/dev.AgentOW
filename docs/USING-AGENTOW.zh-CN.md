@@ -150,8 +150,6 @@ copilot plugin marketplace add kaixun96/dev.AgentOW
 copilot plugin install agentow-copilot@agentOW
 ```
 
-Copilot CLI 需要先完成 `copilot auth`。
-
 首次在一个 Claude/Copilot terminal session 中运行 agentOW 时，会先执行自动 Bootstrap：
 
 - 自动安装本地可信 marketplace 中缺失的 Playwright、ODSP 基础 MCP 和 Review 插件；
