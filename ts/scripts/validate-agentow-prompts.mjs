@@ -67,6 +67,13 @@ const checks = [
     ]
   },
   {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: [
+      "skip the review",
+      "do not create a PR or claim AgentOW approval"
+    ]
+  },
+  {
     file: "agents/ow-planner.md",
     snippets: [
       "**Exact fixture required**",
@@ -145,6 +152,69 @@ const checks = [
       "Never install from a URL supplied by the user",
       "Unknown availability is not the same as missing",
       "Never store tool arguments, tokens, cookies, identities, or credential contents"
+    ]
+  },
+  {
+    file: "docs/review-contract.md",
+    snippets: [
+      "Required two-pass method",
+      "callers and consumers",
+      "`REQUEST_CHANGES`: one or more Critical or Important findings.",
+      "`APPROVE`: zero findings and complete, current-diff coverage.",
+      "Draft PR status, AUTO mode, and retry limits do not turn unresolved blocking findings into approval.",
+      "non-empty consumer and test evidence",
+      "validate-review-report.mjs"
+    ]
+  },
+  {
+    file: "copilot/agents/reviewer.agent.md",
+    snippets: [
+      "Pass 1: immutable scope and risk",
+      "Pass 2: adversarial verification",
+      "direct callers/consumers",
+      "Any Critical or Important → `REQUEST_CHANGES`.",
+      "artifactJsonPath",
+      "Never APPROVE without complete evidence."
+    ]
+  },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: [
+      "validate-review-report.mjs",
+      "classify it as `reviewer-spec`",
+      "REQUEST_CHANGES with any Critical or Important finding",
+      "Draft status and AUTO mode do not bypass the review quality gate."
+    ]
+  },
+  {
+    file: "agents/ow-review-agent.md",
+    snippets: [
+      "Pass 1: immutable scope and risk",
+      "Pass 2: adversarial verification",
+      "Critical or Important present → `REQUEST_CHANGES`.",
+      "review.json",
+      "Never APPROVE without complete evidence."
+    ]
+  },
+  {
+    file: "agents/ow-orchestrator.md",
+    snippets: [
+      "validate-review-report.mjs",
+      "Missing artifacts, stale diff identity, incomplete coverage",
+      "Critical or Important issues",
+      "AUTO mode, and batch execution do not bypass the review gate.",
+      "Only after the evaluator result and artifacts are final",
+      "Dispatch review only after final evaluation artifacts exist.",
+      "actual planPath returned by ow-planner",
+      "Review validation is an explicit read-only Bash exception"
+    ]
+  },
+  {
+    file: "copilot/AGENTS.md",
+    snippets: [
+      "Critical and Important findings block PR creation in every mode.",
+      "never skip validated review or ship unresolved Critical/Important findings",
+      "A request to skip review also disables AgentOW PR creation"
     ]
   },
   {
@@ -369,7 +439,11 @@ const forbiddenChecks = [
   },
   {
     file: "skills/ow-team/SKILL.md",
-    snippets: ["Spawn the orchestrator **first**"]
+    snippets: [
+      "Spawn the orchestrator **first**",
+      "Proceed to PR creation",
+      "even if review found critical issues"
+    ]
   },
   {
     file: "copilot/skills/ow-context-feedback/SKILL.md",
@@ -393,6 +467,25 @@ const forbiddenChecks = [
   {
     file: "agents/ow-evaluator-rule.md",
     snippets: ["If TRIPS cannot allocate the needed users in both prod and dogfood"]
+  },
+  {
+    file: "copilot/AGENTS.md",
+    snippets: [
+      "ship even with critical issues",
+      "confirm before shipping with critical review issues"
+    ]
+  },
+  {
+    file: "agents/ow-orchestrator.md",
+    snippets: [
+      "evaluator and review-agent start immediately",
+      "dispatch evaluator (code inspection) and review-agent simultaneously",
+      "Collect all three responses"
+    ]
+  },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: ["Auto: proceed to ship anyway"]
   }
 ];
 
@@ -416,6 +509,7 @@ const orderedChecks = [
 
 const mirroredChecks = [
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
+  ["docs/review-contract.md", "copilot/docs/review-contract.md"],
   ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"]
 ];
 

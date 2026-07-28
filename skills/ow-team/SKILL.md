@@ -28,10 +28,10 @@ Check the skill arguments and user prompt for the `--auto` flag:
 
 Set `{autoMode}` = `true` or `false`.
 
-| Mode | Brainstorm | Plan approval | Review critical confirmation |
-|------|-----------|---------------|------------------------------|
-| **Interactive** (default) | ✅ runs | ✅ asks user | ✅ asks user |
-| **Auto** (`--auto`) | ❌ skipped | ❌ auto-approve | ❌ auto-proceed (still fixes within cycle limit) |
+| Mode | Brainstorm | Plan approval | Review quality gate |
+|------|-----------|---------------|---------------------|
+| **Interactive** (default) | ✅ runs | ✅ asks user | ✅ Critical/Important must be fixed |
+| **Auto** (`--auto`) | ❌ skipped | ❌ auto-approve | ✅ Critical/Important must be fixed |
 
 **Announce the mode to the user immediately, before any other work.** This is mandatory — the user must know upfront which mode is active.
 
@@ -47,7 +47,7 @@ If INTERACTIVE MODE:
 💬 INTERACTIVE MODE — you will be asked to:
    1. Confirm intent during brainstorming (a few questions)
    2. Approve the implementation plan
-   3. Decide whether to proceed if review finds critical issues
+   3. Review Critical and Important findings are fixed before PR creation
    To skip all prompts next time, use: /ow-team --auto
 ```
 
@@ -286,9 +286,8 @@ prompt:
   If autoMode is true:
   - SKIP plan approval (Step 1a). Auto-approve immediately and tell
     the planner "approved" via SendMessage.
-  - SKIP review critical confirmation (Step 5b). Proceed to PR creation
-    even if review found critical issues. The PR is draft, so a human
-    can review before publishing.
+  - Do not bypass review. Critical or Important findings must be fixed
+    and a fresh review must validate the final HEAD before PR creation.
   - Do NOT call AskUserQuestion at all in auto mode.
 
   Team members (already spawned and waiting for your instructions):

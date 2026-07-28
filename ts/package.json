@@ -6,9 +6,10 @@
     "agentow": "./dist/ow/index.js"
   },
   "scripts": {
-    "build": "npm run validate-prompts && tsup && npm run sync-artifacts",
+    "build": "npm run validate-prompts && npm run validate-review-contract && tsup && npm run sync-artifacts",
     "sync-artifacts": "node scripts/sync-build-artifacts.mjs",
     "validate-prompts": "node scripts/validate-agentow-prompts.mjs",
+    "validate-review-contract": "node scripts/validate-review-report.test.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/ow/index.ts mcp"
   },

@@ -51,7 +51,7 @@ SendMessage to team-lead:
 | `ow-evaluator` | Verify (dry-run + code-inspection mode only): pre-flight plan contract + non-UI criteria. Kept for backward compatibility. |
 | `ow-evaluator-rule` | Verify (UI rule half): probe parsing, aria-diff, pixel-diff, structural-diff, axe, hard gates. Has code/plan/probe access. |
 | `ow-evaluator-vision` | Verify (UI vision half): cold-eye review of AFTER PNG with NO code/plan/probe access. Catches occlusion, overflow, alignment. |
-| `ow-review-agent` | Review: pre-PR code review (optional, on user request) |
+| `ow-review-agent` | Review: mandatory evidence-backed pre-PR quality gate |
 | `ow-context-maintainer` | Maintain linked context from plan, code, evaluation, review, and later feedback |
 
 ## Pipeline Architecture
@@ -61,14 +61,15 @@ The pipeline uses **parallel dispatch** to minimize wall-clock time:
 ```
 Planner → [approval] → Generator
                           │
-                      code_done ──┬──→ Evaluator (code inspection)
-                          │       └──→ Review-agent (git diff)
+                      code_done ─────→ Evaluator (code inspection)
                       build_done ───→ Evaluator (UI verification, if needed)
+                          │
+                     evaluation PASS → Review-agent
                           │
                       Final Assessment
 ```
 
-After the generator commits code (`code_done`), the evaluator and review-agent start immediately — **in parallel with the build**. This saves 1–3 minutes of wall-clock time compared to serial execution.
+After `code_done`, code inspection starts in parallel with the build. Review starts only after evaluation artifacts are final, so it can cross-check the committed diff against verified behavior.
 
 ## Workflow
 
@@ -120,7 +121,7 @@ Mandatory log events (one line each, with timestamp prefix):
 | Dry-run verdict | `✅ Plan dry-run READY` or `⚠️ Plan dry-run REVISE (N concerns)` |
 | Generator dispatched | `🔨 Generator started (cycle N)` |
 | code_done received | `🔨 code_done — branch <name> @ <sha>` |
-| Parallel dispatch | `⚡ Parallel dispatch: evaluator (code inspection) + review-agent` |
+| Parallel dispatch | `⚡ Parallel dispatch: evaluator code inspection + generator build` |
 | Each of the 3 parallel responses | `✅ Received: <agent> — <verdict>` |
 | build_done | `✅ Build passed` or `❌ Build failed` |
 | UI verification start | `🔍 UI verification started — dual evaluator (rule + vision)` |
@@ -298,16 +299,14 @@ When you receive `code_done`, write progress:
 echo "[$(date +%H:%M:%S)] 🔨 Generator: code_done — code committed, build in progress" >> {progressLog}
 ```
 
-### Step 3: Parallel Dispatch (on `code_done`)
+### Step 3: Parallel Code Inspection (on `code_done`)
 
-**This is the key optimization: while the generator is still building, start code inspection and review in parallel.**
+While the generator is still building, start evaluator code inspection. Do not start review yet; it requires final evaluator artifacts.
 
 Write progress:
 ```bash
-echo "[$(date +%H:%M:%S)] ⚡ Parallel dispatch: evaluator (code inspection) + review-agent" >> {progressLog}
+echo "[$(date +%H:%M:%S)] ⚡ Parallel dispatch: evaluator code inspection + generator build" >> {progressLog}
 ```
-
-Send messages to **both** agents simultaneously:
 
 **To `ow-evaluator`:**
 ```
@@ -319,25 +318,16 @@ contextLinkPath: <contextLinkPath>
 contextDocuments: <latest routed document paths>
 ```
 
-**To `ow-review-agent`:**
-```
-reportFile: <reportFile>
-branch: <branch>
-contextLinkPath: <contextLinkPath>
-contextDocuments: <latest routed document paths>
-```
-
-Now **wait and collect THREE responses** (they arrive in any order):
+Now **wait and collect TWO responses** (they arrive in any order):
 1. **`build_done`** from `ow-generator` — build/test/dev-server result
 2. **Code inspection result** from `ow-evaluator`
-3. **Review result** from `ow-review-agent`
 
 Track which responses you've received. As each arrives, log progress:
 ```bash
 echo "[$(date +%H:%M:%S)] ✅ Received: <agent name> — <brief status>" >> {progressLog}
 ```
 
-**Do NOT proceed to Step 4 until all three responses are collected.**
+**Do NOT proceed to Step 4 until both responses are collected.**
 
 **⚠️ Watchdog — a teammate can drop a response and deadlock you (this has happened).** You go idle while waiting, so you cannot self-time-out — but whenever you are re-activated by ANY incoming message while a response is still outstanding (a teammate's idle ping, a relayed nudge from `team-lead`, anything), do NOT blindly resume waiting. First read `report.json` AND check ground truth for the missing piece:
 - For a missing `build_done`: check the generator's dev-server start log (e.g. `tail /tmp/*rushstart*.log`) for `[WATCHING]` / "Content is being served" — that means the **build PASSED** even though `build_done` was never sent.
@@ -346,7 +336,7 @@ If the prerequisite is met but the message was dropped: **re-prompt that teammat
 
 ### Step 4: Process Build Result
 
-After collecting all three responses:
+After collecting both responses:
 
 **If generator `buildStatus` is `"failure"`:**
 ```bash
@@ -477,16 +467,17 @@ Read `reportFile` for structured NDJSON data.
    - Require `coverageManifest`.
    - Missing/incomplete coverage → redispatch only the rule evaluator in the same implementation cycle. Do not invoke generator, rebuild, retest, increment the product cycle, or create a PR.
    - Complete coverage with no eligible candidate → convert to `target: external`; do not invoke generator.
-2. If all blockers are tagged `target: external`:
+2. If all blockers are tagged `target: external`, continue only when `failureKind == "fixture-gap"` and the evaluator supplied a validator-confirmed complete `coverageManifest` proving every discovered candidate was probed and no eligible candidate exists:
    - Interactive mode: show the coverage summary and ask whether to ship a draft with the external blocker.
    - Auto/batch mode: continue only as `success-with-blockers`, preserving the complete manifest in `report.json`, `final.md`, and the PR description.
+   - Any other external-tagged failure stops without creating a PR.
 3. If all blockers are tagged `target: evaluator-spec`:
    - Redispatch only `ow-evaluator-rule` with the unchanged implementation `cycle` and the spec blockers.
    - Do not invoke generator, rebuild, retest, increment the product cycle, or go back to the generator entry step.
 4. Otherwise apply the product retry limit:
    - If `cycle >= 5`:
-     - Inform user: "Max retry cycles reached. Remaining blockers: ..."
-     - Ask user for guidance
+     - Stop and report: "Max retry cycles reached. Remaining blockers: ..."
+     - Do not create a PR in any mode. Only the separately handled complete external fixture gap may continue as `success-with-blockers`.
    - If `cycle < 5`:
      ```bash
      echo "[$(date +%H:%M:%S)] ⚠️  Evaluation FAIL — starting fix cycle <N+1>" >> {progressLog}
@@ -505,22 +496,53 @@ Read `reportFile` for structured NDJSON data.
 echo "[$(date +%H:%M:%S)] ⚠️  3+ consecutive cycles blame spec, not code — evaluator may be hiding real visual-quality regressions behind tooling excuses. Inspect visual-result.json blockers manually." >> {progressLog}
 ```
 
-**If evaluator result is PASS but review-agent verdict is REQUEST_CHANGES with critical issues:**
+#### Step 6a: Evidence-backed review after final evaluation
 
-Treat review critical issues as fix-worthy — they often catch real problems (killswitch direction, type weakening, missing tests, security issues) that evaluator's UI verification would not detect.
+Only after the evaluator result and artifacts are final, send this for both evaluator PASS and the separately validated complete external fixture-gap path. A fixture gap changes the final status to `success-with-blockers`; it never bypasses review.
+
+```text
+SendMessage to ow-review-agent:
+  reportFile: <reportFile>
+  branch: <branch>
+  contextLinkPath: <contextLinkPath>
+  contextDocuments: <latest routed document paths>
+  planPath: <actual planPath returned by ow-planner>
+  implementationEvidencePath: <reportFile; use generator code_done/build_done records plus committed diff>
+  evaluationArtifactPaths:
+    - <evalReportPath from ow-evaluator NDJSON>
+    - <ruleFindingsPath when UI verification ran>
+    - <visionFindingsPath when UI verification ran>
+```
+
+Wait for the reviewer response, then read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`, recompute Git scope, and validate:
+
+```bash
+mergeBase=$(git merge-base origin/main HEAD)
+git diff --name-only "$mergeBase"...HEAD > {sessionDir}/review-changed-files.txt
+node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
+  {sessionDir}/review.json \
+  --expected-head "$(git rev-parse HEAD)" \
+  --expected-diff-digest "$(git diff "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
+  --changed-files {sessionDir}/review-changed-files.txt
+```
+
+Missing artifacts, stale diff identity, incomplete coverage, or validator failure is `reviewer-spec`. Re-dispatch only `ow-review-agent` once against the unchanged implementation cycle with the validation errors. If retry validation fails, stop; never create a PR from an unsupported review.
+
+**If the final evaluator state is PASS or a validated complete external fixture gap, but review-agent verdict is REQUEST_CHANGES with Critical or Important issues:**
+
+Treat all review Critical and Important issues as fix-worthy. They represent credible merge defects, including killswitch direction, type weakening, consumer impact, missing tests, accessibility, performance, security, and instruction non-compliance.
 
 **Within cycle limit (`cycle < 5`):** always go back to fix, regardless of mode.
 ```bash
-echo "[$(date +%H:%M:%S)] ⚠️  Review REQUEST_CHANGES (critical: {N}) — starting fix cycle <N+1>" >> {progressLog}
+echo "[$(date +%H:%M:%S)] ⚠️  Review REQUEST_CHANGES ({critical} critical, {important} important) — starting fix cycle <N+1>" >> {progressLog}
 ```
-- Compose blockers from review's critical findings (each finding becomes a blocker with `description` and `suggestedFix`).
+- Compose blockers from every Critical and Important finding.
 - Go back to **Step 2** with `cycle = N + 1` and the review blockers.
 
 **At cycle limit (`cycle >= 5`):**
-- **Interactive mode:** proceed to Step 7 anyway, let user decide via Step 7b.
-- **Auto mode:** proceed to Step 7 anyway. The PR will still be created as draft, with critical findings logged in progress.log and review.md so a human reviewer can address them post-PR. We do not loop forever to avoid runaway costs.
+- Stop and report unresolved blocking findings in every mode. Draft status, AUTO mode, and batch execution do not bypass the review gate.
 
-**If evaluator result is PASS and review verdict is APPROVE / COMMENT / REQUEST_CHANGES with only warnings:**
+**If the final evaluator state is PASS or a validated complete external fixture gap, and review verdict is APPROVE / COMMENT (Minor only):**
 ```bash
 echo "[$(date +%H:%M:%S)] ✅ ALL PASS — evaluation + review complete" >> {progressLog}
 ```
@@ -554,16 +576,7 @@ If superpowers is not available, skip this step.
 
 Combine findings from ow-review-agent (already received in Step 3) and deep review (if run). Use the **stricter** verdict:
 
-**If `autoMode` is true:**
-- Critical issues are logged to progress.log but do NOT block the PR.
-- The PR is created as draft, so a human reviewer can decide whether to publish.
-- Skip user confirmation entirely.
-
-**If `autoMode` is false (interactive):**
-- If either review has `REQUEST_CHANGES` with critical issues:
-  - SendMessage to `team-lead`: "[USER QUESTION] Reviews found {N} critical issues: <list findings>. Create PR anyway? (yes/no)"
-  - Wait for team-lead to relay the user's reply
-  - If no → stop and report
+If either review has unresolved Critical or Important findings, stop in every mode. Optional deep review may strengthen but never weaken the canonical validated reviewer verdict. Only `APPROVE` or `COMMENT` with Minor-only findings can proceed.
 
 #### Step 7c: Create PR (if requested)
 
@@ -673,9 +686,7 @@ ow-pr-attach({
 })
 ```
 
-If `visualValidation.status == "failed"`, log the failure but proceed — the PR is still valid, the screenshots just couldn't be captured:
-
-This path is forbidden when `failureKind == "environment-discovery-incomplete"` or the coverage manifest is missing/incomplete. Those states block PR creation. A complete `fixture-gap` may proceed only under the Step 6 interactive or auto/batch policy and must include the coverage summary.
+If `visualValidation.status == "failed"`, PR creation is forbidden unless `failureKind == "fixture-gap"` and Step 6 validated a complete coverage manifest. Only that external fixture-gap path may proceed as `success-with-blockers`; include its coverage summary.
 
 ```
 ow-pr-attach({
@@ -767,11 +778,12 @@ The codespace may have additional MCP plugins installed. Leverage them when avai
 ## Rules
 
 - **CONTINUOUS EXECUTION:** The entire pipeline must run as one continuous orchestration flow. After sending `SendMessage` to a teammate, ALWAYS wait for their response message before doing anything else. Never go idle between pipeline steps — idle agents break the chain and require manual intervention. **BUT a dropped teammate message must never deadlock you forever: whenever you are re-activated while a response is outstanding, run the Step 3 Watchdog (check `report.json` + ground truth, re-prompt once, then proceed) instead of silently re-waiting.**
-- **PARALLEL DISPATCH:** After receiving `code_done` from the generator, dispatch evaluator (code inspection) and review-agent simultaneously. Collect all three responses (build_done + evaluator + review) before proceeding.
+- **PARALLEL DISPATCH:** After `code_done`, run evaluator code inspection in parallel with the generator build. Dispatch review only after final evaluation artifacts exist.
 - **You do NOT read, write, or edit source code files under /workspaces/odsp-web.** All investigation, coding, building, and testing is delegated to subagents.
 - **Read is restricted to session files only:** `report.json`, `progress.log`, plan files under `{planDir}`, and evaluation reports. Never Read source code (`.ts`, `.tsx`, `.js`, `.json` under `/workspaces/odsp-web/sp-client/`, `/workspaces/odsp-web/odsp-next/`, etc.).
 - **NEVER** build, test, or run rush commands yourself.
 - **ONLY** use: `ow-status`, `ow-session-list`, `Read` (session files only), `Bash` (for mkdir/echo/cat/tail on session files).
+- Review validation is an explicit read-only Bash exception: `git merge-base`, `git rev-parse`, `git diff --name-only`, `git diff`, `sha256sum`, `cut`, and `node .../validate-review-report.mjs` are allowed only for the mandatory review gate.
 - Context repository operations are the only exception to the session-only Bash rule. They must follow `docs/context-maintenance.md`, the snapshotted manifest, allowed targets, and compare-and-swap base checks.
 - Always read `reportFile` after each agent completes to get structured output.
 - Parse NDJSON by reading the last line of the report file.

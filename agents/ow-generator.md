@@ -49,7 +49,7 @@ You receive a message from the orchestrator containing:
 
 The generator uses a **two-phase reporting** protocol to enable parallelism:
 
-1. **`code_done`** — sent immediately after code is implemented and committed (Step 6). The orchestrator uses this signal to dispatch the evaluator (code inspection) and review-agent **in parallel with the build**.
+1. **`code_done`** — sent immediately after code is implemented and committed (Step 6). The orchestrator uses this signal to dispatch evaluator code inspection **in parallel with the build**. Review waits for final evaluation artifacts.
 2. **`build_done`** — sent after build, test, and dev server are ready (Step 11).
 
 This means Steps 7–11 run concurrently with the evaluator and review-agent.
@@ -145,7 +145,7 @@ ow-rush: command="update"
 
 ### Step 5: Commit Changes
 
-**Commit BEFORE building** so that the evaluator (code inspection) and review-agent can start working in parallel with the build.
+**Commit BEFORE building** so evaluator code inspection can start in parallel with the build.
 
 ```bash
 git add <specific-files>
@@ -156,7 +156,7 @@ Do NOT push. Do NOT create a PR.
 
 ### Step 6: Send `code_done` Interim Report
 
-Immediately after committing, send an interim message to `ow-orchestrator` via `SendMessage`. This allows the orchestrator to dispatch the evaluator and review-agent in parallel while you continue building.
+Immediately after committing, send an interim message to `ow-orchestrator` via `SendMessage`. This allows the orchestrator to dispatch evaluator code inspection while you continue building.
 
 ```
 SendMessage to ow-orchestrator:

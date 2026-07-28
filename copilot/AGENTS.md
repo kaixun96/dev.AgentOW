@@ -44,16 +44,18 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 │   └── apply/
 ├── capabilities.json
 ├── review.md
+├── review.json
 └── final.md
 ```
 
 - `progress.log` is mandatory and user-visible. Append a timestamped line before every state transition. Treat it as a first-class product surface, not debug noise.
 - `report.json` is NDJSON. Append one JSON object for planner, each implementation cycle, evaluator, reviewer, and final status.
-- `planning/planner-report.md`, `implementation/iter<N>.md`, `evaluation/iter<N>/evaluator-report.md`, `review.md`, and `final.md` are mandatory unless the run stops before that phase.
+- `planning/planner-report.md`, `implementation/iter<N>.md`, `evaluation/iter<N>/evaluator-report.md`, `review.md`, `review.json`, and `final.md` are mandatory unless the run stops before that phase.
 - `context/link.json` is mandatory and records either a resolved context library or `status: "unlinked"`.
 - Context evidence is append-only. Plan intent, actual code, evaluation, review, and later feedback must remain distinguishable.
 - Context maintenance is non-blocking. It follows the linked library's `auto-commit`, `patch-only`, or `disabled` policy and never adds a user prompt to interactive, AUTO, or batch execution.
 - Session bootstrap runs before planning. It installs only fixed packages from the trusted local odsp-web marketplace, redacts evidence, and stops once when newly installed MCP/settings require a host restart.
+- Review follows `docs/review-contract.md`. APPROVE requires validated current-diff identity, every changed file, every canonical coverage dimension, and an adversarial second pass. Critical and Important findings block PR creation in every mode.
 
 ## Progress log event contract
 
@@ -83,7 +85,7 @@ Use this exact style. Each line starts with `[HH:MM:SS]`, one emoji, and a short
 [HH:MM:SS] ❌ Evaluation FAIL — <reason>
 [HH:MM:SS] 📝 Reviewer started
 [HH:MM:SS] ✅ Review APPROVE
-[HH:MM:SS] ⚠️ Review REQUEST_CHANGES — <count> critical
+[HH:MM:SS] ⚠️ Review REQUEST_CHANGES — <critical> critical, <important> important
 [HH:MM:SS] 🧠 Context linked — <library id|unlinked>
 [HH:MM:SS] 🧠 Context plan update — <applied|no-update|patch-only|conflict|disabled>
 [HH:MM:SS] 🧠 Context as-built update — <applied|no-update|patch-only|conflict|disabled>
@@ -133,8 +135,8 @@ The `agentow` skill walks you through this in detail. It auto-loads when the use
 
 ## Modes
 
-- **Interactive** (default) — clarify intent, approve the plan, confirm before shipping with critical review issues. ~3-5 user touches.
-- **Auto** (`--auto` in the prompt) — skip all gates: no intent questions, auto-approve the plan, ship even with critical issues (PR is draft, a human reviews before publishing). Zero user touches.
+- **Interactive** (default) — clarify intent and approve the plan. Validated review remains mandatory; Critical and Important findings must be fixed.
+- **Auto** (`--auto` in the prompt) — skip intent and plan-approval questions, but never skip validated review or ship unresolved Critical/Important findings.
 - **Batch** (`/ow-batch`) — serial unattended loop over multiple main-session agentOW AUTO runs. Each task gets fresh bounded planner/evaluator/reviewer subagents, a checkpoint, and one summary row.
 
 ## Core principles
@@ -158,6 +160,6 @@ The `agentow` skill walks you through this in detail. It auto-loads when the use
 
 ## Instruction priority
 
-1. User's explicit instructions — highest. "Skip this" / "just do it" wins.
+1. User's explicit scope and delivery instructions — highest. A request to skip review also disables AgentOW PR creation; never label or ship unreviewed code as AgentOW-approved.
 2. This workflow — overrides default behavior.
 3. Default system prompt — lowest.

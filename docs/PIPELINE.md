@@ -133,16 +133,13 @@ team-lead (skill: /ow-team)
         │
         ▼  on code_done
    ┌────────────────────────────────────────────────────────────┐
-   │ Step 3: PARALLEL DISPATCH                                   │
+   │ Step 3: PARALLEL CODE INSPECTION                            │
    │                                                             │
-   │   ┌──────────────────────┐   ┌──────────────────────────┐   │
-   │   │ ow-evaluator         │   │ ow-review-agent          │   │
-   │   │ (code_inspection)    │   │ (git diff review)        │   │
-   │   └──────────────────────┘   └──────────────────────────┘   │
+   │   ow-evaluator (code_inspection)                            │
    │                                                             │
    │   meanwhile: ow-generator finishes build → build_done       │
    │                                                             │
-   │   collect all THREE responses before continuing             │
+   │   collect evaluator + build responses before continuing     │
    └────────────────────────────────────────────────────────────┘
         │
         ▼
@@ -252,7 +249,9 @@ team-lead (skill: /ow-team)
    │     • blockers tagged target:evaluator-spec → dispatch      │
    │       evaluator-rule only; generator idle                   │
    │     • vision blockers always target:generator (code defect) │
-   │   eval PASS + review REQUEST_CHANGES critical → fix cycle   │
+   │   eval PASS → evidence-backed ow-review-agent               │
+   │   review Critical/Important → fix cycle                     │
+   │   stale/incomplete review → reviewer-only retry             │
    │   eval PASS + review OK → Step 7                            │
    └────────────────────────────────────────────────────────────┘
         │
@@ -260,7 +259,7 @@ team-lead (skill: /ow-team)
    ┌────────────────────────────────────────────────────────────┐
    │ Step 7: PR creation (if user requested PR)                  │
    │   7a: optional deep review (superpowers skill)              │
-   │   7b: in interactive mode, confirm critical issues          │
+   │   7b: validated review.json must be APPROVE or Minor-only   │
    │   7c: ow-pr-create → draft PR                               │
    │   7c.2: ow-pr-attach BEFORE/AFTER screenshots               │
    │         HARD RULE: use appendToDescription, NOT             │
@@ -377,7 +376,7 @@ Each rule below the platform layer was extracted from a specific past-session fa
 | Plan approval (1a) | asks user | auto-approve |
 | Plan dry-run (1.5) | always runs | always runs |
 | Fix cycles | always run (max 5) | always run (max 5) |
-| Critical review confirmation (7b) | asks user | auto-proceed (PR is draft) |
+| Review quality gate (7b) | Critical/Important block | Critical/Important block |
 | PR creation | only if user asked | only if user asked |
 | PR screenshots placement | description (not comment) | description (not comment) |
 

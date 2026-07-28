@@ -205,7 +205,7 @@ Agent({
       - ow-review-agent
       - ow-context-maintainer
 
-    AUTO MODE: skip plan approval, skip review-critical confirmation.
+    AUTO MODE: skip plan approval, but never bypass validated review or unresolved Critical/Important findings.
 
     BATCH MODE — CRITICAL FINAL STEP:
     When the entire pipeline completes (PR created OR failure), you MUST

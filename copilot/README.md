@@ -73,6 +73,8 @@ copilot                                                               # interact
 > /ow-batch tasks.md
 ```
 
+Before PR creation, the reviewer performs a risk inventory and an adversarial second pass. Its `review.json` must prove coverage of every changed file, direct consumers, tests, repository/context instructions, and all canonical quality dimensions. Critical and Important findings block every mode until fixed and re-reviewed; AUTO and draft status do not bypass this gate.
+
 ## Needs verification (the spike)
 
 These are written per the conventions of working Copilot CLI plugins (ironflow-copilot, slidesshare), but each is an integration point I could not test from here. Verify before relying on the port:

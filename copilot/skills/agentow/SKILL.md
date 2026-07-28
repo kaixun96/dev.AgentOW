@@ -242,14 +242,14 @@ Before accepting any evaluator claim about auth, FIC, tenant suitability, test-p
 Before starting each fix cycle, append `[HH:MM:SS] 🔁 Fix cycle N+1 — <reason>`.
 
 **Product/code FAIL and cycle ≥ 5:**
-- Interactive: show the remaining blockers, ask the user how to proceed.
-- Auto: proceed to ship anyway (the PR is draft; a human reviews).
+- Stop and report the remaining blockers in every mode. Only the separately defined complete external fixture gap may continue as `success-with-blockers`.
 
 **PASS:** continue to Step 7.
 
 ## Step 7: Review (dispatch reviewer)
 
 Append `[HH:MM:SS] 📝 Reviewer started` before dispatching.
+Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`. The review is a hard evidence gate in interactive, AUTO, and batch execution.
 
 Dispatch `@agentow-copilot:reviewer` with:
 
@@ -260,21 +260,37 @@ sessionDir: /workspaces/odsp-web/.aero/<session>
 reportFile: /workspaces/odsp-web/.aero/<session>/report.json
 progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
 artifactPath: /workspaces/odsp-web/.aero/<session>/review.md
+artifactJsonPath: /workspaces/odsp-web/.aero/<session>/review.json
 contextDocuments:
   - <every routed feature/domain context document>
-planPath: /workspaces/odsp-web/.aero/<session>/plan.md
-implementationArtifactPath: /workspaces/odsp-web/.aero/<session>/implementation/iter<N>.md
-evaluatorArtifactPath: /workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md
+planPath: <actual planPath returned by the planner NDJSON record>
+implementationEvidencePath: /workspaces/odsp-web/.aero/<session>/report.json
+evaluationArtifactPaths:
+  - <every existing artifact path from the final evaluator NDJSON record, including artifactPath/evalReportPath/ruleFindingsPath/visionFindingsPath when present>
 ```
 
-Read the verdict. If `review.md` or the reviewer NDJSON line is missing, treat reviewer as failed.
+Read the final evaluator NDJSON record immediately before dispatch. Pass only artifact paths that the record actually returned and that exist; do not synthesize conventional paths. If the final evaluator record or its required artifacts are missing, classify it as `evaluator-spec` and stop or retry under Step 6 rather than reviewing stale evidence.
 
-**REQUEST_CHANGES with Critical issues:**
-- Within the cycle limit, treat critical review findings like evaluator blockers — go back to Step 6 and fix them (they catch things UI verification misses: killswitch direction, type weakening, security).
-- Interactive at the cycle limit: ask the user whether to ship anyway.
-- Auto at the cycle limit: ship (draft PR).
+After the reviewer returns, independently recompute the merge base, HEAD, diff digest, and changed-file list, then validate:
 
-**APPROVE / COMMENT / Important-or-Minor only:** continue.
+```bash
+mergeBase=$(git merge-base origin/main HEAD)
+git diff --name-only "$mergeBase"...HEAD > <sessionDir>/review-changed-files.txt
+node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
+  <sessionDir>/review.json \
+  --expected-head "$(git rev-parse HEAD)" \
+  --expected-diff-digest "$(git diff "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
+  --changed-files <sessionDir>/review-changed-files.txt
+```
+
+If `review.md`, `review.json`, or the reviewer NDJSON line is missing, or validation fails, classify it as `reviewer-spec`. Re-dispatch the reviewer once against the unchanged implementation cycle with the validation errors. Do not edit code, rebuild, retest, or consume a product fix cycle. If the retry still fails validation, stop; never ship an unsupported review.
+
+**REQUEST_CHANGES with any Critical or Important finding:**
+- Convert every blocking finding into a product blocker with its evidence and suggested fix.
+- If `cycle < 5`, go back to Step 6, fix, rebuild, retest, re-evaluate, and run a completely new review against the new HEAD.
+- At `cycle >= 5`, stop and report unresolved findings in every mode. Draft status and AUTO mode do not bypass the review quality gate.
+
+**APPROVE / COMMENT (Minor only):** continue.
 
 ## Step 8: Maintain context from the as-built result
 
@@ -292,7 +308,7 @@ No-update, patch-only, disabled, dirty-worktree, read-only, auth, or conflict ou
 
 1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no auto-generated "Testing" section).
 2. **Visual validation for UI changes:** prefer evaluator screenshots from the local `rush start` debug link because it is available immediately after implementation. If local debug validation captures BEFORE/AFTER successfully, attach those screenshots to the PR description. Only fall back to `ow-pr-debug-query` / `finalValidationMode=pr-cdn-fic` when local debug validation fails for environment/tooling reasons (for example localhost cert/assembly-load failure, missing browser MCP, or a surface that only reproduces against PR CDN).
-3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. The primary BEFORE/AFTER table in the PR description MUST embed the full-page/viewport `beforePath` and `afterPath`. Component crops may be attached as clearly labeled supplemental detail links, but must never replace the primary images. Include `visualValidation.source` in the PR description (`local-rush-start` or `pr-cdn-fic`) so reviewers know which path produced the images. If the evaluator did not capture valid full-page/viewport BEFORE/AFTER screenshots, do not present the run as visually verified; include the visual-validation failure reason in the PR description only if the user explicitly chooses to ship a draft anyway.
+3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. The primary BEFORE/AFTER table in the PR description MUST embed the full-page/viewport `beforePath` and `afterPath`. Component crops may be attached as clearly labeled supplemental detail links, but must never replace the primary images. Include `visualValidation.source` in the PR description (`local-rush-start` or `pr-cdn-fic`) so reviewers know which path produced the images. Missing or invalid full-page/viewport BEFORE/AFTER screenshots block PR creation unless Step 6 proved a complete external fixture gap; only that case may ship as `success-with-blockers` with the complete coverage manifest.
    - If visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.
 4. **Report** the PR URL to the user.
 
@@ -306,4 +322,4 @@ Append `[HH:MM:SS] ✅ Workflow complete` after `final.md` is written.
 
 - One feature/bug per run. For multiple, use `ow-batch`; it runs this pipeline serially in the main session and checkpoints between tasks.
 - Specs/plans stay local (`.aero/`), never committed, never referenced from code.
-- If the user says "skip the review" / "don't make a PR" / "just code it" — follow them. The user is in control.
+- If the user explicitly says "skip the review", do not dispatch reviewer and do not create a PR or claim AgentOW approval. Requests to avoid a PR or only edit code remain valid.

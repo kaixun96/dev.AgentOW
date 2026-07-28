@@ -138,7 +138,7 @@ copilot plugin update agentow-copilot@agentOW
 The team will:
 - Brainstorm with you to clarify intent (a few questions)
 - Ask you to approve the implementation plan
-- Confirm with you if review finds critical issues
+- Run an evidence-backed two-pass review before creating the PR
 
 Typical interaction count: 3–5 questions.
 
@@ -152,7 +152,7 @@ Typical interaction count: 3–5 questions.
 You provide one input. You get back one draft PR URL. Nothing in between.
 - Brainstorm: skipped (planner makes reasonable assumptions)
 - Plan approval: auto
-- Review critical issues: auto-fix within the cycle limit; if still failing, PR is created as draft anyway
+- Review: Critical and Important findings are auto-fixed and re-reviewed; unresolved blocking findings stop the run rather than creating a PR
 
 ### Batch mode — drop a list, get a list of PRs
 
