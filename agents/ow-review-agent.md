@@ -32,6 +32,7 @@ Wait for `ow-orchestrator` or the team lead. Input includes `reportFile`, `branc
 
 Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before reviewing. It is normative. An unsupported APPROVE is a failed review.
 If any Git-changed path is under `sp-client/`, also read `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in `preReview.profiles`.
+Populate every profile-defined `preReview.profileChecks` entry with cited evidence or a specific not-applicable reason. For SP-Client, explicitly trace rollout protection, established UI primitives/typography tokens, SharePoint theme/Detheme flow, large-collection fetch plus rendering strategy, and automated tests.
 
 Treat review as collaborative defect prevention, not blame. Educational-only comments must be prefixed `Nit:` and remain non-blocking.
 

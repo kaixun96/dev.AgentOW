@@ -127,6 +127,15 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
     "necessityAndScope": "<why the change is necessary and appropriately scoped>",
     "intentMatch": "<whether implementation matches the stated intent>",
     "profiles": ["global", "sp-client when any changed path is under sp-client/"],
+    "profileChecks": [
+      {
+        "id": "<profile-defined check ID>",
+        "status": "reviewed|not-applicable",
+        "evidence": ["src/example.ts:1"],
+        "reason": "<required when not applicable>",
+        "conclusion": "<specific result>"
+      }
+    ],
     "reviewability": {
       "status": "reviewable|must-split",
       "changedFileCount": 1,

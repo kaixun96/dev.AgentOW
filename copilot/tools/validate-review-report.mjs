@@ -23,6 +23,20 @@ const SEVERITIES = new Set(["Critical", "Important", "Minor"]);
 const VERDICTS = new Set(["APPROVE", "COMMENT", "REQUEST_CHANGES"]);
 const HASH_40 = /^[0-9a-f]{40}$/;
 const HASH_64 = /^[0-9a-f]{64}$/;
+const SP_CLIENT_PROFILE_CHECKS = [
+  "spClientRolloutTrace",
+  "spClientUiPrimitivesTokens",
+  "spClientThemeDetheme",
+  "spClientLargeCollections",
+  "spClientAutomatedTests",
+];
+const SP_CLIENT_PROFILE_TERMS = {
+  spClientRolloutTrace: /\b(?:rollout|flight|killswitch|fallback|entry point|gate)\b/i,
+  spClientUiPrimitivesTokens: /\b(?:fluent|spds|primitive|typography|token|component)\b/i,
+  spClientThemeDetheme: /\b(?:theme|detheme|provider|override)\b/i,
+  spClientLargeCollections: /\b(?:collection|pagination|continuation|progressive|virtualization|render)\b/i,
+  spClientAutomatedTests: /\b(?:test|coverage|assertion|regression)\b/i,
+};
 const HARD_CHURN_LIMIT = 5000;
 const LARGE_CHURN_LIMIT = 2000;
 const DIMENSION_TERMS = {
@@ -148,6 +162,30 @@ function sameStrings(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function validateProfileChecks(profileChecks, expectedIds, conclusionTerms) {
+  if (!Array.isArray(profileChecks)) return false;
+  const ids = profileChecks.map((entry) => entry?.id);
+  if (!sameStrings([...ids].sort(), [...expectedIds].sort())) return false;
+  return profileChecks.every((entry) => {
+    if (
+      !isObject(entry) ||
+      !nonEmpty(entry.id) ||
+      !specific(entry.conclusion) ||
+      !conclusionTerms[entry.id]?.test(entry.conclusion)
+    ) {
+      return false;
+    }
+    if (entry.status === "reviewed") {
+      return (
+        Array.isArray(entry.evidence) &&
+        entry.evidence.length > 0 &&
+        entry.evidence.every(evidenceReference)
+      );
+    }
+    return entry.status === "not-applicable" && specific(entry.reason);
+  });
+}
+
 function validate(report, options) {
   const errors = [];
   if (!isObject(report) || report.schemaVersion !== 1) {
@@ -237,6 +275,16 @@ function validate(report, options) {
       !report.preReview?.profiles?.includes("sp-client")
     ) {
       errors.push("sp-client changes require the sp-client review profile");
+    }
+    if (
+      expectedFiles.some((file) => file.startsWith("sp-client/")) &&
+      !validateProfileChecks(
+        report.preReview?.profileChecks,
+        SP_CLIENT_PROFILE_CHECKS,
+        SP_CLIENT_PROFILE_TERMS,
+      )
+    ) {
+      errors.push("sp-client changes require complete scoped profile checks");
     }
   }
 

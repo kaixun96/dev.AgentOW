@@ -66,6 +66,7 @@ function makeReport() {
       necessityAndScope: "The focused change is necessary to prevent valid empty results from crashing callers",
       intentMatch: "The implementation matches the stated behavior and does not expand beyond the affected path",
       profiles: ["global"],
+      profileChecks: [],
       reviewability: {
         status: "reviewable",
         changedFileCount: 1,
@@ -170,7 +171,49 @@ missingSpClientProfile.coverage.changedFiles[0].path = "sp-client/src/example.ts
 missingSpClientProfile.preReview.reviewability.independentBehaviorUnits[0].paths = ["sp-client/src/example.ts"];
 assert.equal(validate(missingSpClientProfile).status, 1, "sp-client changes require the scoped profile");
 missingSpClientProfile.preReview.profiles.push("sp-client");
+missingSpClientProfile.preReview.profileChecks = [
+  {
+    id: "spClientRolloutTrace",
+    status: "reviewed",
+    evidence: ["sp-client/src/example.ts:1"],
+    conclusion: "The rollout entry point and flight fallback were traced through the changed implementation",
+  },
+  {
+    id: "spClientUiPrimitivesTokens",
+    status: "reviewed",
+    evidence: ["sp-client/src/example.ts:1"],
+    conclusion: "Fluent and SPDS component primitives plus typography tokens were checked for reuse",
+  },
+  {
+    id: "spClientThemeDetheme",
+    status: "reviewed",
+    evidence: ["sp-client/src/example.ts:1"],
+    conclusion: "The SharePoint theme and Detheme provider flow requires no local override for this change",
+  },
+  {
+    id: "spClientLargeCollections",
+    status: "reviewed",
+    evidence: ["sp-client/src/example.ts:1"],
+    conclusion: "Collection pagination and bounded rendering behavior were reviewed for the changed data path",
+  },
+  {
+    id: "spClientAutomatedTests",
+    status: "reviewed",
+    evidence: ["sp-client/src/example.test.ts:1"],
+    conclusion: "Automated regression test coverage exercises the changed behavior and error paths",
+  },
+];
 assert.equal(validate(missingSpClientProfile).status, 0, "explicit sp-client profile should satisfy scoped review");
+
+const missingSpClientCheck = structuredClone(missingSpClientProfile);
+missingSpClientCheck.preReview.profileChecks.pop();
+assert.equal(validate(missingSpClientCheck).status, 1, "sp-client profile cannot omit a required evidence check");
+
+const paddedSpClientChecks = structuredClone(missingSpClientProfile);
+for (const check of paddedSpClientChecks.preReview.profileChecks) {
+  check.conclusion = "This scoped profile check was reviewed against the implementation evidence";
+}
+assert.equal(validate(paddedSpClientChecks).status, 1, "sp-client checks require concern-specific conclusions");
 fs.writeFileSync(changedFilesPath, "src/example.ts\n");
 fs.writeFileSync(diffNumstatPath, "10\t2\tsrc/example.ts\n");
 

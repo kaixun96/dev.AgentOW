@@ -179,6 +179,11 @@ const checks = [
       "Activated means old/fallback behavior; not activated means new behavior.",
       "never module evaluation",
       "bundle delta of 2 KB or more is a review trigger",
+      "server-side filtering, transport pagination/continuation, and bounded viewport rendering",
+      "typographyStyles",
+      "Fluent V9/SPDS primitive",
+      "SharePoint theme/Detheme provider flow",
+      "spClientRolloutTrace",
       "Use `Nit:` only for optional education."
     ]
   },
@@ -192,6 +197,7 @@ const checks = [
       "artifactJsonPath",
       "Never APPROVE without complete evidence.",
       "sp-client-review-profile.md",
+      "preReview.profileChecks",
       "do not equate reading every line with reliable exhaustive review",
       "`preliminary-non-exhaustive` completeness claim",
       "git diff --no-renames"
@@ -216,6 +222,7 @@ const checks = [
       "review.json",
       "Never APPROVE without complete evidence.",
       "sp-client-review-profile.md",
+      "preReview.profileChecks",
       "reading all files does not prove the review is reliable or exhaustive",
       "`preliminary-non-exhaustive`",
       "git diff --no-renames"

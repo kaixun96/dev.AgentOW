@@ -16,6 +16,7 @@ Do not mechanically demand a new killswitch, flight, experiment, log, or documen
 
 For user-facing or operationally risky behavior:
 
+- Trace protection from the changed page/component back to its reachable entry point. An upstream flight or killswitch counts only when it gates every new path; do not infer protection from a nearby check.
 - Identify the rollback strategy and whether KS, flight/Feature, experiment, or an existing gate is appropriate.
 - Verify new behavior runs when the KS is **not** activated and the activated state preserves a safe old/fallback path.
 - Test enabled and disabled/fallback states.
@@ -51,13 +52,27 @@ For user-facing or operationally risky behavior:
 ## Performance and UI quality
 
 - Assess bundle, latency, render, and memory impact. A bundle delta of 2 KB or more is a review trigger requiring measurement and justification or on-demand loading; it is not automatically a defect.
+- For large collections, review three separate concerns: server-side filtering, transport pagination/continuation, and bounded viewport rendering (progressive loading, paging, or virtualization). Do not recommend fetching every page without also proving the UI will not render an unbounded item set.
 - Performance changes use an experiment for statistically meaningful comparison and preserve an emergency rollback strategy when risk warrants it.
 - User-facing strings use resources; post-freeze additions follow localization review/locking policy.
 - Styling uses theme tokens rather than hardcoded colors and is checked in light, dark, and high-contrast modes.
+- Prefer semantic typography presets such as `typographyStyles` over manually composing individual font-family/size/weight tokens when a matching preset exists.
+- Before hand-rolling navigation, menus, lists, or other interactive structures, search the package and repository for an established Fluent V9/SPDS primitive. Record why the standard component is unsuitable if custom semantic markup remains.
+- Before adding theme-specific overrides, trace the established SharePoint theme/Detheme provider flow. Local overrides require evidence that the formal flow cannot provide the intended appearance across supported themes.
 - Interactive controls are keyboard accessible with correct role, state, and accessible name.
+
+## Required profile checks
+
+For every `sp-client/` review, record these IDs in `preReview.profileChecks`. Each must be `reviewed` with citations and a conclusion or `not-applicable` with a specific reason:
+
+- `spClientRolloutTrace`
+- `spClientUiPrimitivesTokens`
+- `spClientThemeDetheme`
+- `spClientLargeCollections`
+- `spClientAutomatedTests`
 
 ## Blocking examples
 
-Classify as Important or Critical when evidenced: wrong KS direction, module-evaluated SP-Client KS, missing safe fallback, performance work using only a flight, missing behavior/gate tests, unhandled meaningful async failure, PII logging, missing user-action telemetry where required by established conventions, unjustified bundle growth, hardcoded user-facing strings/colors, inaccessible controls, or suppressions/deferred work without required rationale.
+Request changes when evidenced: wrong KS direction, module-evaluated SP-Client KS, missing safe fallback, performance work using only a flight, missing behavior/gate tests, unhandled meaningful async failure, PII logging, missing user-action telemetry where required by established conventions, unjustified bundle growth, unbounded collection rendering, bypassing an available Fluent/SPDS primitive without rationale, theme overrides that conflict with the formal Detheme flow, hardcoded user-facing strings/colors, inaccessible controls, or suppressions/deferred work without required rationale.
 
 Use `Nit:` only for optional education. A checklist item is not automatically blocking when it is demonstrably inapplicable; document that disposition with evidence.
