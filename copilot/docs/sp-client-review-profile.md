@@ -28,7 +28,6 @@ For user-facing or operationally risky behavior:
 
 - Unit tests cover changed behavior, edge/error paths, null/undefined inputs, and both gate states when gated.
 - Tests assert product behavior rather than mock implementation details.
-- The proposed PR description contains concise buddy-test scenarios for SP-Client behavior: Given/When/Then, including rollback/disabled behavior and a relevant edge case. This is a scoped exception to AgentOW's global rule against generic auto-generated test plans.
 - Complex features add or update durable Markdown documentation when it materially helps future maintenance and AI-assisted follow-ups.
 
 ## TypeScript and maintainability
