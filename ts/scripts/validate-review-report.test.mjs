@@ -67,6 +67,9 @@ function makeReport() {
       intentMatch: "The implementation matches the stated behavior and does not expand beyond the affected path",
       profiles: ["global"],
       reviewLedger: { status: "absent", ledgerPath: null, entryCount: 0, carriedCount: 0 },
+      externalContracts: [],
+      externalContractsNotApplicableReason:
+        "The diff only edits a local constant and calls no symbol whose semantics are defined outside the changed set.",
       profileChecks: [],
       reviewability: {
         status: "reviewable",
@@ -125,6 +128,11 @@ function addBlockingRolloutFinding(report) {
     impact: "Users can enter the new behavior when the gate should preserve the fallback path",
     suggestedFix: "Gate every runtime entry and add disabled-state regression coverage",
     evidence: ["sp-client/src/example.ts:1"],
+    classSweep: {
+      query: "isExampleKSActivated",
+      scope: ["sp-client/src/example.ts"],
+      accountedFor: [],
+    },
   });
   report.counts.important = 1;
   report.verdict = "REQUEST_CHANGES";
@@ -596,6 +604,7 @@ important.findings.push({
   impact: "The command crashes for valid input",
   suggestedFix: "Preserve the empty-result branch",
   evidence: ["src/example.ts:1", "src/caller.ts:2"],
+  classSweep: { query: "example", scope: ["src/example.ts"], accountedFor: [] },
 });
 important.counts.important = 1;
 assert.equal(validate(important).status, 1, "Important finding cannot use APPROVE");
@@ -613,6 +622,7 @@ critical.findings.push({
   impact: "An attacker can execute arbitrary commands",
   suggestedFix: "Pass fixed arguments without shell interpolation",
   evidence: ["src/example.ts:1"],
+  classSweep: { query: "example", scope: ["src/example.ts"], accountedFor: [] },
 });
 critical.counts.critical = 1;
 critical.verdict = "REQUEST_CHANGES";

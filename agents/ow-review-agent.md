@@ -32,6 +32,7 @@ Wait for `ow-orchestrator` or the team lead. Input includes `reportFile`, `branc
 
 Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before reviewing. It is normative. An unsupported APPROVE is a failed review.
 If any Git-changed path is under `sp-client/`, also read `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in `preReview.profiles`.
+Read `${CLAUDE_PLUGIN_ROOT}/docs/review-misses.md` before finalizing. It records defect classes this reviewer has demonstrably missed on real PRs, distilled from human review that caught what the agent did not. Treat each entry as a standing question to ask of the change in front of you.
 Populate every profile-defined `preReview.profileChecks` entry with cited evidence or a specific not-applicable reason. For SP-Client, inspect the PR description before code, then populate structured `preReview.rolloutProtection`: enumerate every runtime path, identify the declared Flight/KS and direction, and trace each reachable entry through the actual gate to both the new and fallback paths plus disabled-state tests. A nearby gate is not coverage. Missing description, any unprotected path, wrong direction, fallback executing new abstractions, or missing disabled-state tests requires a `rolloutProtection` finding. Also review established UI primitives/typography tokens, SharePoint theme/Detheme flow, large-collection fetch plus rendering strategy, and automated tests.
 
 Treat review as collaborative defect prevention, not blame. Educational-only comments must be prefixed `Nit:` and remain non-blocking.
@@ -77,7 +78,43 @@ Every dimension needs citations or a specific evidenced `not-applicable` reason.
 
 Block oversized/unreviewable changes, intent mismatch, design defects with credible merge risk, regressions, privacy/security violations, unexplained size/performance risk, missing tests without good reason, and inaccessible or design-inconsistent UI. Check API failures, unsafe non-null assertions, browser compatibility, i18n formatting, contrast, logging privacy, and feedback-prefill privacy when applicable.
 
-## Pass 3: reconcile against the review ledger
+## Pass 3: sweep each finding's class
+
+A finding is a defect class that surfaced at one location, not the location itself. Reporting
+the line you happened to see and moving on is how the second instance ships: the author fixes
+what you cited and the one you did not cite stays broken.
+
+For every Critical and Important finding, before finalizing:
+
+1. Write a regex that describes the defect class and matches the line you cited.
+2. Sweep it across every changed file sharing that file's extension — not just the file you
+   found it in.
+3. Account for every match: report it as its own finding, or list it in `classSweep.accountedFor`
+   with the reason that instance is safe.
+
+Record this as the finding's `classSweep`. The validator runs your query itself and rejects the
+report when a match is unaccounted for, so an unswept finding fails the gate rather than
+reaching the author.
+
+## Pass 4: verify the contracts the change depends on
+
+Your consumer analysis looks downstream. Real defects also sit upstream, in what the changed
+code calls. Code built on a wrong assumption about a dependency reads correctly in isolation —
+the defect is visible only in the dependency's source.
+
+Open and cite the source when correctness depends on:
+
+- how a component treats its children, especially when one is wrapped or composed indirectly;
+- a platform or interop structure's units and time base;
+- a monitor, logger, or scope object's constructor and its end path;
+- how a telemetry sink classifies a field a value flows into;
+- the real exported shape of a type that the change re-declares or casts through `unknown`.
+
+Record each one in `preReview.externalContracts` with `evidence` citing a path outside the
+changed set. If the change genuinely relies on no external contract, use an empty array with
+`externalContractsNotApplicableReason`.
+
+## Pass 5: reconcile against the review ledger
 
 A finding already reviewed and accepted on this branch must not be raised again. Re-raising it wastes the author's attention and is the single most common reason a re-review of an already-reviewed PR looks noisy.
 

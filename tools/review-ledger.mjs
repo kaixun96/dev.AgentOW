@@ -67,7 +67,7 @@ function significantLength(text) {
 
 // Reads the cited file from the working tree, falling back to Git so a review
 // of a deleted or since-changed path still resolves.
-function readSource(repoRoot, filePath, ref) {
+export function readSource(repoRoot, filePath, ref) {
   const absolute = `${repoRoot}/${filePath}`;
   if (!ref && fs.existsSync(absolute)) {
     try {
