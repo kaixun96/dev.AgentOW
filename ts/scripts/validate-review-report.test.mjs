@@ -67,6 +67,7 @@ function makeReport() {
       intentMatch: "The implementation matches the stated behavior and does not expand beyond the affected path",
       profiles: ["global"],
       reviewLedger: { status: "absent", ledgerPath: null, entryCount: 0, carriedCount: 0 },
+      priorArt: [],
       externalContracts: [],
       externalContractsNotApplicableReason:
         "The diff only edits a local constant and calls no symbol whose semantics are defined outside the changed set.",

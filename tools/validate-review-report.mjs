@@ -466,6 +466,74 @@ function validateRolloutProtection(report, expectedFiles, errors) {
 // Both blocking defects this reviewer has missed lived in a dependency's
 // source, not in the changed file. Consumer analysis looks downstream; this
 // forces at least one look upstream, at what the changed code relies on.
+// Shared code is where capability gets reinvented. A reviewer that only asks
+// whether new code is correct will approve a hand-rolled copy of something the
+// platform already ships, so every symbol exported from a shared-code path has
+// to be answered against what already exists. The symbol list is derived from
+// the changed sources here rather than taken from the report, so an entry
+// cannot be omitted by simply not mentioning it.
+const SHARED_CODE_SEGMENTS = ["common", "shared", "utilities", "utils", "helpers", "hooks", "components"];
+const EXPORTED_SYMBOL = /^\s*export\s+(?:async\s+)?(?:function|const|class)\s+([A-Za-z_$][\w$]*)/;
+
+function isSharedCodePath(filePath) {
+  return filePath
+    .split("/")
+    .some((segment) => SHARED_CODE_SEGMENTS.includes(segment.toLowerCase()));
+}
+
+function validatePriorArt(report, options, expectedFiles, errors) {
+  const entries = report.preReview?.priorArt;
+  if (!Array.isArray(entries)) {
+    errors.push("preReview.priorArt is required");
+    return;
+  }
+
+  for (const entry of entries) {
+    if (!isObject(entry) || !nonEmpty(entry.symbol) || !nonEmpty(entry.path) || !nonEmpty(entry.searched)) {
+      errors.push("every priorArt entry requires symbol, path, and searched");
+      return;
+    }
+    if (!["none", "reused", "justified"].includes(entry.result)) {
+      errors.push(`priorArt entry ${entry.symbol} requires result of none, reused, or justified`);
+      continue;
+    }
+    // Claiming something already exists is only useful if you say what it is,
+    // and keeping your own copy anyway needs a reason.
+    if (entry.result !== "none" && !nonEmpty(entry.existing)) {
+      errors.push(`priorArt entry ${entry.symbol} reports result ${entry.result} and must cite the existing implementation`);
+    }
+    if (entry.result === "justified" && !nonEmpty(entry.justification)) {
+      errors.push(`priorArt entry ${entry.symbol} keeps a new implementation and requires justification`);
+    }
+  }
+
+  const sharedFiles = expectedFiles.filter(isSharedCodePath);
+  if (sharedFiles.length === 0) return;
+
+  const repoRoot = options.get("--repo") ?? process.cwd();
+  const ref = options.get("--ledger-ref");
+  const covered = new Set(
+    entries
+      .filter((entry) => isObject(entry) && nonEmpty(entry.symbol))
+      .map((entry) => String(entry.symbol)),
+  );
+
+  const missing = [];
+  for (const filePath of sharedFiles) {
+    const source = readSource(repoRoot, filePath, ref);
+    if (source === null) continue;
+    for (const line of source.split(/\r?\n/)) {
+      const match = EXPORTED_SYMBOL.exec(line);
+      if (match && !covered.has(match[1])) missing.push(`${match[1]} (${filePath})`);
+    }
+  }
+  if (missing.length > 0) {
+    errors.push(
+      `preReview.priorArt omits shared-code exports that must be answered against existing implementations: ${missing.slice(0, 5).join(", ")}`,
+    );
+  }
+}
+
 function validateExternalContracts(report, expectedFiles, errors) {
   const contracts = report.preReview?.externalContracts;
   if (!Array.isArray(contracts)) {
@@ -670,6 +738,7 @@ function validate(report, options) {
       validateRolloutProtection(report, expectedFiles, errors);
     }
     validateExternalContracts(report, expectedFiles, errors);
+    validatePriorArt(report, options, expectedFiles, errors);
   }
 
   const diffNumstatPath = options.get("--diff-numstat");

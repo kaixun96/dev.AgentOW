@@ -57,9 +57,16 @@ For every review with SP-Client runtime changes, perform this sequence before th
 - For large collections, review three separate concerns: server-side filtering, transport pagination/continuation, and bounded viewport rendering (progressive loading, paging, or virtualization). Do not recommend fetching every page without also proving the UI will not render an unbounded item set.
 - Performance changes use an experiment for statistically meaningful comparison and preserve an emergency rollback strategy when risk warrants it.
 - User-facing strings use resources; post-freeze additions follow localization review/locking policy.
+- Externalizing a string is the easy half. For each added `.resx` entry also check that every
+  `{N}` placeholder is locked with `{Locked="{N}"}` in the comment, that anything which can be
+  1 has a singular form, and that any English string left in code cannot reach a user.
 - Styling uses theme tokens rather than hardcoded colors and is checked in light, dark, and high-contrast modes.
 - Prefer semantic typography presets such as `typographyStyles` over manually composing individual font-family/size/weight tokens when a matching preset exists.
 - Before hand-rolling navigation, menus, lists, or other interactive structures, search the package and repository for an established Fluent V9/SPDS primitive. Record why the standard component is unsuitable if custom semantic markup remains.
+- The same applies beyond components. Before accepting a new hook, utility, or style helper,
+  search by capability rather than by the author's chosen name — screen-reader announcements,
+  string formatting, URL handling, and spacing or radius values all have established
+  implementations here.
 - Before adding theme-specific overrides, trace the established SharePoint theme/Detheme provider flow. Local overrides require evidence that the formal flow cannot provide the intended appearance across supported themes.
 - Interactive controls are keyboard accessible with correct role, state, and accessible name.
 
