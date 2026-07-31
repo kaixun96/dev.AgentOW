@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Agentic tooling for odsp-web development in Codespaces",
-    "version": "0.4.23"
+    "version": "0.4.24"
   },
   "plugins": [
     {
       "name": "agentOW",
       "source": "./",
       "description": "odsp-web agentic tooling. Registers ow MCP server with rush, tmux, git, and debug link tools.",
-      "version": "0.4.23",
+      "version": "0.4.24",
       "author": {
         "name": "kaixun"
       },
@@ -22,7 +22,7 @@
       "name": "agentow-copilot",
       "source": "./copilot",
       "description": "Copilot CLI port of agentOW. Main-session implementer plus stateless research, verify, and review subagents.",
-      "version": "0.1.17",
+      "version": "0.1.18",
       "author": {
         "name": "kaixun"
       },
