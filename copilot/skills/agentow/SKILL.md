@@ -251,6 +251,20 @@ Before starting each fix cycle, append `[HH:MM:SS] 🔁 Fix cycle N+1 — <reaso
 Append `[HH:MM:SS] 📝 Reviewer started` before dispatching.
 Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`. The review is a hard evidence gate in interactive, AUTO, and batch execution.
 
+Resolve the branch's review ledger first, so a finding already dispositioned on this branch is never raised again:
+
+```bash
+ledgerSlug=$(printf '%s' "<branch>" | tr '/' '-')
+reviewLedgerPath="$HOME/.config/agentow/review-ledger/${ledgerSlug}.json"
+```
+
+When the PR already exists, recover the ledger the PR description carries before reviewing, so a re-review from a different machine or session sees the same decisions:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" parse \
+  --description <sessionDir>/pr-description.md --out "$reviewLedgerPath"
+```
+
 Dispatch `@agentow-copilot:reviewer` with:
 
 ```yaml
@@ -261,6 +275,7 @@ reportFile: /workspaces/odsp-web/.aero/<session>/report.json
 progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
 artifactPath: /workspaces/odsp-web/.aero/<session>/review.md
 artifactJsonPath: /workspaces/odsp-web/.aero/<session>/review.json
+reviewLedgerPath: <resolved $reviewLedgerPath>
 contextDocuments:
   - <every routed feature/domain context document>
 planPath: <actual planPath returned by the planner NDJSON record>
@@ -282,8 +297,12 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   --expected-head "$(git rev-parse HEAD)" \
   --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
   --changed-files <sessionDir>/review-changed-files.txt \
-  --diff-numstat <sessionDir>/review-numstat.txt
+  --diff-numstat <sessionDir>/review-numstat.txt \
+  --ledger "$reviewLedgerPath" \
+  --repo "$(git rev-parse --show-toplevel)"
 ```
+
+The validator re-runs the ledger match itself, so a reviewer that re-raises an accepted finding or invents a `previouslyAccepted` entry fails validation rather than reaching the author.
 
 If `review.md`, `review.json`, or the reviewer NDJSON line is missing, or validation fails, classify it as `reviewer-spec`. Re-dispatch the reviewer once against the unchanged implementation cycle with the validation errors. Do not edit code, rebuild, retest, or consume a product fix cycle. If the retry still fails validation, stop; never ship an unsupported review.
 
@@ -292,7 +311,21 @@ If `review.md`, `review.json`, or the reviewer NDJSON line is missing, or valida
 - If `cycle < 5`, go back to Step 6, fix, rebuild, retest, re-evaluate, and run a completely new review against the new HEAD.
 - At `cycle >= 5`, stop and report unresolved findings in every mode. Draft status and AUTO mode do not bypass the review quality gate.
 
-**APPROVE / COMMENT (Minor only):** continue.
+**APPROVE / COMMENT (Minor only):** every Minor must be dispositioned before shipping. An undispositioned Minor is what makes the next review of this PR look noisy, so choose one per finding:
+
+- **Fix it** when it is cheap and low-risk. Prefer this. Batch the fixes into the existing branch, then re-run the review against the new HEAD.
+- **Accept it** when fixing is out of scope, riskier than the nit, or contradicts the plan. Record the decision so no later review re-raises it:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" accept \
+  --report <sessionDir>/review.json \
+  --ledger "$reviewLedgerPath" \
+  --repo "$(git rev-parse --show-toplevel)" \
+  --branch "<branch>" \
+  --accept '<findingId>=<why this stays as-is in this PR>'
+```
+
+The reason is shown to the author and to every later reviewer, so it must say why the nit stays rather than restate the nit; the tool rejects a reason that is too short or that merely repeats the finding. Report accepted Minors in the run summary alongside the fixed ones, then continue.
 
 ## Step 8: Maintain context from the as-built result
 
@@ -308,7 +341,14 @@ No-update, patch-only, disabled, dirty-worktree, read-only, auth, or conflict ou
 
 ## Step 9: Ship
 
-1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no generic auto-generated "Testing" section). For SP-Client runtime changes, the first line must be `Gate: <Flight/KS identifier> — <enabled/new-path direction>; <disabled/fallback direction>`, grounded in the validated `preReview.rolloutProtection` artifact.
+1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no generic auto-generated "Testing" section). For SP-Client runtime changes, the first line must be `Gate: <Flight/KS identifier> — <enabled/new-path direction>; <disabled/fallback direction>`, grounded in the validated `preReview.rolloutProtection` artifact. When the ledger has entries, append its rendered block to the description so the accepted nits and their reasons travel with the PR:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
+  --ledger "$reviewLedgerPath" >> <sessionDir>/pr-description.md
+```
+
+   The block is human-readable and carries a machine-readable comment, so a later reviewer on any machine recovers the same decisions with `review-ledger.mjs parse` instead of re-raising them.
 2. **Visual validation for UI changes:** prefer evaluator screenshots from the local `rush start` debug link because it is available immediately after implementation. If local debug validation captures BEFORE/AFTER successfully, attach those screenshots to the PR description. Only fall back to `ow-pr-debug-query` / `finalValidationMode=pr-cdn-fic` when local debug validation fails for environment/tooling reasons (for example localhost cert/assembly-load failure, missing browser MCP, or a surface that only reproduces against PR CDN).
 3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. The primary BEFORE/AFTER table in the PR description MUST embed the full-page/viewport `beforePath` and `afterPath`. Component crops may be attached as clearly labeled supplemental detail links, but must never replace the primary images. Include `visualValidation.source` in the PR description (`local-rush-start` or `pr-cdn-fic`) so reviewers know which path produced the images. Missing or invalid full-page/viewport BEFORE/AFTER screenshots block PR creation unless Step 6 proved a complete external fixture gap; only that case may ship as `success-with-blockers` with the complete coverage manifest.
    - If visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.

@@ -154,6 +154,12 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
       ],
       "conclusion": "<exact gate coverage result>"
     },
+    "reviewLedger": {
+      "status": "applied|absent",
+      "ledgerPath": "<path consulted>",
+      "entryCount": 0,
+      "carriedCount": 0
+    },
     "profileChecks": [
       {
         "id": "<profile-defined check ID>",
@@ -212,6 +218,7 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
     ]
   },
   "findings": [],
+  "previouslyAccepted": [],
   "counts": { "critical": 0, "important": 0, "minor": 0 }
 }
 ```
@@ -242,3 +249,60 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
 Malformed, incomplete, or stale review output is a reviewer-spec failure. Re-dispatch the reviewer once against the unchanged implementation. It does not consume a product fix cycle. If validation still fails, stop rather than shipping an unsupported approval.
 
 Any Critical or Important finding enters the product fix loop. After code changes, run a new review against the new commit; never reuse an earlier verdict.
+
+## Review ledger
+
+A branch is reviewed many times: once per fix cycle, and again whenever anyone re-reviews the shipped PR. Because a verdict is never reused, each of those runs starts blank, so an issue that was already raised and consciously accepted is raised again. A PR that was reviewed to completion therefore keeps collecting the same comments.
+
+The ledger is the memory that fixes this. It records, per branch, the findings that were accepted rather than fixed.
+
+Identity cannot be the line number, the category, or the wording; all three drift between reviews of the same defect. In one real run the same magic constant was reported as `maintainability` at line 146, then `designMaintainability` at line 152, then again at 146. What stayed constant was the source line being complained about, so `tools/review-ledger.mjs` anchors identity to that text and hashes it with the path. When the code is edited the anchor stops matching and the finding is correctly treated as new.
+
+The reviewer must, before finalizing:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" match \
+  --report <sessionDir>/review.json --ledger <ledgerPath> --repo /workspaces/odsp-web
+```
+
+Every finding the matcher reports as `carried` belongs in `previouslyAccepted`, not in `findings`. Re-raising an accepted finding is a reviewer-spec failure, and the orchestrator's validator re-runs the match itself rather than trusting the claim.
+
+`preReview.reviewLedger` is mandatory:
+
+```json
+"reviewLedger": {
+  "status": "applied|absent",
+  "ledgerPath": "<path consulted>",
+  "entryCount": 0,
+  "carriedCount": 0
+}
+```
+
+`absent` is valid only when no ledger exists yet for the branch, and then `entryCount` and `carriedCount` must both be `0`.
+
+`previouslyAccepted` lists what was carried forward, so the artifact stays self-describing:
+
+```json
+"previouslyAccepted": [
+  { "fingerprint": "<32-char hash>", "path": "src/example.ts", "reason": "<why it was accepted>" }
+]
+```
+
+A carried finding is not counted in `counts` and does not affect the verdict. Carrying an accepted nit forward is not approval of the code; it is a record that the decision was already made.
+
+## Disposing of Minor findings
+
+A Minor finding that is neither fixed nor recorded is the direct cause of a shipped PR that still comments on itself. Before shipping, every Minor must be either:
+
+- **fixed**, so the anchor changes and the finding disappears on its own; or
+- **accepted**, with a reason recorded in the ledger and rendered into the PR description.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" accept \
+  --report <sessionDir>/review.json --ledger <ledgerPath> \
+  --accept MINOR-1="<why this does not need to block or change this PR>" \
+  --repo /workspaces/odsp-web --branch <branch>
+```
+
+The reason must be a reason, not a restatement: the tool rejects anything under 40 characters or equal to the finding description. A shipped PR carries the accepted set in its description so that a reviewer on another machine, agent or human, sees the same decisions.
+
