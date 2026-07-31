@@ -66,6 +66,7 @@ function makeReport() {
       necessityAndScope: "The focused change is necessary to prevent valid empty results from crashing callers",
       intentMatch: "The implementation matches the stated behavior and does not expand beyond the affected path",
       profiles: ["global"],
+      reviewLedger: { status: "absent", ledgerPath: null, entryCount: 0, carriedCount: 0 },
       profileChecks: [],
       reviewability: {
         status: "reviewable",
@@ -108,6 +109,7 @@ function makeReport() {
       ],
     },
     findings: [],
+    previouslyAccepted: [],
     counts: { critical: 0, important: 0, minor: 0 },
   };
 }

@@ -27,6 +27,7 @@ The dispatcher gives you:
 - `artifactPath` (`review.md`) and `artifactJsonPath` (`review.json`);
 - `contextDocuments`;
 - the actual `planPath`, `implementationEvidencePath`, and `evaluationArtifactPaths` extracted from the latest planner/evaluator NDJSON records; never infer conventional artifact paths;
+- `reviewLedgerPath`, the branch's record of previously accepted findings; it may not exist yet;
 - `changedFiles` as a hint only; Git is authoritative.
 
 ## Pass 1: immutable scope and risk
@@ -74,6 +75,42 @@ Block oversized/unreviewable changes, intent mismatch, poor design with credible
 
 Every dimension needs citations or a specific `not-applicable` reason. Empty evidence, generic claims, and uncited conclusions are invalid. You may say evidence is insufficient; never guess.
 
+## Pass 3: reconcile against the review ledger
+
+A finding already reviewed and accepted on this branch must not be raised again. Re-raising it wastes the author's attention and is the single most common reason a re-review of an already-reviewed PR looks noisy.
+
+Write your draft `artifactJsonPath`, then reconcile it before finalizing:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" match \
+  --report "<artifactJsonPath>" --ledger "<reviewLedgerPath>" --repo "<repoRoot>"
+```
+
+The matcher anchors every finding to the source text it cites, so it still recognizes an accepted finding after the line number moves or you word it differently. Then:
+
+1. Move every `carried` finding out of `findings` and into `previouslyAccepted` as `{ fingerprint, path, reason }`, using the ledger's reason. Carried findings are excluded from `counts` and from the verdict.
+2. Keep every `fresh` finding.
+3. For each `unanchored` finding, fix the `path`/`line` citation so it resolves to real source. A finding that cites nothing reviewable is not reportable.
+4. Record `preReview.reviewLedger` with `status`, `ledgerPath`, `entryCount`, and `carriedCount`. Use `status: "absent"` with both counts `0` only when no ledger file exists yet.
+
+When the dispatcher does not supply `reviewLedgerPath` — for example a standalone re-review of an existing PR — resolve it yourself rather than reviewing without memory:
+
+```bash
+ledgerSlug=$(git rev-parse --abbrev-ref HEAD | tr '/' '-')
+reviewLedgerPath="$HOME/.config/agentow/review-ledger/${ledgerSlug}.json"
+```
+
+If that file does not exist but the PR description does, recover the ledger the description carries:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" parse \
+  --description <saved PR description> --out "$reviewLedgerPath"
+```
+
+Only after both fail is `status: "absent"` correct.
+
+Do not hand-copy fingerprints; take them from the matcher. The orchestrator's validator re-runs this match itself and rejects the report if you re-raise an accepted finding or invent a `previouslyAccepted` entry, so an unreconciled report fails the gate rather than reaching the author.
+
 ## Severity and deterministic verdict
 
 - **Critical** — security, data loss, outage, severe functional, or visible layout regression. Must fix.
@@ -103,6 +140,9 @@ Write concise `artifactPath`:
 - <finding with file:line>
 ### Minor
 - <finding with file:line>
+
+## Previously accepted (not re-raised)
+- <file:line> — <why it was accepted earlier>
 ```
 
 Write canonical `artifactJsonPath` exactly as specified by `docs/review-contract.md`. It includes immutable diff identity, every Git-changed file, all coverage dimensions, second-pass hypotheses, cited findings, counts, and deterministic verdict.
@@ -117,7 +157,7 @@ Before returning:
 3. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"reviewer","timestamp":"<ISO>","status":"success|failure","verdict":"APPROVE|REQUEST_CHANGES|COMMENT","artifactPath":"<artifactPath>","artifactJsonPath":"<artifactJsonPath>","reviewedHead":"<SHA>","diffDigest":"<SHA256>","criticalCount":0,"importantCount":0,"minorCount":0,"blockers":[{"description":"<Critical or Important issue>","suggestedFix":"<file:line + change>"}]}
+{"sender":"reviewer","timestamp":"<ISO>","status":"success|failure","verdict":"APPROVE|REQUEST_CHANGES|COMMENT","artifactPath":"<artifactPath>","artifactJsonPath":"<artifactJsonPath>","reviewedHead":"<SHA>","diffDigest":"<SHA256>","criticalCount":0,"importantCount":0,"minorCount":0,"carriedCount":0,"blockers":[{"description":"<Critical or Important issue>","suggestedFix":"<file:line + change>"}]}
 ```
 
 If the code is clean, say so; never manufacture issues. Never APPROVE without complete evidence.

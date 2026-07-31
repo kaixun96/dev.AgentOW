@@ -2,6 +2,11 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import {
+  acceptedFingerprints,
+  annotateFindings,
+  loadLedger,
+} from "./review-ledger.mjs";
 
 const DIMENSIONS = [
   "behavior",
@@ -63,6 +68,86 @@ const DIMENSION_TERMS = {
   repoInstructionsContext: /\b(?:instructions?|context|guidelines?|conventions?|documentation)\b/i,
   dependenciesTooling: /\b(?:dependency|tooling|package|build|lockfile|config)\b/i,
 };
+
+function validateReviewLedger(report, options, errors) {
+  const ledger = report.preReview?.reviewLedger;
+  if (!isObject(ledger)) {
+    errors.push("preReview.reviewLedger is required");
+    return;
+  }
+  if (ledger.status !== "applied" && ledger.status !== "absent") {
+    errors.push("reviewLedger.status must be applied or absent");
+    return;
+  }
+  if (!Number.isInteger(ledger.entryCount) || ledger.entryCount < 0) {
+    errors.push("reviewLedger.entryCount must be a non-negative integer");
+  }
+  if (!Number.isInteger(ledger.carriedCount) || ledger.carriedCount < 0) {
+    errors.push("reviewLedger.carriedCount must be a non-negative integer");
+  }
+  if (ledger.status === "absent" && (ledger.entryCount > 0 || ledger.carriedCount > 0)) {
+    errors.push("reviewLedger.status absent requires zero entries and zero carried findings");
+  }
+  if (!Array.isArray(report.previouslyAccepted)) {
+    errors.push("previouslyAccepted must be an array");
+    return;
+  }
+  if (report.previouslyAccepted.length !== (ledger.carriedCount ?? -1)) {
+    errors.push("reviewLedger.carriedCount must equal the previouslyAccepted entries");
+  }
+  for (const entry of report.previouslyAccepted) {
+    if (!isObject(entry) || !nonEmpty(entry.fingerprint) || !nonEmpty(entry.path) || !nonEmpty(entry.reason)) {
+      errors.push("every previouslyAccepted entry requires fingerprint, path, and reason");
+      break;
+    }
+  }
+}
+
+// A self-declared "I honored the ledger" is worth nothing, so the match is
+// recomputed here from the ledger file and the repository itself.
+function crossCheckReviewLedger(report, options, errors) {
+  const ledgerPath = options.get("--ledger");
+  if (!ledgerPath) return;
+
+  let ledger;
+  try {
+    ledger = loadLedger(ledgerPath);
+  } catch (error) {
+    errors.push(`cannot read review ledger: ${error.message}`);
+    return;
+  }
+
+  const accepted = acceptedFingerprints(ledger);
+  const declared = report.preReview?.reviewLedger;
+  if (isObject(declared) && Number.isInteger(declared.entryCount) && declared.entryCount !== accepted.size) {
+    errors.push(`reviewLedger.entryCount claims ${declared.entryCount} but the ledger holds ${accepted.size}`);
+  }
+  if (isObject(declared) && declared.status === "absent" && accepted.size > 0) {
+    errors.push("reviewLedger.status claims absent but the ledger holds accepted entries");
+  }
+  if (accepted.size === 0) return;
+
+  const repoRoot = options.get("--repo") ?? process.cwd();
+  const ref = options.get("--ledger-ref");
+  const annotated = annotateFindings(report, repoRoot, ref);
+  for (const finding of annotated) {
+    if (finding.fingerprint === null) continue;
+    if (accepted.has(finding.fingerprint)) {
+      errors.push(
+        `finding ${finding.id} at ${finding.path}:${finding.line} was already accepted in the ledger and must be carried in previouslyAccepted, not reported again`,
+      );
+    }
+  }
+
+  const reportedFingerprints = new Set(
+    (report.previouslyAccepted ?? []).map((entry) => entry.fingerprint),
+  );
+  for (const fingerprint of reportedFingerprints) {
+    if (!accepted.has(fingerprint)) {
+      errors.push(`previouslyAccepted cites ${fingerprint}, which is not accepted in the ledger`);
+    }
+  }
+}
 
 function parseArgs(argv) {
   const options = new Map();
@@ -669,6 +754,8 @@ function validate(report, options) {
   }
 
   if (!Array.isArray(report.findings)) errors.push("findings must be an array");
+  validateReviewLedger(report, options, errors);
+  crossCheckReviewLedger(report, options, errors);
   const actualCounts = { critical: 0, important: 0, minor: 0 };
   for (const finding of report.findings ?? []) {
     if (

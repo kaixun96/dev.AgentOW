@@ -500,12 +500,27 @@ echo "[$(date +%H:%M:%S)] ⚠️  3+ consecutive cycles blame spec, not code —
 
 Only after the evaluator result and artifacts are final, send this for both evaluator PASS and the separately validated complete external fixture-gap path. A fixture gap changes the final status to `success-with-blockers`; it never bypasses review.
 
+Resolve the branch's review ledger first, so a finding already dispositioned on this branch is never raised again:
+
+```bash
+ledgerSlug=$(printf '%s' "<branch>" | tr '/' '-')
+reviewLedgerPath="$HOME/.config/agentow/review-ledger/${ledgerSlug}.json"
+```
+
+When the PR already exists, recover the ledger its description carries first, so a re-review from a different machine or session sees the same decisions:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" parse \
+  --description {sessionDir}/pr-description.md --out "$reviewLedgerPath"
+```
+
 ```text
 SendMessage to ow-review-agent:
   reportFile: <reportFile>
   branch: <branch>
   contextLinkPath: <contextLinkPath>
   contextDocuments: <latest routed document paths>
+  reviewLedgerPath: <resolved $reviewLedgerPath>
   planPath: <actual planPath returned by ow-planner>
   implementationEvidencePath: <reportFile; use generator code_done/build_done records plus committed diff>
   evaluationArtifactPaths:
@@ -525,8 +540,12 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   --expected-head "$(git rev-parse HEAD)" \
   --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
   --changed-files {sessionDir}/review-changed-files.txt \
-  --diff-numstat {sessionDir}/review-numstat.txt
+  --diff-numstat {sessionDir}/review-numstat.txt \
+  --ledger "$reviewLedgerPath" \
+  --repo "$(git rev-parse --show-toplevel)"
 ```
+
+The validator re-runs the ledger match itself, so a reviewer that re-raises an accepted finding or invents a `previouslyAccepted` entry fails validation rather than reaching the author.
 
 Missing artifacts, stale diff identity, incomplete coverage, or validator failure is `reviewer-spec`. Re-dispatch only `ow-review-agent` once against the unchanged implementation cycle with the validation errors. If retry validation fails, stop; never create a PR from an unsupported review.
 
@@ -545,6 +564,23 @@ echo "[$(date +%H:%M:%S)] ⚠️  Review REQUEST_CHANGES ({critical} critical, {
 - Stop and report unresolved blocking findings in every mode. Draft status, AUTO mode, and batch execution do not bypass the review gate.
 
 **If the final evaluator state is PASS or a validated complete external fixture gap, and review verdict is APPROVE / COMMENT (Minor only):**
+
+Every Minor must be dispositioned before shipping. An undispositioned Minor is what makes the next review of this PR look noisy, so choose one per finding:
+
+- **Fix it** when it is cheap and low-risk. Prefer this. Batch the fixes into the branch, then run a completely new review against the new HEAD.
+- **Accept it** when fixing is out of scope, riskier than the nit, or contradicts the plan. Record the decision so no later review re-raises it:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" accept \
+  --report {sessionDir}/review.json \
+  --ledger "$reviewLedgerPath" \
+  --repo "$(git rev-parse --show-toplevel)" \
+  --branch "<branch>" \
+  --accept '<findingId>=<why this stays as-is in this PR>'
+```
+
+The reason is shown to the author and to every later reviewer, so it must say why the nit stays rather than restate the nit; the tool rejects a reason that is too short or that merely repeats the finding.
+
 ```bash
 echo "[$(date +%H:%M:%S)] ✅ ALL PASS — evaluation + review complete" >> {progressLog}
 ```
@@ -601,6 +637,15 @@ description: |
   ## Changes
   <list from generator tasksCompleted>
 ```
+
+When the ledger has entries, append its rendered block to the description so the accepted nits and their reasons travel with the PR:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
+  --ledger "$reviewLedgerPath" >> {sessionDir}/pr-description.md
+```
+
+The block is human-readable and carries a machine-readable comment, so a later reviewer on any machine recovers the same decisions with `review-ledger.mjs parse` instead of re-raising them.
 
 **HARD RULE — keep PR description SHORT.** Reviewers TL;DR long descriptions and miss the point. Target:
 - **Gate first:** for SP-Client runtime changes, line 1 identifies the validated Flight/KS and both directions from `preReview.rolloutProtection`.
@@ -787,7 +832,7 @@ The codespace may have additional MCP plugins installed. Leverage them when avai
 - **Read is restricted to session files only:** `report.json`, `progress.log`, plan files under `{planDir}`, and evaluation reports. Never Read source code (`.ts`, `.tsx`, `.js`, `.json` under `/workspaces/odsp-web/sp-client/`, `/workspaces/odsp-web/odsp-next/`, etc.).
 - **NEVER** build, test, or run rush commands yourself.
 - **ONLY** use: `ow-status`, `ow-session-list`, `Read` (session files only), `Bash` (for mkdir/echo/cat/tail on session files).
-- Review validation is an explicit read-only Bash exception: `git merge-base`, `git rev-parse`, `git diff --name-only`, `git diff --numstat`, `git diff`, `sha256sum`, `cut`, and `node .../validate-review-report.mjs` are allowed only for the mandatory review gate.
+- Review validation is an explicit read-only Bash exception: `git merge-base`, `git rev-parse`, `git diff --name-only`, `git diff --numstat`, `git diff`, `sha256sum`, `cut`, `node .../validate-review-report.mjs`, and `node .../review-ledger.mjs` are allowed only for the mandatory review gate and its ledger.
 - Context repository operations are the only exception to the session-only Bash rule. They must follow `docs/context-maintenance.md`, the snapshotted manifest, allowed targets, and compare-and-swap base checks.
 - Always read `reportFile` after each agent completes to get structured output.
 - Parse NDJSON by reading the last line of the report file.
