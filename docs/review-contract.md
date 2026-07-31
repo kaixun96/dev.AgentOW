@@ -160,6 +160,16 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
       "entryCount": 0,
       "carriedCount": 0
     },
+    "priorArt": [
+      {
+        "symbol": "<symbol exported from a shared-code path>",
+        "path": "<changed path where it is defined>",
+        "searched": "<repo search performed>",
+        "result": "none|reused|justified",
+        "existing": "<path:line of the implementation that already exists>",
+        "justification": "<why the existing implementation cannot be used>"
+      }
+    ],
     "externalContracts": [
       {
         "symbol": "<external symbol the change relies on>",
@@ -318,6 +328,25 @@ Every Critical and Important finding therefore carries `classSweep`:
 The validator runs `query` itself over `scope` and rejects the report when a match is left
 unaccounted for, so the sweep cannot be claimed without being performed. `reviewability`
 findings are exempt, because they describe the shape of the change rather than a code pattern.
+
+## Capability the platform already provides
+
+Every other dimension asks whether the change is wrong. This one asks whether it should exist.
+Shared code is where capability gets reinvented — a hand-rolled announcement helper, a wrapper
+around a formatting utility the repo already uses in hundreds of files, a literal where a token
+with that exact value is defined.
+
+`preReview.priorArt` answers each symbol exported from a shared-code path — any path with a
+`common`, `shared`, `utilities`, `utils`, `helpers`, `hooks`, or `components` segment — against
+what already exists:
+
+- `none` — the search found nothing equivalent;
+- `reused` — an existing implementation was adopted, cited in `existing`;
+- `justified` — a new implementation is kept, cited against `existing` with a `justification`.
+
+The validator derives the symbol list from the changed sources rather than from the report, so
+an export cannot be skipped by not mentioning it. Feature pages and layouts are exempt: they
+are inherently novel, and demanding a search for each one is noise.
 
 ## Contracts the change depends on
 

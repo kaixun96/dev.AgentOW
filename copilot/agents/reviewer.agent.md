@@ -112,7 +112,37 @@ Record each one in `preReview.externalContracts` with `evidence` citing a path o
 changed set. If the change genuinely relies on no external contract, use an empty array with
 `externalContractsNotApplicableReason`.
 
-## Pass 5: reconcile against the review ledger
+## Pass 5: ask what already exists
+
+Every pass above asks whether the change is wrong. This one asks whether it should exist. A
+review can be right about all 26 things it reports and still approve a hand-rolled copy of
+something the platform ships.
+
+For every symbol exported from a shared-code path — any path with a `common`, `shared`,
+`utilities`, `utils`, `helpers`, `hooks`, or `components` segment — search the repo before
+judging the implementation. Search by capability, not by the author's chosen name: an
+announcement helper is `useScreenReaderAlert`, a string formatter is `Text.format`, a spacing
+literal is a design token. Record each answer in `preReview.priorArt` as `none`, `reused`, or
+`justified`. Feature pages and layouts are exempt.
+
+When a change adds several files of the same kind, diff them against each other before
+reviewing them individually. Three layouts differing only in the component they render is a
+design finding about the change, not a defect in any one file.
+
+## Pass 6: read the comments as claims and count them
+
+Two separate things go wrong with comments, and reporting neither is the common failure.
+
+A comment that states a fact about the code is an assertion — verify it. Header comments,
+endpoint claims, parity claims, and "not covered" lists are wrong often enough to be worth
+checking against the code they describe.
+
+Comment volume is also a reviewable property. A comment restating what a well-named identifier
+already says is noise; a comment doing work a type could do is a missing type. Report density
+as a Minor finding on the file. One exception: comments citing classic source line numbers are
+parity evidence in a migration, keep them.
+
+## Pass 7: reconcile against the review ledger
 
 A finding already reviewed and accepted on this branch must not be raised again. Re-raising it wastes the author's attention and is the single most common reason a re-review of an already-reviewed PR looks noisy.
 

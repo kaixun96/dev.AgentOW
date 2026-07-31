@@ -147,6 +147,75 @@ diff, one of them describing an approach the file itself explained it had abando
 comments, endpoint and contract claims, and "NOT covered" lists against the code they describe.
 Stale claims are worst in new files, because they become the next reader's mental model.
 
+## M8. Capability reinvented because nothing asked what already exists
+
+**Missed:** a change hand-rolled a screen-reader announcement helper in a shared `styles.ts`.
+The review produced 26 findings — three blockers, several correct parity defects in 64-bit
+permission math — and never asked whether the platform already provided it. A human reviewer
+named the existing hook from memory: `useScreenReaderAlert`, which ships in *two* places
+(`odsp-common/shared-react/screen-reader-alert/` and
+`sp-client/libraries/sp-component-utilities/src/hooks/`). The same reviewer, on a different PR
+by a different author, caught a wrapper around string formatting when `Text.format` /
+`StringHelper.format` were already used in 355 files, and hardcoded literals where a design
+token with that exact value existed.
+
+**Mechanism:** every dimension in the contract asks whether the code in front of the reviewer
+is *wrong*. None asks whether it should *exist*. The profile's one prior-art rule is scoped to
+"navigation, menus, lists, or other interactive structures" — UI components only — so hooks,
+utilities, and style helpers fall outside it entirely.
+
+**Rule:** shared code is answered against the platform before it is answered for correctness.
+Every symbol exported from a shared-code path gets a repo search and one of three outcomes:
+nothing exists, an existing implementation is adopted, or the divergence is justified against
+the thing it duplicates. `preReview.priorArt` records this and the validator derives the symbol
+list from the changed sources, so an export cannot be skipped by not mentioning it.
+
+## M9. Comment volume treated as a style preference
+
+**Missed:** across two PRs, one human reviewer raised unnecessary comments **seven** times —
+"we usually only add comments for unavoidable hack methods", "not needed comment", "simplify
+comments, only add when we cannot understand why", "confusing comments, do it by TypeScript
+typing instead". The authors' own before/after measurements ran 43%→22%, 41%→21%, 36%→22%.
+The review agent raised it zero times in either PR.
+
+**Mechanism:** "comments/docs" is three words inside one design bullet listing eight concerns.
+A dimension that only appears as a clause never fires. The same burial explains M4.
+
+**Rule:** comment density is a reviewable property of the change. A comment that restates what
+a well-named identifier already says is noise, and a comment doing work that a type could do
+is a missing type. The exception worth protecting: comments citing classic source line numbers
+are parity evidence in a migration, not commentary.
+
+## M10. Localization checked for extraction, not for contract
+
+**Missed:** new `.resx` strings without `{Locked=...}` on their placeholders; a count-bearing
+string with no singular/plural pair ("1 more breadcrumb items"); English fallback strings
+sitting in code with no answer to whether they are user-visible. Human reviewers raised these
+five times across the two PRs; the agent raised none.
+
+**Mechanism:** the contract lists `localization` as a dimension, which the agent satisfies by
+confirming strings are externalized. Externalization is the easy half. The `{Locked=}`
+convention is real and repo-wide — 85 occurrences across 43 `.resx` files.
+
+**Rule:** for each added `.resx` entry, check placeholder locking, singular/plural coverage for
+anything that can be 1, and whether any English string left in code can reach a user.
+
+## M11. Sibling files reviewed one at a time
+
+**Missed:** three new page layouts with, in the human reviewer's words, "the same private
+members/functions, the only difference is the component it renders" — and separately, "the 3
+pages look like totally the same structure and similar UX, should we split them into 3 pages?"
+The agent reviewed each file's contents correctly and never compared them to each other.
+
+**Mechanism:** this is M1 pointed at structure instead of defects. The class sweep asks whether
+a *defect* recurs across the change; nothing asks whether the change's *files* are copies.
+
+**Rule:** when a change adds several files of the same kind, diff them against each other
+before reviewing them individually. Near-identical siblings are a design finding about the
+change, not a defect in any one file.
+
+---
+
 ---
 
 ## Calibration — findings that were wrong
