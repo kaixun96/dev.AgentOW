@@ -6,6 +6,7 @@ import {
   acceptedFingerprints,
   annotateFindings,
   loadLedger,
+  readSource,
 } from "./review-ledger.mjs";
 
 const DIMENSIONS = [
@@ -99,6 +100,104 @@ function validateReviewLedger(report, options, errors) {
     if (!isObject(entry) || !nonEmpty(entry.fingerprint) || !nonEmpty(entry.path) || !nonEmpty(entry.reason)) {
       errors.push("every previouslyAccepted entry requires fingerprint, path, and reason");
       break;
+    }
+  }
+}
+
+// A finding is a class, not a line. The reviewer declares the query that
+// describes its defect class; this runs that query over the changed set and
+// rejects the report when a hit is left unaccounted for, so "I checked the
+// other sites" cannot be asserted without having actually checked them.
+function crossCheckClassSweep(report, options, errors, changedFiles) {
+  const findings = (report.findings ?? []).filter(
+    (finding) =>
+      isObject(finding) &&
+      (finding.severity === "Critical" || finding.severity === "Important") &&
+      // A reviewability finding is about the shape of the change itself, not
+      // about a code pattern that could recur elsewhere in it.
+      finding.category !== "reviewability",
+  );
+  if (findings.length === 0) return;
+
+  const repoRoot = options.get("--repo") ?? process.cwd();
+  const ref = options.get("--ledger-ref");
+  const reported = new Set();
+  for (const finding of report.findings ?? []) {
+    if (isObject(finding) && nonEmpty(finding.path) && Number.isInteger(finding.line)) {
+      reported.add(`${finding.path}:${finding.line}`);
+    }
+  }
+
+  const sourceCache = new Map();
+  const linesOf = (filePath) => {
+    if (!sourceCache.has(filePath)) {
+      const source = readSource(repoRoot, filePath, ref);
+      sourceCache.set(filePath, source === null ? null : source.split(/\r?\n/));
+    }
+    return sourceCache.get(filePath);
+  };
+
+  for (const finding of findings) {
+    const sweep = finding.classSweep;
+    if (!isObject(sweep) || !nonEmpty(sweep.query) || !Array.isArray(sweep.scope) || sweep.scope.length === 0) {
+      errors.push(`finding ${finding.id} requires classSweep with a query and a non-empty scope`);
+      continue;
+    }
+    if (!Array.isArray(sweep.accountedFor)) {
+      errors.push(`finding ${finding.id} requires classSweep.accountedFor as an array`);
+      continue;
+    }
+
+    let pattern;
+    try {
+      pattern = new RegExp(sweep.query);
+    } catch (error) {
+      errors.push(`finding ${finding.id} classSweep.query is not a valid regular expression: ${error.message}`);
+      continue;
+    }
+
+    // The query has to describe the defect the finding reports, or the sweep
+    // is measuring something else. Without resolvable source there is nothing
+    // to recompute, so the schema check above stands on its own.
+    const ownLines = linesOf(finding.path);
+    if (ownLines === null) continue;
+    const ownLine = ownLines[finding.line - 1];
+    if (ownLine === undefined || !pattern.test(ownLine)) {
+      errors.push(
+        `finding ${finding.id} classSweep.query does not match its own cited line ${finding.path}:${finding.line}, so it does not describe the reported defect`,
+      );
+      continue;
+    }
+
+    // Sweeping only the file the defect was spotted in is how the second
+    // instance gets missed, so every changed sibling of the same type is required.
+    if (changedFiles.length > 0) {
+      const extension = finding.path.slice(finding.path.lastIndexOf("."));
+      const siblings = changedFiles.filter((file) => file.endsWith(extension));
+      const missing = siblings.filter((file) => !sweep.scope.includes(file));
+      if (missing.length > 0) {
+        errors.push(
+          `finding ${finding.id} classSweep.scope omits changed ${extension} files it must sweep: ${missing.slice(0, 5).join(", ")}`,
+        );
+        continue;
+      }
+    }
+
+    const accounted = new Set([...reported, ...sweep.accountedFor.filter((entry) => typeof entry === "string")]);
+    const unaccounted = [];
+    for (const filePath of sweep.scope) {
+      const lines = linesOf(filePath);
+      if (lines === null) continue;
+      for (let index = 0; index < lines.length; index++) {
+        if (!pattern.test(lines[index])) continue;
+        const location = `${filePath}:${index + 1}`;
+        if (!accounted.has(location)) unaccounted.push(location);
+      }
+    }
+    if (unaccounted.length > 0) {
+      errors.push(
+        `finding ${finding.id} classSweep leaves ${unaccounted.length} instance(s) of its own class unaccounted for: ${unaccounted.slice(0, 5).join(", ")}`,
+      );
     }
   }
 }
@@ -364,6 +463,44 @@ function validateRolloutProtection(report, expectedFiles, errors) {
   }
 }
 
+// Both blocking defects this reviewer has missed lived in a dependency's
+// source, not in the changed file. Consumer analysis looks downstream; this
+// forces at least one look upstream, at what the changed code relies on.
+function validateExternalContracts(report, expectedFiles, errors) {
+  const contracts = report.preReview?.externalContracts;
+  if (!Array.isArray(contracts)) {
+    errors.push("preReview.externalContracts is required");
+    return;
+  }
+  const changed = new Set(expectedFiles);
+  if (contracts.length === 0) {
+    if (!nonEmpty(report.preReview?.externalContractsNotApplicableReason)) {
+      errors.push(
+        "preReview.externalContracts is empty and requires externalContractsNotApplicableReason explaining why the change relies on no external contract",
+      );
+    }
+    return;
+  }
+  for (const contract of contracts) {
+    if (
+      !isObject(contract) ||
+      !nonEmpty(contract.symbol) ||
+      !nonEmpty(contract.module) ||
+      !nonEmpty(contract.verifiedBehavior) ||
+      !nonEmpty(contract.evidence)
+    ) {
+      errors.push("every externalContracts entry requires symbol, module, verifiedBehavior, and evidence");
+      return;
+    }
+    const cited = String(contract.evidence).split(":")[0];
+    if (changed.has(cited)) {
+      errors.push(
+        `externalContracts entry ${contract.symbol} cites ${cited}, which this PR changed; the contract must be evidenced from the dependency's own source`,
+      );
+    }
+  }
+}
+
 function readLines(filePath) {
   return fs
     .readFileSync(filePath, "utf8")
@@ -532,6 +669,7 @@ function validate(report, options) {
     if (expectedFiles.some((file) => file.startsWith("sp-client/"))) {
       validateRolloutProtection(report, expectedFiles, errors);
     }
+    validateExternalContracts(report, expectedFiles, errors);
   }
 
   const diffNumstatPath = options.get("--diff-numstat");
@@ -756,6 +894,7 @@ function validate(report, options) {
   if (!Array.isArray(report.findings)) errors.push("findings must be an array");
   validateReviewLedger(report, options, errors);
   crossCheckReviewLedger(report, options, errors);
+  crossCheckClassSweep(report, options, errors, expectedFiles);
   const actualCounts = { critical: 0, important: 0, minor: 0 };
   for (const finding of report.findings ?? []) {
     if (

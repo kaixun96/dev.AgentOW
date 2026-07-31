@@ -160,6 +160,14 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
       "entryCount": 0,
       "carriedCount": 0
     },
+    "externalContracts": [
+      {
+        "symbol": "<external symbol the change relies on>",
+        "module": "<package or library it comes from>",
+        "verifiedBehavior": "<what its source actually does>",
+        "evidence": "<path:line outside the changed set>"
+      }
+    ],
     "profileChecks": [
       {
         "id": "<profile-defined check ID>",
@@ -217,7 +225,24 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
       }
     ]
   },
-  "findings": [],
+  "findings": [
+    {
+      "id": "<finding ID>",
+      "severity": "Critical|Important|Minor",
+      "category": "<dimension key>",
+      "path": "<changed path>",
+      "line": 1,
+      "description": "<what is wrong>",
+      "impact": "<what it costs>",
+      "suggestedFix": "<the change to make>",
+      "evidence": ["<path:line>"],
+      "classSweep": {
+        "query": "<regex describing the defect class>",
+        "scope": ["<every changed file swept>"],
+        "accountedFor": ["<path:line found and explained rather than reported>"]
+      }
+    }
+  ],
   "previouslyAccepted": [],
   "counts": { "critical": 0, "important": 0, "minor": 0 }
 }
@@ -266,6 +291,47 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" match \
 ```
 
 Every finding the matcher reports as `carried` belongs in `previouslyAccepted`, not in `findings`. Re-raising an accepted finding is a reviewer-spec failure, and the orchestrator's validator re-runs the match itself rather than trusting the claim.
+
+## Findings are classes, not lines
+
+A finding names a defect class that happened to be spotted at one location. Reporting the
+location and moving on is how a second instance of the same defect ships: the author fixes the
+line that was cited, and the one that was not stays broken.
+
+Every Critical and Important finding therefore carries `classSweep`:
+
+```json
+"classSweep": {
+  "query": "<regex describing the defect class>",
+  "scope": ["<every changed file swept>"],
+  "accountedFor": ["<path:line found and explained rather than reported>"]
+}
+```
+
+- `query` must match the finding's own cited line. A query that does not match the defect it
+  reports is measuring something else.
+- `scope` must include every changed file that shares the cited file's extension. Sweeping only
+  the file the defect was spotted in reproduces the miss this exists to prevent.
+- Every line the query matches inside `scope` must be accounted for: reported as its own
+  finding, or listed in `accountedFor` because that instance is genuinely safe.
+
+The validator runs `query` itself over `scope` and rejects the report when a match is left
+unaccounted for, so the sweep cannot be claimed without being performed. `reviewability`
+findings are exempt, because they describe the shape of the change rather than a code pattern.
+
+## Contracts the change depends on
+
+Consumer analysis looks downstream, at who calls the changed code. Defects also live upstream,
+in what the changed code calls and what that thing actually promises — a component's treatment
+of its children, a platform structure's units or time base, a monitor's event lifecycle, a
+type's real exported shape. Code that relies on a wrong assumption about a dependency reads
+correctly in isolation; only the dependency's source shows the defect.
+
+`preReview.externalContracts` records each external symbol whose semantics the change depends
+on for correctness, with `evidence` citing that symbol's own source. The cited path must be
+outside the changed set — a contract cannot be evidenced from the file under review. When the
+change genuinely relies on no external contract, use an empty array plus
+`preReview.externalContractsNotApplicableReason`.
 
 `preReview.reviewLedger` is mandatory:
 
