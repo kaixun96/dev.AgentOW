@@ -221,6 +221,7 @@ For UI-visible changes, visual validation is mandatory and the evaluator owns it
 - Screenshots created manually by the main session do **not** satisfy evaluator validation. If the main session writes a temporary spec to unblock an investigation, move that logic into the evaluator retry prompt and re-dispatch the evaluator.
 - Surface the exact failure reason to the user and record it in `progress.log`, `report.json`, and `final.md` if the run stops.
 - Do not claim the UI was verified without screenshot evidence.
+- Failing visual validation blocks the *claim*, not the *delivery*. If the implementation is already committed and green, do not end the run empty-handed — see the environment-discovery branch of Step 6 and ship an explicitly unverified draft instead.
 
 Before accepting any evaluator claim about auth, FIC, tenant suitability, test-page availability, or a fixture gap, inspect its `coverageManifest`. A single URL, credential, tenant, or site failure is resource-local evidence only.
 
@@ -231,7 +232,14 @@ Before accepting any evaluator claim about auth, FIC, tenant suitability, test-p
 
 ## Step 6: Fix loop
 
-**Environment-discovery incomplete (any cycle):** re-dispatch only `@agentow-copilot:evaluator` in the same implementation cycle with the missing coverage requirements. If the retry is still incomplete, stop rather than auto-shipping an unsupported environment claim.
+**Environment-discovery incomplete (any cycle):** re-dispatch only `@agentow-copilot:evaluator` in the same implementation cycle with the missing coverage requirements. If the retry is still incomplete, do not claim the environment is unsupported and do not claim the UI was verified.
+
+- If nothing has been committed yet, stop and report the blocker.
+- If the implementation is already committed and green — `ow-build` passing, `ow-test` passing — then in auto/batch mode **ship it as `success-with-blockers` rather than discarding it**. Continue to review and `ow-pr-create`, and mark the draft PR `unverified`. Do not retry the capture a third time. In interactive mode, show the incomplete manifest and ask.
+
+  The PR description must then carry a verification section stating exactly what was and was not done — build and unit tests passed, visual verification was attempted and could not be completed, BEFORE/AFTER screenshots are still owed, and a human must confirm the rendering before this leaves draft. Record the incomplete manifest and the capture failure verbatim in `report.json` and `final.md`. Never imply the UI was seen.
+
+  The safeguard against hand-waving is the disclosure and the draft state, not the discarding of finished work. A run that verified nothing and says so is useful; a run that silently deletes a green commit is not.
 
 **Evaluator-spec FAIL (any cycle):** re-dispatch only `@agentow-copilot:evaluator` once in the same implementation cycle with the spec blocker. Do not edit code, rebuild, retest, or consume a product fix cycle. If the retry still violates the evaluator contract, stop and report the blocker rather than looping or auto-shipping.
 

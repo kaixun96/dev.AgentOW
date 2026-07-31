@@ -110,13 +110,17 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
 
 1. Determine screenshot source:
    - **Default / preferred:** use the local `rush start` debug link because it is available before PR validation builds finish. Call `ow-debuglink` with the test page URL → `fullTestUrl`.
-   - Use PR CDN only when `finalValidationMode == "pr-cdn-fic"` is explicitly requested, or when local debug validation already failed for environment/tooling reasons (localhost cert/assembly-load failure, missing local dev server, browser MCP unavailable with a FIC spec that must use PR CDN, etc.).
+   - Use PR CDN when `finalValidationMode == "pr-cdn-fic"` is explicitly requested, or when local debug validation already failed for environment/tooling reasons (localhost cert/assembly-load failure, missing local dev server, browser MCP unavailable with a FIC spec that must use PR CDN, etc.).
+   - **Never attempt the same source twice for the same failure.** The local route is a preference, not a commitment: once a local capture has failed for any environment/tooling reason, switching to the PR's SP-Client Validation CDN query is required, not optional. Retrying `local-rush-start` after it has already failed once is a contract violation — record the switch in `visualValidation.source` and state the original local failure in `reasonForSkipOrFail`.
+   - If the surface needs a real tenant with pre-existing content (Viva Amplify campaigns, published news posts, analytics telemetry), prefer the PR CDN query on a dogfood tenant from the start. A per-run pool tenant has no such content, and building it inside the capture spec adds several minutes of setup that can fail before a single pixel is captured.
 2. Get the debug link/query:
    - If `ow-debuglink` is unavailable, returns no `fullTestUrl`, or the dev server is not ready, return `FAIL` with blocker `visual-validation-debug-link-missing`.
 3. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
    - If browser tools are unavailable, do **not** stop at `playwright-tools-unavailable`. Use the FIC fallback below first.
    - If an AAD/login/consent page blocks access, return `FAIL` with blocker `playwright-auth-required` and tell the user exactly what page/prompt was seen.
 4. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
+   - Drive the real control. A URL query parameter whose name matches the surface is not a trigger: `?Action=ViewPublishingDetails` opens the publishing drawer for three of six publication statuses and silently runs the pre-publish flow for the rest, so the capture waits for a heading that will never appear. Before writing a capture step, find the call site that flips the open state (`setIsPublishingPanelOpen(true)` and friends) and click that control, preferring its `data-automation-id`.
+   - A capture spec must build its own fixture with the package's existing helpers rather than depending on tenant state it did not create. Selecting "the first card" picks up half-created leftovers from earlier timed-out runs, which open into an empty shell and look like a product failure.
    - If the surface hosts an iframe or another async shell, the outer Drawer/Dialog/Modal is not enough. Wait for the inner discriminator or iframe content to be visible before taking screenshots.
 5. Capture the primary BEFORE screenshot as the **full browser page/viewport**, including SharePoint chrome, page canvas, backdrop, and target surface. Never use an element/locator/selector crop as primary PR evidence.
    - Set and record one viewport size for both phases.
