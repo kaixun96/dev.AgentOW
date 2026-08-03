@@ -75,6 +75,42 @@ Apply these concrete standards when relevant:
 - Inspect telemetry for data classification, useful success/failure coverage, stable event semantics, and absence of sensitive payloads.
 - Treat unexplained bundle-size growth, credible hot-path regressions, and UI that conflicts with common design as blocking until measured or confirmed.
 
+### Focused review checks
+
+Apply these checks when their trigger appears in the changed set:
+
+**Design system and UI**
+
+- In Fluent v9 styles, challenge hardcoded typography, radius, shadow, and pseudo-selector values etc. Check both the component API and the typography preset/token table before accepting that no supported value exists, and cite the relevant Fluent Storybook source https://storybooks.fluentui.dev/react. Prefer semantic preset components when their HTML element is suitable; otherwise spread the preset style onto the required semantic element.
+- Treat a local style helper whose callers immediately override one of its axes as a failed abstraction. Prefer design-system presets over a helper that pins an incompatible size, weight, or line height.
+- Reject selectors that target internal `.fui-*` classes. Do not guess that a token, especially a shadow token, is visually equivalent; verify it against the design source.
+- Ask for the design source behind unexplained fixed pixel values. Check SPDS and Fluent v9 before accepting a new raw-element component; if no component fits, verify the element-level accessibility contract in every supported composition.
+
+**Comments, reuse, and API shape**
+
+- Comment density above roughly 15–20% in a touched file requires a simplification pass, not indiscriminate deletion. Remove comments and file headers that merely restate implementation syntax or well-named identifiers. Preserve concise comments for unavoidable hacks and classic-parity citations. Public interfaces and API contracts require detailed documentation of purpose, input constraints, units, side effects, error behavior, and other caller-visible semantics that the type system does not express.
+- Before accepting net-new cross-cutting code such as a REST client, error parser, URL utility, or formatter, run a bounded repo-wide prior-art survey. A similarly named candidate is reusable only after its source and callers show compatible error preservation, option and verb handling, headers/defaults, write support such as `X-RequestDigest`, API stability, and dependency availability.
+- Delete pure pass-through wrappers that add no contract, policy, or observability. Treat widespread duplication without a proven shared consumer as follow-up extraction work rather than automatically blocking the current PR.
+- New helpers must replace every in-scope instance of the pattern they consolidate. Extraction functions return bare data; presentation formatting belongs at the composition site. Prefer readable `??` or `||` fallback chains when they preserve the intended nullish-versus-falsy semantics.
+- Document non-obvious interface constraints, including relative-versus-absolute paths, value ranges, and required non-empty values, in the type or API documentation even when all callers are in-repo and runtime checks are unnecessary.
+
+**Control flow and edge cases**
+
+- For `ReactNode` render guards, decide explicitly whether `0`, `""`, `false`, and `null` are meaningful. `!== undefined` and boolean coercion are not interchangeable.
+- Put cheap guards before transforms or other expensive work. When behavior depends on iterating a constant array, establish whether the empty case is supported or rejected and cover the invariant with a test.
+
+**Localization and security**
+
+- For count-bearing strings, verify the `0`, `1`, and `>=2` cases. Apply `{Locked=...}` requirements to accessibility and screen-reader strings as well as visible UI, but do not lock placeholders that formatting utilities substitute only at runtime. Preserve machine syntax with the repository's `{ValidChars="..."}` and delimiter metadata such as `{Split="||"}`.
+- Before requesting removal of front-end validation, trace the input source and every pre-server sink. Query parameters such as `Source` and `NextUsing` remain untrusted until validation rejects dangerous schemes, protocol-relative or cross-origin URLs, and control characters; distinguish them from trusted platform values such as `webAbsoluteUrl`.
+
+**Routing, accessibility, and change scope**
+
+- Any `data-interception='off'` requires evidence that disabling SPFx soft routing and discarding navigation preload is correct. Where the server stamps authoritative page identity, preserve its priority over client URL matching and verify related killswitch/ECS, preload, and rights contracts.
+- A raw `<li>` must be owned by a real list container or a component documented to render one. During classic-to-modern ports, do not preserve pre-ARIA workarounds such as `title` as the accessible name, `accesskey`, `tabindex="0"` on static text, or `<a tabindex="-1">` unless observable parity explicitly requires them.
+- Verify delta-neutral moves and extractions mechanically: strings remain byte-identical, dispatch order is preserved, and relocated files are not silently rewritten.
+- Accept a "pre-existing, defer" response only when history verifies the issue predates the PR, the PR relocates rather than rewrites the code, fixing it would introduce an unsupported visual or behavioral delta, and an owner names a concrete follow-up.
+
 ## Blocking rules
 
 Request changes when any of these are credible and evidenced:

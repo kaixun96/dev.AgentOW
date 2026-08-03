@@ -1,8 +1,9 @@
 # Review misses
 
 Defects that real human reviewers found in PRs this reviewer had already reviewed. Each entry
-records what was missed, the mechanism that caused the miss, and the generalized rule. Every
-claim is cited to code, not to the review comment that reported it.
+records what was missed and the mechanism that caused the miss. General review standards live
+in `docs/review-contract.md`; older entries retain their original rule for historical context.
+Every claim is cited to code, not to the review comment that reported it.
 
 Read this before finalizing a review. These are not additional checklist items to recite; they
 are the failure modes this reviewer actually has.
@@ -26,12 +27,6 @@ other call sites in the same file put a user-chosen file name into the same sink
 **Mechanism:** a finding was treated as a location. Once the location was cited, the reviewer
 moved to the next dimension. Nothing required asking whether the defect *class* occurred
 elsewhere in the diff.
-
-**Rule:** a finding is a class, not a line. Before finalizing, sweep the whole changed set for
-every other instance of each Critical or Important finding's class, and account for every hit —
-as its own finding, or as an explicit reason it is safe. `preReview.classSweep` and the
-validator enforce this: the reviewer declares the query, and the validator runs that query
-itself and rejects the report if a hit is unaccounted for.
 
 ## M2. Reasoning about a dependency without reading it
 
@@ -62,19 +57,6 @@ exports the real shape.
 Every one of these defects is *upstream* — what the changed code calls, and what that thing
 actually promises. The changed file reads plausibly in isolation in all five cases; the defect
 is only visible in the dependency's source.
-
-**Rule:** when correctness depends on what an external symbol does — a component's treatment of
-its children, a platform structure's units or time base, a telemetry helper's event lifecycle,
-an exported type's real shape — open that symbol's source and cite it. Record each one in
-`preReview.externalContracts` with evidence outside the changed set. Trigger shapes seen so far:
-
-| shape | what to open |
-|---|---|
-| a component is wrapped, or its children are composed indirectly | the component's own `render`/children handling |
-| a platform/interop struct is read (`SYSTEMTIME`, offsets, ticks) | the structure's documented units and time base |
-| a monitor/logger/scope object is constructed | its constructor and its end/dispose path |
-| a value flows into telemetry | the sink's classification of that field |
-| a type is re-declared locally, or cast through `unknown` | the package barrel, for the real exported type |
 
 ## M3. The diff contradicting itself
 
@@ -164,12 +146,6 @@ is *wrong*. None asks whether it should *exist*. The profile's one prior-art rul
 "navigation, menus, lists, or other interactive structures" — UI components only — so hooks,
 utilities, and style helpers fall outside it entirely.
 
-**Rule:** shared code is answered against the platform before it is answered for correctness.
-Every symbol exported from a shared-code path gets a repo search and one of three outcomes:
-nothing exists, an existing implementation is adopted, or the divergence is justified against
-the thing it duplicates. `preReview.priorArt` records this and the validator derives the symbol
-list from the changed sources, so an export cannot be skipped by not mentioning it.
-
 ## M9. Comment volume treated as a style preference
 
 **Missed:** across two PRs, one human reviewer raised unnecessary comments **seven** times —
@@ -181,11 +157,6 @@ The review agent raised it zero times in either PR.
 **Mechanism:** "comments/docs" is three words inside one design bullet listing eight concerns.
 A dimension that only appears as a clause never fires. The same burial explains M4.
 
-**Rule:** comment density is a reviewable property of the change. A comment that restates what
-a well-named identifier already says is noise, and a comment doing work that a type could do
-is a missing type. The exception worth protecting: comments citing classic source line numbers
-are parity evidence in a migration, not commentary.
-
 ## M10. Localization checked for extraction, not for contract
 
 **Missed:** new `.resx` strings without `{Locked=...}` on their placeholders; a count-bearing
@@ -196,9 +167,6 @@ five times across the two PRs; the agent raised none.
 **Mechanism:** the contract lists `localization` as a dimension, which the agent satisfies by
 confirming strings are externalized. Externalization is the easy half. The `{Locked=}`
 convention is real and repo-wide — 85 occurrences across 43 `.resx` files.
-
-**Rule:** for each added `.resx` entry, check placeholder locking, singular/plural coverage for
-anything that can be 1, and whether any English string left in code can reach a user.
 
 ## M11. Sibling files reviewed one at a time
 
