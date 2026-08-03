@@ -68,10 +68,14 @@ Then:
 
 ```bash
 copilot -p "/agentow fix the elevation background on mobile"          # auto-ish, one shot
+copilot -p "/ow-review 1234567"                                       # review an existing PR only
 copilot                                                               # interactive session
 > /agentow add a loading spinner to PhotoGrid
 > /ow-batch tasks.md
+> /ow-review                                                          # review the current branch
 ```
+
+`/ow-review` runs the review gate on its own: no planning, no implementation, no PR. With a PR ID it resolves the PR's source/target branches through `az repos pr show` and materializes the PR head in a temporary detached worktree when it is not the current checkout; with no argument it reviews the current branch against `origin/main`.
 
 Before PR creation, the reviewer performs a risk inventory and an adversarial second pass. Its `review.json` must prove coverage of every changed file, direct consumers, tests, repository/context instructions, and all canonical quality dimensions. Critical and Important findings block every mode until fixed and re-reviewed; AUTO and draft status do not bypass this gate.
 

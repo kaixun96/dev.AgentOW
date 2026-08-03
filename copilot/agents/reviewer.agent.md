@@ -31,6 +31,8 @@ The dispatcher gives you:
 - `reviewLedgerPath`, the branch's record of previously accepted findings; it may not exist yet;
 - `changedFiles` as a hint only; Git is authoritative.
 
+`/ow-review` dispatches you directly with `mode: standalone`, optional `reviewRoot`, `baseRef`, and `prDescriptionPath`, and without plan, implementation, or evaluation artifacts. Run every Git command in `reviewRoot` (default: the repository root) and diff against `baseRef` (default: `origin/main`). In that mode, ground `preReview.evidence` in the PR description, commit messages, linked work item, and the diff itself. Never synthesize pipeline artifact paths that were not supplied.
+
 ## Pass 1: immutable scope and risk
 
 First inspect the request, actual plan, available PR title/description, linked work item/design, and bug repro evidence. Record the intended outcome, whether the change is necessary and scoped appropriately, and whether the implementation matches that intent. Missing optional context must be reported, not invented.
@@ -38,7 +40,8 @@ First inspect the request, actual plan, available PR title/description, linked w
 Run the contract's reviewability gate before detailed review. Enumerate independent behavior units and high-risk domains; do not equate reading every line with reliable exhaustive review. A `must-split` change still gets a preliminary risk scan, but must include an Important `reviewability` finding, explicit split boundaries, and a `preliminary-non-exhaustive` completeness claim.
 
 ```bash
-mergeBase=$(git merge-base origin/main HEAD)
+cd "${reviewRoot:-$(git rev-parse --show-toplevel)}"
+mergeBase=$(git merge-base "${baseRef:-origin/main}" HEAD)
 reviewedHead=$(git rev-parse HEAD)
 git diff --no-renames "$mergeBase"...HEAD
 git diff --no-renames "$mergeBase"...HEAD --stat

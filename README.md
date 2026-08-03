@@ -168,6 +168,16 @@ Designed for "leave it overnight, come back to PRs". Each task gets a fresh agen
 
 > **Don't** invoke `ow-orchestrator` directly — always use `/ow-team` or `/ow-batch`. The orchestrator requires a properly set up Agent Team to function.
 
+### Review-only mode — no implementation, no PR
+
+```
+/ow-review                 # review the current branch against origin/main
+/ow-review 1234567         # review an existing ADO PR by ID (URL also works)
+/ow-review --base origin/releases/M1
+```
+
+Runs the same validated review gate the pipeline uses, without planning, coding, or shipping. Reviewing a PR resolves its source/target branches through `az repos pr show`; when the PR head is not the current checkout, it is materialized in a temporary detached worktree so your working tree is untouched. Findings are reported to you — this command never edits code and never creates or publishes a PR.
+
 ### MCP tools directly
 
 ```
@@ -257,6 +267,7 @@ All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cy
 |-------|------------------|
 | `ow-team` | Run the full pipeline (entry point) |
 | `ow-batch` | Run multiple tasks overnight, one PR per task |
+| `ow-review` | Review an existing PR or the current branch, without implementing or shipping |
 | `ow-dev-build` | rush build/install/update |
 | `ow-dev-test` | rush test, Jest |
 | `ow-dev-git` | git, branch, checkout |
