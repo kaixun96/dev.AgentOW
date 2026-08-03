@@ -108,6 +108,12 @@ If this manifest is missing or `status` is `incomplete`, return `failureKind: "e
 
 When `verificationMode == "environment_discovery"`, start with this hard gate and the prior evaluator evidence. Do not repeat code inspection, ask for a rebuild, or emit a generator-target blocker. If a candidate is found, continue directly to screenshot capture.
 
+0. **Establish the surface's open-condition before writing any capture step.** Find the code that sets the surface's open state and record what it requires. Do not infer it from a control's name, a URL parameter, or the component's own name — those match while the behaviour differs.
+
+   A surface can be gated on application *state* rather than on a click. Read the setter's surrounding branch: the panel may render only for particular statuses, only after an operation fails, or not at all because the product mounts a sibling component instead. A capture that drives the happy path will then wait out its timeout against a surface that was never going to appear, and the failure looks like a bad locator.
+
+   Write the precondition into the artifact before capturing. If it cannot be established from the source, say so and return `FAIL` rather than guessing — a guessed precondition costs a full timeout per attempt.
+
 1. Determine screenshot source:
    - **Default / preferred:** use the local `rush start` debug link because it is available before PR validation builds finish. Call `ow-debuglink` with the test page URL → `fullTestUrl`.
    - Use PR CDN only when `finalValidationMode == "pr-cdn-fic"` is explicitly requested, or when local debug validation already failed for environment/tooling reasons (localhost cert/assembly-load failure, missing local dev server, browser MCP unavailable with a FIC spec that must use PR CDN, etc.).
@@ -173,6 +179,14 @@ Rules for this fallback:
 Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed. A missing Playwright MCP plugin is not a FIC failure.
 
 If the surface needs tenant state mutation (created pages, seeded data), clean it up before returning — the synthetic tenant is shared.
+
+**A capture spec that reached the surface is an asset. Keep it.** Tenant data is disposable; the spec that navigates to a surface is not. Leave a working spec in the repo's integration-test project (alongside the existing specs for that area) and name it in the artifact, so the next run on the same surface starts from it rather than rediscovering the fixture, the trigger and the discriminator. Delete only specs that never reached the surface.
+
+Prefer starting from an existing spec in that project over writing a new one. The repo's own helpers already encode how to build a fixture; reimplementing that is where the time goes.
+
+**Never fabricate DOM to satisfy a precondition.** Injecting an element so a guard or helper selector passes — or otherwise faking application state from the page context — produces a screenshot that proves nothing about the product. If a helper's precondition conflicts with the fixture you need, use a different helper or a different route, and say in the artifact which one and why.
+
+**Stop iterating after three attempts that fail to reach the surface.** Three failures in a row are evidence about the precondition, not the selector. Re-derive the open-condition from source, or return `FAIL` naming what you established and what remains unknown. Continuing to adjust locators past that point burns the run's budget without converging — each attempt on a long stateful chain costs minutes, and the chain fails at whichever link is weakest that day.
 
 If pattern is `skip`, verify by code inspection only and record `visualValidation.status="skipped"` with the exact non-UI reason. A vague reason like "not needed" is not valid.
 

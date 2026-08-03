@@ -138,7 +138,7 @@ Using the planner's findings, write a short plan:
 - Spec (2-3 sentences)
 - Acceptance criteria (clear pass/fail)
 - Tasks (exact files, what changes)
-- Visual surface trace (from the planner, for the evaluator later)
+- Visual surface trace (from the planner, for the evaluator later) — including the surface's **open-condition**: the code that sets its open state and the application state that must hold for it to render. A control name or URL parameter is not an open-condition.
 - Context compliance checklist (each routed guard and its required artifact)
 - Root/wrapper layout ownership table when any JSX root/wrapper is replaced
 - Repeated-item geometry target (selector, axis, metric) when Cards/rows/tiles/items repeat
