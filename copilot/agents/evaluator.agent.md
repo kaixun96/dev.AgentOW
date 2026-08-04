@@ -121,6 +121,7 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    - If the surface needs a real tenant with pre-existing content (Viva Amplify campaigns, published news posts, analytics telemetry), prefer the PR CDN query on a dogfood tenant from the start. A per-run pool tenant has no such content, and building it inside the capture spec adds several minutes of setup that can fail before a single pixel is captured.
 2. Get the debug link/query:
    - If `ow-debuglink` is unavailable, returns no `fullTestUrl`, or the dev server is not ready, return `FAIL` with blocker `visual-validation-debug-link-missing`.
+   - **Re-verify the bundle is being served immediately before every capture attempt, not just once at the start.** A dev server can die mid-session — killed with a stray process cleanup, evicted, or crashed — and every subsequent attempt then loads a page with no product code on it. Fetch the loader or manifests URL and require a 200. If it fails, restart the server and say so; do not proceed.
 3. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
    - If browser tools are unavailable, do **not** stop at `playwright-tools-unavailable`. Use the FIC fallback below first.
    - If an AAD/login/consent page blocks access, return `FAIL` with blocker `playwright-auth-required` and tell the user exactly what page/prompt was seen.
@@ -128,6 +129,16 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    - Drive the real control. A URL query parameter whose name matches the surface is not a trigger: `?Action=ViewPublishingDetails` opens the publishing drawer for three of six publication statuses and silently runs the pre-publish flow for the rest, so the capture waits for a heading that will never appear. Before writing a capture step, find the call site that flips the open state (`setIsPublishingPanelOpen(true)` and friends) and click that control, preferring its `data-automation-id`.
    - A capture spec must build its own fixture with the package's existing helpers rather than depending on tenant state it did not create. Selecting "the first card" picks up half-created leftovers from earlier timed-out runs, which open into an empty shell and look like a product failure.
    - If the surface hosts an iframe or another async shell, the outer Drawer/Dialog/Modal is not enough. Wait for the inner discriminator or iframe content to be visible before taking screenshots.
+
+   **When an element is not found, diagnose from the bottom up before concluding anything about the product.** "Element not found" is the same error whether the app never loaded, the surface was never opened, or the selector is wrong — and the cheapest explanations are the ones furthest from the product. Work the ladder in order and record which rung failed:
+
+   1. **Is the bundle being served?** Fetch the loader/manifests URL. A dead dev server yields a page with no product code, and every locator on it fails identically. This is the single most misleading failure mode: it looks exactly like missing tenant data.
+   2. **Did the app shell mount at all?** Check for the application's root/shell element. If the shell is absent, nothing about the surface, the fixture or the tenant has been tested yet.
+   3. **Are the required flights actually on?** `debugFlights` only applies on the page load that carries it, and it can only switch a flight ON. A surface behind an un-applied flight is absent, not broken.
+   4. **Did the precondition hold?** Assert the state established in step 0 — the error the panel needs, the status the branch requires. Prove it in the page, do not assume the setup step worked.
+   5. **Only then** question the selector or the surface itself.
+
+   Report the rung that failed, not just the locator. A snapshot showing only the page chrome means rung 1 or 2, never rung 5 — and iterating selectors against it is wasted time.
 5. Capture the primary BEFORE screenshot as the **full browser page/viewport**, including SharePoint chrome, page canvas, backdrop, and target surface. Never use an element/locator/selector crop as primary PR evidence.
    - **Wait for paint, not for visibility.** Playwright's `toBeVisible` resolves as soon as the element is in the layout, which for a runtime-styled component is before its CSS exists. SPDS v9 / Fluent v9 components are styled by Griffel, which injects styles at runtime, so there is a real window in which the element is "visible" and completely unstyled — a v8 component in the same position is unaffected because its styles come from a preloaded stylesheet. Screenshotting in that window produced an unstyled drawer that passed every other check.
 
@@ -183,8 +194,10 @@ Playwright MCP is convenient, but it is not the only screenshot path. If `browse
 
 ```bash
 cd <playwright project>
-PLAYWRIGHT_FIC_AUTH_MODE=required rushx playwright --grep "<unique probe title>" --project chrome
+CI=1 PLAYWRIGHT_FIC_AUTH_MODE=required rushx playwright --grep "<unique probe title>" --project chrome
 ```
+
+**Keep `CI=1`.** Without it Heft serves the HTML report and blocks (`Serving HTML report at http://127.0.0.1:…`), so the command never returns and the run burns its entire timeout on an attempt that already finished. Kill any leftover browser processes between attempts too — a previous run's browsers compete for the machine and produce hangs that look like slow tenants.
 
 Rules for this fallback:
 - Prefer the local `rush start` debug query when the dev server is available. It is faster than waiting for PR validation builds.
@@ -204,6 +217,8 @@ Do not write "FIC unavailable" unless a `rushx playwright` probe has been attemp
 If the surface needs tenant state mutation (created pages, seeded data), clean it up before returning — the synthetic tenant is shared.
 
 **A capture spec that reached the surface is an asset. Keep it.** Tenant data is disposable; the spec that navigates to a surface is not. Leave a working spec in the repo's integration-test project (alongside the existing specs for that area) and name it in the artifact, so the next run on the same surface starts from it rather than rediscovering the fixture, the trigger and the discriminator. Delete only specs that never reached the surface.
+
+**Once a spec has reached the surface it is frozen — change the minimum and nothing else.** A later run needing a different capture from that same surface starts from that exact committed spec and makes the smallest possible edit. Do not rewrite it, do not restructure its navigation, do not "improve" its fixture setup. Rewriting discards the one thing that was verified and re-enters a search space that has already been paid for: on the Amplify results panel a spec that had genuinely produced an image was re-derived from scratch across five later runs, each rediscovering the same dead ends. Name the committed spec you started from and state what you changed; a large diff means you threw the asset away.
 
 Prefer starting from an existing spec in that project over writing a new one. The repo's own helpers already encode how to build a fixture; reimplementing that is where the time goes.
 
