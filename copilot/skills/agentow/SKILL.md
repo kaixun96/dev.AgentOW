@@ -207,6 +207,8 @@ Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
 
 Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, cycle number, debug link, routed `contextDocuments`, `planPath`, `implementationArtifactPath`, `sessionDir`, `reportFile`, `progressLog`, and `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for PASS/FAIL + blockers.
 
+**Never end the turn while a dispatched subagent is still running.** Wait for its verdict. A run that reports "the browser capture is still running, I'm waiting for its result" and then terminates has abandoned the work mid-flight: the subagent's findings are lost, nothing is written to the artifact, and the next run repeats the whole discovery. If the wait is genuinely unbounded, record what was dispatched and why you stopped, then return a `FAIL` naming that — an explicit abandonment is recoverable, a silent one is not.
+
 For UI-visible changes, visual validation is mandatory and the evaluator owns it:
 - BEFORE and AFTER screenshot paths must be present in the evaluator result.
 - Primary `beforePath` / `afterPath` must be full browser-page/viewport screenshots that include the surrounding page context, not Drawer/Dialog/component-only crops. Their dimensions must match the evaluator's recorded viewport.
@@ -216,6 +218,7 @@ For UI-visible changes, visual validation is mandatory and the evaluator owns it
 - If screenshots are missing, visual validation failed, or the evaluator says Playwright/browser tools were unavailable, treat the evaluator result as **FAIL** even if code inspection passed.
 - Before accepting PASS, independently `view` both primary images and run `file -- "<beforePath>" "<afterPath>"`; do not trust filenames, `captureMethod`, `dimensionEvidence`, or the evaluator's dimension claim without this cross-check.
 - If either primary image lacks surrounding page context or its actual PNG dimensions do not match the recorded viewport, classify it as `evaluator-spec` and re-dispatch the evaluator once in the same implementation cycle.
+- **Look at the changed component in both images and judge whether it actually rendered.** Right dimensions and page context are not enough — a component whose runtime styles never applied still fills the viewport and still sits in its page. If it has no surface of its own, text overflows or overlaps the page behind it, or the design's background is absent, treat the evidence as invalid: classify `evaluator-spec` with blocker `component-rendered-unstyled` and re-dispatch. An assertion on the component's `data-automation-id` proves only that the element exists.
 - If repeated-item crops or geometry evidence are required but missing/malformed, classify it as `evaluator-spec` and re-dispatch the evaluator once in the same implementation cycle.
 - Before accepting repeated-item PASS, independently `view` both crops and inspect the numeric geometry evidence; do not accept "looks right".
 - Screenshots created manually by the main session do **not** satisfy evaluator validation. If the main session writes a temporary spec to unblock an investigation, move that logic into the evaluator retry prompt and re-dispatch the evaluator.

@@ -125,6 +125,23 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
 4. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
    - If the surface hosts an iframe or another async shell, the outer Drawer/Dialog/Modal is not enough. Wait for the inner discriminator or iframe content to be visible before taking screenshots.
 5. Capture the primary BEFORE screenshot as the **full browser page/viewport**, including SharePoint chrome, page canvas, backdrop, and target surface. Never use an element/locator/selector crop as primary PR evidence.
+   - **Wait for paint, not for visibility.** Playwright's `toBeVisible` resolves as soon as the element is in the layout, which for a runtime-styled component is before its CSS exists. SPDS v9 / Fluent v9 components are styled by Griffel, which injects styles at runtime, so there is a real window in which the element is "visible" and completely unstyled — a v8 component in the same position is unaffected because its styles come from a preloaded stylesheet. Screenshotting in that window produced an unstyled drawer that passed every other check.
+
+     Before shooting, assert the surface is actually laid out and painted, for example:
+
+     ```js
+     await page.waitForFunction((sel) => {
+       const el = document.querySelector(sel);
+       if (!el) return false;
+       const r = el.getBoundingClientRect();
+       const s = getComputedStyle(el);
+       const bg = s.backgroundColor;
+       return r.width > 300 && r.height > 200 && s.position !== 'static'
+         && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+     }, '<surface selector>', { timeout: 30_000 });
+     ```
+
+     Tune the thresholds to the surface, then settle briefly. Record the surface's bounding box in the artifact so the numbers can be checked later.
    - Set and record one viewport size for both phases.
    - With browser MCP, take a page screenshot without an element/ref/selector.
    - With a Playwright spec, use `page.screenshot({ path, fullPage: false })` after setting the viewport; `fullPage: false` captures the entire current viewport rather than one DOM element.
@@ -138,6 +155,8 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 AFTER captured — <path>`.
 8. Run `file -- "<beforePath>" "<afterPath>"` with the shell tool and quote its PNG dimension output in `evaluator-report.md`. Verify both primary PNG dimensions equal the configured viewport dimensions and visually inspect both images for surrounding page context. If either primary image is component-width, clipped, missing page context, or otherwise not the full viewport, return `failureKind: "evaluator-spec"` with blocker `primary-screenshot-not-full-viewport`.
+
+   **Then look at the changed component itself and judge whether it rendered.** Correct dimensions and page context do not mean the surface is usable evidence: a component whose styles have not applied still fills the viewport and still sits in its page. Signs it did not render: no bounded surface or chrome of its own, text overflowing its container or overlapping page content behind it, no background where the design has one, controls stacked in raw document order. If the changed component looks unstyled or half-painted, return `failureKind: "evaluator-spec"` with blocker `component-rendered-unstyled` — never attach it. Passing an assertion on the component's `data-automation-id` proves the element exists in the DOM; it says nothing about whether it was painted.
 9. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
 
 ### Repeated/dense UI geometry (hard gate when required)
@@ -187,6 +206,8 @@ Prefer starting from an existing spec in that project over writing a new one. Th
 **Never fabricate DOM to satisfy a precondition.** Injecting an element so a guard or helper selector passes — or otherwise faking application state from the page context — produces a screenshot that proves nothing about the product. If a helper's precondition conflicts with the fixture you need, use a different helper or a different route, and say in the artifact which one and why.
 
 **Stop iterating after three attempts that fail to reach the surface.** Three failures in a row are evidence about the precondition, not the selector. Re-derive the open-condition from source, or return `FAIL` naming what you established and what remains unknown. Continuing to adjust locators past that point burns the run's budget without converging — each attempt on a long stateful chain costs minutes, and the chain fails at whichever link is weakest that day.
+
+**A failed fixture BUILD is not a failed surface attempt.** Distinguish them, because conflating the two exhausts the budget without ever testing the hypothesis. A pooled tenant is drawn fresh per run and its state varies: the app shell may not mount at all, the hub may hold other runs' leftovers, a create control may be missing. That is a lottery loss — **re-run to draw a different tenant, up to five times, and do not count it as a surface attempt.** The three-attempt rule applies only once a fixture exists and you are trying to reach the surface with it. Track the two counts separately in the artifact so the report shows which wall was actually hit.
 
 If pattern is `skip`, verify by code inspection only and record `visualValidation.status="skipped"` with the exact non-UI reason. A vague reason like "not needed" is not valid.
 
