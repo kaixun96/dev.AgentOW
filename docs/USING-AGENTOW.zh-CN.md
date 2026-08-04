@@ -1,3 +1,8 @@
+<p align="right">
+  <a href="USING-AGENTOW.md"><img src="https://img.shields.io/badge/English-eaeef2?style=for-the-badge" alt="English"></a>
+  <a href="USING-AGENTOW.zh-CN.md"><img src="https://img.shields.io/badge/%E4%B8%AD%E6%96%87-0969da?style=for-the-badge" alt="中文"></a>
+</p>
+
 # 如何使用 agentOW
 
 agentOW 是一个面向 odsp-web 开发的自动化 Harness。它可以从需求出发，完成代码调研、计划、实现、构建、测试、页面验证、代码审查，并最终创建 Draft PR。
