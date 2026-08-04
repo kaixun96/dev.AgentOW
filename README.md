@@ -36,7 +36,7 @@ flowchart TD
 
 > See [docs/architecture.md](docs/architecture.md) for the full invocation flow diagram with details.
 >
-> 中文上手指南：[如何使用 agentOW：从项目 Context 到零交互自动化](docs/USING-AGENTOW.zh-CN.md)
+> Getting started guide: [How to use agentOW: from project context to zero-interaction automation](docs/USING-AGENTOW.md) · 中文版：[如何使用 agentOW：从项目 Context 到零交互自动化](docs/USING-AGENTOW.zh-CN.md)
 
 ---
 
