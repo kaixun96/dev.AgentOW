@@ -102,7 +102,7 @@ Apply these checks when their trigger appears in the changed set:
 
 **Localization and security**
 
-- For count-bearing strings, verify the `0`, `1`, and `>=2` cases. Apply `{Locked=...}` requirements to accessibility and screen-reader strings as well as visible UI, but do not lock placeholders that formatting utilities substitute only at runtime. Preserve machine syntax with the repository's `{ValidChars="..."}` and delimiter metadata such as `{Split="||"}`.
+- For count-bearing strings, verify the `0`, `1`, and `>=2` cases. Just suggest author to apply `{Locked}` tag to accessibility and screen-reader strings as well as visible UI when strings are not approved by designer as sometimes they thinks screen reader string no need content view. Do not lock placeholders that formatting utilities substitute only at runtime.
 - Before requesting removal of front-end validation, trace the input source and every pre-server sink. Query parameters such as `Source` and `NextUsing` remain untrusted until validation rejects dangerous schemes, protocol-relative or cross-origin URLs, and control characters; distinguish them from trusted platform values such as `webAbsoluteUrl`.
 
 **Routing, accessibility, and change scope**
