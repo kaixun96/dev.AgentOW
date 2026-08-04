@@ -122,10 +122,13 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
 2. Get the debug link/query:
    - If `ow-debuglink` is unavailable, returns no `fullTestUrl`, or the dev server is not ready, return `FAIL` with blocker `visual-validation-debug-link-missing`.
    - **Re-verify the bundle is being served immediately before every capture attempt, not just once at the start.** A dev server can die mid-session — killed with a stray process cleanup, evicted, or crashed — and every subsequent attempt then loads a page with no product code on it. Fetch the loader or manifests URL and require a 200. If it fails, restart the server and say so; do not proceed.
-3. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
+3. **Pre-flight the environment before the FIRST capture attempt — do not wait for a failure to start checking.** The ladder in step 5 is written as a diagnosis, but rungs 1 and 2 are cheap enough to be assertions, and running them up front is what stops a dead environment from being misread as a product or selector problem. Before the first navigation: fetch the loader/manifests URL and require a 200, then confirm the app shell mounted on the page you land on. If either fails, fix it (restart the dev server, re-resolve the debug link) and say so — do not proceed to a capture attempt and do not count the failure as a surface attempt.
+
+   Observed cost of not doing this: a run whose dev server was down attributed its first failure to the navigation/open-condition rung, and only reached rung 1 after burning an attempt. An earlier sequence lost two days re-drawing tenants against a bundle that was never being served.
+4. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
    - If browser tools are unavailable, do **not** stop at `playwright-tools-unavailable`. Use the FIC fallback below first.
    - If an AAD/login/consent page blocks access, return `FAIL` with blocker `playwright-auth-required` and tell the user exactly what page/prompt was seen.
-4. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
+5. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
    - Drive the real control. A URL query parameter whose name matches the surface is not a trigger: `?Action=ViewPublishingDetails` opens the publishing drawer for three of six publication statuses and silently runs the pre-publish flow for the rest, so the capture waits for a heading that will never appear. Before writing a capture step, find the call site that flips the open state (`setIsPublishingPanelOpen(true)` and friends) and click that control, preferring its `data-automation-id`.
    - A capture spec must build its own fixture with the package's existing helpers rather than depending on tenant state it did not create. Selecting "the first card" picks up half-created leftovers from earlier timed-out runs, which open into an empty shell and look like a product failure.
    - If the surface hosts an iframe or another async shell, the outer Drawer/Dialog/Modal is not enough. Wait for the inner discriminator or iframe content to be visible before taking screenshots.
@@ -139,7 +142,7 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    5. **Only then** question the selector or the surface itself.
 
    Report the rung that failed, not just the locator. A snapshot showing only the page chrome means rung 1 or 2, never rung 5 — and iterating selectors against it is wasted time.
-5. Capture the primary BEFORE screenshot as the **full browser page/viewport**, including SharePoint chrome, page canvas, backdrop, and target surface. Never use an element/locator/selector crop as primary PR evidence.
+6. Capture the primary BEFORE screenshot as the **full browser page/viewport**, including SharePoint chrome, page canvas, backdrop, and target surface. Never use an element/locator/selector crop as primary PR evidence.
    - **Wait for paint, not for visibility.** Playwright's `toBeVisible` resolves as soon as the element is in the layout, which for a runtime-styled component is before its CSS exists. SPDS v9 / Fluent v9 components are styled by Griffel, which injects styles at runtime, so there is a real window in which the element is "visible" and completely unstyled — a v8 component in the same position is unaffected because its styles come from a preloaded stylesheet. Screenshotting in that window produced an unstyled drawer that passed every other check.
 
      Before shooting, assert the surface is actually laid out and painted, for example:
@@ -157,6 +160,8 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
      ```
 
      Tune the thresholds to the surface, then settle briefly. Record the surface's bounding box in the artifact so the numbers can be checked later.
+
+     **Let that wait fail the test — never `.catch()` it and shoot anyway.** A swallowed paint wait is worse than no wait: it still costs the full timeout, and then produces exactly the unstyled image it was meant to prevent, with nothing in the log to say the guard fired. Observed: a spec whose wait required a non-transparent background caught the timeout, waited a further 3s, and screenshotted a transparent surface — the image was only stopped later, by hand. If the wait times out, that is the finding; report it as `component-rendered-unstyled` and read the paragraph on `mountNode` in step 9 before assuming it was a timing problem.
    - Set and record one viewport size for both phases.
    - With browser MCP, take a page screenshot without an element/ref/selector.
    - With a Playwright spec, use `page.screenshot({ path, fullPage: false })` after setting the viewport; `fullPage: false` captures the entire current viewport rather than one DOM element.
@@ -164,15 +169,17 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    - You may additionally save `<sessionDir>/evaluation/iter<N>/before-<component>-crop.png` for close-up inspection, but a crop is supplemental only.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `before-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 BEFORE captured — <path>`.
-6. `browser_navigate` to the AFTER URL (local `fullTestUrl` or PR CDN query) → AFTER. Same setup + click. Verify discriminator again.
-7. Capture the primary AFTER screenshot with the same full-page/viewport method and dimensions → save to `<sessionDir>/evaluation/iter<N>/after-<component>-full.png`.
+7. `browser_navigate` to the AFTER URL (local `fullTestUrl` or PR CDN query) → AFTER. Same setup + click. Verify discriminator again.
+8. Capture the primary AFTER screenshot with the same full-page/viewport method and dimensions → save to `<sessionDir>/evaluation/iter<N>/after-<component>-full.png`.
    - An optional `<sessionDir>/evaluation/iter<N>/after-<component>-crop.png` may accompany it, but must not replace it.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 AFTER captured — <path>`.
-8. Run `file -- "<beforePath>" "<afterPath>"` with the shell tool and quote its PNG dimension output in `evaluator-report.md`. Verify both primary PNG dimensions equal the configured viewport dimensions and visually inspect both images for surrounding page context. If either primary image is component-width, clipped, missing page context, or otherwise not the full viewport, return `failureKind: "evaluator-spec"` with blocker `primary-screenshot-not-full-viewport`.
+9. Run `file -- "<beforePath>" "<afterPath>"` with the shell tool and quote its PNG dimension output in `evaluator-report.md`. Verify both primary PNG dimensions equal the configured viewport dimensions and visually inspect both images for surrounding page context. If either primary image is component-width, clipped, missing page context, or otherwise not the full viewport, return `failureKind: "evaluator-spec"` with blocker `primary-screenshot-not-full-viewport`.
 
    **Then look at the changed component itself and judge whether it rendered.** Correct dimensions and page context do not mean the surface is usable evidence: a component whose styles have not applied still fills the viewport and still sits in its page. Signs it did not render: no bounded surface or chrome of its own, text overflowing its container or overlapping page content behind it, no background where the design has one, controls stacked in raw document order. If the changed component looks unstyled or half-painted, return `failureKind: "evaluator-spec"` with blocker `component-rendered-unstyled` — never attach it. Passing an assertion on the component's `data-automation-id` proves the element exists in the DOM; it says nothing about whether it was painted.
-9. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
+
+   **An unstyled v9 surface is a product finding, not a retry signal.** Before assuming the capture was mistimed, check whether the component overrides where it mounts: a v9 `mountNode` (or any hand-rolled portal) that re-parents the surface outside the `FluentProvider` subtree puts it out of scope for Griffel's injected rules and theme variables, so it renders with browser-default fonts and no background no matter how long you wait. `surfaceMotion={null}` alongside it is a strong hint the author was fighting the default portal. Compare against the other v9 surfaces in the repo — if none of them pass `mountNode`, the override is the defect. Report it as a product defect against the PR instead of re-running the capture; re-running only reproduces the same unstyled image.
+10. **Do NOT add `market=qps-ploc`** to the URL — it pollutes screenshots with pseudo-localized text. Prove the PR build loaded via the `prBuildCount > 0` console value, not visual pseudo-loc.
 
 ### Repeated/dense UI geometry (hard gate when required)
 
@@ -197,7 +204,7 @@ cd <playwright project>
 CI=1 PLAYWRIGHT_FIC_AUTH_MODE=required rushx playwright --grep "<unique probe title>" --project chrome
 ```
 
-**Keep `CI=1`.** Without it Heft serves the HTML report and blocks (`Serving HTML report at http://127.0.0.1:…`), so the command never returns and the run burns its entire timeout on an attempt that already finished. Kill any leftover browser processes between attempts too — a previous run's browsers compete for the machine and produce hangs that look like slow tenants.
+**Copy that command line verbatim — every playwright invocation starts with `CI=1`, including the first.** Without it Heft serves the HTML report and blocks (`Serving HTML report at http://127.0.0.1:…`), so the command never returns and the run burns its entire timeout on an attempt that already finished. This is not advice to apply after the first hang: a run that had this rule in front of it still omitted `CI=1` on its first invocation and hung. Before you send any `rushx playwright` command, check the string you are about to run actually begins with `CI=1`. Kill any leftover browser processes between attempts too — a previous run's browsers compete for the machine and produce hangs that look like slow tenants.
 
 Rules for this fallback:
 - Prefer the local `rush start` debug query when the dev server is available. It is faster than waiting for PR validation builds.
@@ -219,6 +226,10 @@ If the surface needs tenant state mutation (created pages, seeded data), clean i
 **A capture spec that reached the surface is an asset. Keep it.** Tenant data is disposable; the spec that navigates to a surface is not. Leave a working spec in the repo's integration-test project (alongside the existing specs for that area) and name it in the artifact, so the next run on the same surface starts from it rather than rediscovering the fixture, the trigger and the discriminator. Delete only specs that never reached the surface.
 
 **Once a spec has reached the surface it is frozen — change the minimum and nothing else.** A later run needing a different capture from that same surface starts from that exact committed spec and makes the smallest possible edit. Do not rewrite it, do not restructure its navigation, do not "improve" its fixture setup. Rewriting discards the one thing that was verified and re-enters a search space that has already been paid for: on the Amplify results panel a spec that had genuinely produced an image was re-derived from scratch across five later runs, each rediscovering the same dead ends. Name the committed spec you started from and state what you changed; a large diff means you threw the asset away.
+
+**A speculative edit to a frozen spec is a contract violation, and "the surface rendered wrong" is not a licence to edit it.** The freeze holds for the whole run, not just until the first surprise. Once the spec has put you on the surface, every further failure is an environment or product question, and the answer is never in the spec file. Specifically: do not edit the spec to probe how a store is exported, to try a different import shape, to add instrumentation, or to test a hypothesis about the component's internals — read the product source for that instead. Observed: a run that had already reached the surface spent three edit/rebuild cycles guessing at a store's export shape, each costing a full playwright run, and concluded the guess was wrong; the actual cause was a `mountNode` override plainly visible in the component's source.
+
+Before editing a spec that has reached the surface, state which rung of the ladder failed. If the answer is not "the selector", do not touch the file.
 
 Prefer starting from an existing spec in that project over writing a new one. The repo's own helpers already encode how to build a fixture; reimplementing that is where the time goes.
 

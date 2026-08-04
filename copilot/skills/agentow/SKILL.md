@@ -17,6 +17,8 @@ Announce the mode in one line before starting, so the user knows what to expect.
 
 Call `ow-status` (MCP) to confirm the git branch, node, and rush state. Note whether you're on `main` (you'll branch later) or already on a feature branch.
 
+**Check the working tree is clean here, in Step 0 — not later, when a checkout fails.** A previous run's abandoned edits (a half-tuned capture spec, a hand-patched `pnpm-lock.yaml`, a modified playwright config) survive in the tree and block the branch switch this run needs. Batch policy forbids auto-stashing them, so the run dies at the starting line having done nothing — observed, 76 seconds in, after the environment had already been prepared. Report the dirty paths in your first message, name them individually, and say plainly that the user must stash or commit them before this run can proceed. Do not discard them and do not stash them yourself; they may be the only copy of a previous run's work.
+
 Create a durable session folder:
 
 ```text
