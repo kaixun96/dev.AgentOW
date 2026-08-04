@@ -36,6 +36,7 @@ The dispatcher gives you:
 6. **UI surface trace** (if the change has a visible UI surface) — the implementer will need BEFORE/AFTER screenshots. Provide:
    - Changed component + where it renders (`file:line`)
    - The DOM selector / `data-automation-id` that triggers the surface, with the `file:line` that defines it
+   - **The open-condition**, with `file:line`: the call site that sets the surface's open state, and the application state required for that branch to be taken. Read the code around the setter — a surface may render only for certain statuses, only after an operation *fails*, or never, because the product mounts a sibling component instead. Name the state to arrange, not just the control to click; a capture driving the happy path will otherwise time out against a surface that could not appear. If the component has no reachable call site, say so — that is a finding about the change, not a gap in the trace.
    - A discriminator (unique text/attribute) that proves it's THIS change's surface, not similar UI
    - Pattern: A (simple click) / B (needs REST data) / C (needs second user) / D (external dep — note a reachability probe hint) / skip (server-side, no UI)
    - `exactFixtureRequired` — defaults to `false`; set it to `true` only when the user explicitly requires one exact tenant, route, or seeded fixture
