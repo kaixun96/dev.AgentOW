@@ -206,6 +206,7 @@ const checks = [
       "`preliminary-non-exhaustive` completeness claim",
       "git diff --no-renames",
       "skills/ow-review/references/localization-and-formatting.md",
+      "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
       "physical-direction CSS",
       "non-visible assistive text read by screen readers"
     ]
@@ -236,6 +237,7 @@ const checks = [
       "`preliminary-non-exhaustive`",
       "git diff --no-renames",
       "skills/ow-review/references/localization-and-formatting.md",
+      "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
       "physical-direction CSS",
       "non-visible assistive text read by screen readers"
     ]
@@ -300,6 +302,44 @@ const checks = [
       "resource provenance and casing",
       "Do not place interactive links inside checkbox or radio labels",
       "Verify claimed resolutions in the actual PR source"
+    ]
+  },
+  {
+    file: "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    snippets: [
+      "highest supported ODSP-Web design-system layer",
+      "Do not skip a higher layer merely to obtain a small styling or API preference",
+      "@msinternal/sharepoint-ui-react-stable-bundle",
+      "@msinternal/sharepoint-ui-react",
+      "Fluent UI React V9",
+      "custom HTML/CSS component only when all three layers cannot meet the requirement",
+      "documented props, slots, appearance options, typography presets, and design tokens",
+      "Do not target generated or private Fluent implementation selectors such as `.fui-*`",
+      "existing ODSP-Web shared wrapper, helper, or component",
+      "semantic structure, keyboard behavior, focus handling, high-contrast and theme support",
+      "documented gap showing why SPDS",
+      "preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience",
+      "Can SPDS meet this requirement?",
+      "Custom HTML/CSS requires a documented gap in all three layers"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    snippets: [
+      "highest supported ODSP-Web design-system layer",
+      "Do not skip a higher layer merely to obtain a small styling or API preference",
+      "@msinternal/sharepoint-ui-react-stable-bundle",
+      "@msinternal/sharepoint-ui-react",
+      "Fluent UI React V9",
+      "custom HTML/CSS component only when all three layers cannot meet the requirement",
+      "documented props, slots, appearance options, typography presets, and design tokens",
+      "Do not target generated or private Fluent implementation selectors such as `.fui-*`",
+      "existing ODSP-Web shared wrapper, helper, or component",
+      "semantic structure, keyboard behavior, focus handling, high-contrast and theme support",
+      "documented gap showing why SPDS",
+      "preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience",
+      "Can SPDS meet this requirement?",
+      "Custom HTML/CSS requires a documented gap in all three layers"
     ]
   },
   {
