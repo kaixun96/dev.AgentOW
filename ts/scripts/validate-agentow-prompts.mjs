@@ -204,7 +204,10 @@ const checks = [
       "A nearby gate is not coverage.",
       "do not equate reading every line with reliable exhaustive review",
       "`preliminary-non-exhaustive` completeness claim",
-      "git diff --no-renames"
+      "git diff --no-renames",
+      "skills/ow-review/references/localization-and-formatting.md",
+      "physical-direction CSS",
+      "non-visible assistive text read by screen readers"
     ]
   },
   {
@@ -231,7 +234,72 @@ const checks = [
       "A nearby gate is not coverage.",
       "reading all files does not prove the review is reliable or exhaustive",
       "`preliminary-non-exhaustive`",
-      "git diff --no-renames"
+      "git diff --no-renames",
+      "skills/ow-review/references/localization-and-formatting.md",
+      "physical-direction CSS",
+      "non-visible assistive text read by screen readers"
+    ]
+  },
+  {
+    file: "skills/ow-review/references/localization-and-formatting.md",
+    snippets: [
+      "hard-coded user-visible strings and non-visible assistive text",
+      "announcements, and live-region content",
+      "dynamic data from an API, such as a user name",
+      "translator comment for each string",
+      "explain every placeholder",
+      "Do not lock placeholders",
+      "formatter argument matches the placeholder",
+      "Keep punctuation inside the localized string",
+      "Localize complete sentences, not fragments assembled in code",
+      "StringHelper.formatWithLocalizedCountValue",
+      "Use plural wording for `0`",
+      "all three cases in tests",
+      "physical-direction CSS",
+      "CSS-in-JS, and inline styles",
+      "Created at {0} by {1}",
+      "name + \" - \" + description",
+      "resource.replace(\"{0}\", value)",
+      "local formatting helpers, and manual interpolation",
+      "props.text || strings.fallbackStr",
+      "split plural resources, interval metadata",
+      "machine-readable pipeline syntax",
+      "Duplicated resources can diverge across translations",
+      "site or user locale and locale skeletons",
+      "resource provenance and casing",
+      "Do not place interactive links inside checkbox or radio labels",
+      "Verify claimed resolutions in the actual PR source"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-review/references/localization-and-formatting.md",
+    snippets: [
+      "hard-coded user-visible strings and non-visible assistive text",
+      "announcements, and live-region content",
+      "dynamic data from an API, such as a user name",
+      "translator comment for each string",
+      "explain every placeholder",
+      "Do not lock placeholders",
+      "formatter argument matches the placeholder",
+      "Keep punctuation inside the localized string",
+      "Localize complete sentences, not fragments assembled in code",
+      "StringHelper.formatWithLocalizedCountValue",
+      "Use plural wording for `0`",
+      "all three cases in tests",
+      "physical-direction CSS",
+      "CSS-in-JS, and inline styles",
+      "Created at {0} by {1}",
+      "name + \" - \" + description",
+      "resource.replace(\"{0}\", value)",
+      "local formatting helpers, and manual interpolation",
+      "props.text || strings.fallbackStr",
+      "split plural resources, interval metadata",
+      "machine-readable pipeline syntax",
+      "Duplicated resources can diverge across translations",
+      "site or user locale and locale skeletons",
+      "resource provenance and casing",
+      "Do not place interactive links inside checkbox or radio labels",
+      "Verify claimed resolutions in the actual PR source"
     ]
   },
   {
