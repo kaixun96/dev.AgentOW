@@ -14,7 +14,7 @@ Use this reference when a change adds or modifies visible UI text, non-visible a
 8. Validate remaining localization metadata exactly. Whole-string approval locks and valid-character annotations must use the machine-readable pipeline syntax, not explanatory prose.
 9. Consolidate identical strings into an appropriate shared resource when the repository has a suitable shared ownership boundary. Duplicated resources can diverge across translations.
 10. Require locale-aware dates and times using the site or user locale and locale skeletons. Reject fixed US field order, separators, AM/PM, and hour cycles, including code copied from legacy UI. Search for an existing repository utility before accepting new formatting logic.
-11. Check resource provenance and casing. Newly authored strings may require approval locks; prefer sentence-style casing unless established terminology or inherited approved text requires otherwise.
+11. Check resource provenance and casing. For newly authored strings, remind the author to lock the string if approval status is uncertain, but do not treat a missing lock tag by itself as a blocking defect because the reviewer may not know whether the string is already approved. Prefer sentence-style casing unless established terminology or inherited approved text requires otherwise.
 12. Flag physical-direction CSS such as `margin-left`, `right`, or `border-left` unless an RTL-aware mixin or logical property is used. Check CSS, Sass/Less, CSS-in-JS, and inline styles. For CSS-in-JS used in Fluent V8/V9 style APIs, Fluent already handles auto-flipping for those directional properties, so do not raise an RTL finding there unless the code bypasses Fluent's styling path.
 13. Verify claimed resolutions in the actual PR source. A resolved review thread may defer the issue to another PR without fixing the current source.
 
@@ -51,7 +51,7 @@ Example `.resx` resource:
 </data>
 ```
 
-Use this pattern when you review newly authored strings with approval-lock metadata. The reviewer should verify that the comment gives translators usable context, and that any lock or approval marker follows the repository's machine-readable metadata format instead of freeform prose.
+Use this pattern when you review newly authored strings with approval-lock metadata. The reviewer should verify that the comment gives translators usable context, and that any lock or approval marker follows the repository's machine-readable metadata format instead of freeform prose. For newly added strings, if approval status is unclear, leave a comment prompting the author to lock the string when it is not yet approved; do not raise missing lock metadata alone as a blocking issue.
 
 ### Separators and fragments
 
