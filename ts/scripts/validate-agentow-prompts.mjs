@@ -320,7 +320,10 @@ const checks = [
       "documented gap showing why SPDS",
       "preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience",
       "Can SPDS meet this requirement?",
-      "Custom HTML/CSS requires a documented gap in all three layers"
+      "Custom HTML/CSS requires a documented gap in all three layers",
+      "Breadcrumb overflow action versus navigation",
+      "`BreadcrumbItem > Menu > MenuTrigger > Button`",
+      "`BreadcrumbButton` only for genuine breadcrumb navigation nodes"
     ]
   },
   {
@@ -339,7 +342,10 @@ const checks = [
       "documented gap showing why SPDS",
       "preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience",
       "Can SPDS meet this requirement?",
-      "Custom HTML/CSS requires a documented gap in all three layers"
+      "Custom HTML/CSS requires a documented gap in all three layers",
+      "Breadcrumb overflow action versus navigation",
+      "`BreadcrumbItem > Menu > MenuTrigger > Button`",
+      "`BreadcrumbButton` only for genuine breadcrumb navigation nodes"
     ]
   },
   {
