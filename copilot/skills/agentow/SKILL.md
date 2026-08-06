@@ -227,6 +227,7 @@ For UI-visible changes, visual validation is mandatory and the evaluator owns it
 - Screenshots created manually by the main session do **not** satisfy evaluator validation. If the main session writes a temporary spec to unblock an investigation, move that logic into the evaluator retry prompt and re-dispatch the evaluator.
 - Surface the exact failure reason to the user and record it in `progress.log`, `report.json`, and `final.md` if the run stops.
 - Do not claim the UI was verified without screenshot evidence.
+- If the run is still blocked on the **same screenshot step** after another attempt and you have no materially new evidence, say that explicitly instead of going silent. Append a progress line naming the unchanged blocker and the next single-variable experiment (for example: `still blocked at app shell mount; next retry keeps the same page and adds only a 2s settle before screenshot`). Silence makes the user think the run is abandoned.
 - Failing visual validation blocks the *claim*, not the *delivery*. If the implementation is already committed and green, do not end the run empty-handed — see the environment-discovery branch of Step 6 and ship an explicitly unverified draft instead.
 
 Before accepting any evaluator claim about auth, FIC, tenant suitability, test-page availability, or a fixture gap, inspect its `coverageManifest`. A single URL, credential, tenant, or site failure is resource-local evidence only.
