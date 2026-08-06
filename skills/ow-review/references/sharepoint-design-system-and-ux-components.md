@@ -66,6 +66,7 @@ Good:
 - Use Fluent icons so theme, sizing, high contrast, and accessibility stay correct.
 - Use supported slots, props, tokens, `className`, `style`, and stable wrapper APIs.
 - Treat compound components such as `Breadcrumb`, `Menu`, `TabList`, `Table`, `Dropdown`, and similar controls as semantic APIs with specific child components and wrapper structure.
+- When you find a compound-component boundary defect, verify the suggested fix against the official story, source, or component docs before recommending a replacement component. Do not infer a substitute merely because it is clickable or renders compatible DOM.
 - If a private Fluent selector is truly unavoidable, document why supported APIs failed, scope the override narrowly, pin the version, and require upgrade re-validation.
 - Share proven cross-page shells, styles, formatters, URLs, and responsive constants intentionally; keep page-local styles local until shared behavior is validated.
 
@@ -81,14 +82,16 @@ Bad:
 
 ### Compound component boundaries
 
+#### Adjacent controls do not belong inside compound component internals
+
 Bad:
 
 ```tsx
 <Breadcrumb>
   {/* BreadcrumbItem navigation nodes */}
   <li className={styles.infoItem}>
-    <Tooltip>
-      <InfoButton ... />
+    <Tooltip {...tooltipProps}>
+      <InfoButton {...infoButtonProps} />
     </Tooltip>
   </li>
 </Breadcrumb>
@@ -99,23 +102,50 @@ Although Fluent `Breadcrumb` currently renders an internal list, the manually au
 Good:
 
 ```tsx
-// Real breadcrumb node: use the Fluent item component.
-<Breadcrumb>
-  <BreadcrumbItem>
-    <BreadcrumbButton>Site Settings</BreadcrumbButton>
-  </BreadcrumbItem>
-</Breadcrumb>
+<Overflow>
+  <Breadcrumb>
+    {/* BreadcrumbItem navigation nodes */}
+  </Breadcrumb>
+</Overflow>
 
-// Adjacent page-help action: keep it outside the breadcrumb.
-<Breadcrumb>{/* BreadcrumbItem nodes only */}</Breadcrumb>
 <div className={styles.infoItem}>
-  <Tooltip>
-    <InfoButton ... />
+  <Tooltip {...tooltipProps}>
+    <InfoButton {...infoButtonProps} />
   </Tooltip>
 </div>
 ```
 
-Use `BreadcrumbItem` only for genuine breadcrumb items. Keep adjacent informational or page-level controls outside the compound component and arrange them with a sibling wrapper.
+Keep adjacent informational or page-level controls outside the compound component and arrange them with a sibling wrapper.
+
+#### Breadcrumb overflow action versus navigation
+
+Bad:
+
+```tsx
+<Menu>
+  <MenuTrigger disableButtonEnhancement>
+    <BreadcrumbItem>
+      <BreadcrumbButton icon={<MoreHorizontalRegular />} aria-label={overflowLabel} />
+    </BreadcrumbItem>
+  </MenuTrigger>
+</Menu>
+```
+
+This hits two problems at once: `MenuTrigger` wraps the wrong level, and the suggested replacement must preserve semantics. `BreadcrumbButton` represents a real breadcrumb navigation or current item; the overflow opener is an action that opens a menu, not a breadcrumb destination.
+
+Good:
+
+```tsx
+<BreadcrumbItem>
+  <Menu>
+    <MenuTrigger disableButtonEnhancement>
+      <Button icon={<MoreHorizontalRegular />} aria-label={overflowLabel} />
+    </MenuTrigger>
+  </Menu>
+</BreadcrumbItem>
+```
+
+Use `BreadcrumbButton` only for genuine breadcrumb navigation nodes. For breadcrumb overflow, keep the list-item structure with `BreadcrumbItem`, but model the overflow opener as an action with `Button` — preferably the available SPDS button wrapper when one fits. The official structure is `BreadcrumbItem > Menu > MenuTrigger > Button`. Navigation nodes stay navigation components, and action triggers stay action components.
 
 ### Semantics and accessibility
 
@@ -129,4 +159,4 @@ Bad:
 
 ## Short enforcement
 
-Use SPDS stable bundle first. If it lacks the required component, either SharePoint UI or Fluent V9 is acceptable when it is the best supported fit. Treat SPDS and Fluent controls as semantic compound APIs: use only their documented items, slots, and wrapper structure, and keep unrelated controls outside. Custom HTML/CSS requires a documented gap in all three layers and must preserve the full semantic, accessibility, theme, localization, and responsiveness contract.
+Use SPDS stable bundle first. If it lacks the required component, either SharePoint UI or Fluent V9 is acceptable when it is the best supported fit. Treat SPDS and Fluent controls as semantic compound APIs: use only their documented items, slots, and wrapper structure, and keep unrelated controls outside. When a finding involves compound-component composition, verify the remediation against the official story, source, or component docs so action-vs-navigation semantics stay correct. Custom HTML/CSS requires a documented gap in all three layers and must preserve the full semantic, accessibility, theme, localization, and responsiveness contract.

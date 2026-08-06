@@ -171,6 +171,7 @@ echo "[$(date +%H:%M:%S)] ✅ Workflow complete" >> "$sessionDir/progress.log"
 
 Report the verdict, Critical/Important/Minor counts, carried findings, and the artifact paths. Then stop:
 
+- For every finding you raise, also provide a concrete likely fix direction. Point to the preferred component, pattern, prop, structure, utility, or test change that would resolve the issue; do not stop at naming the defect alone.
 - Blocking findings go back to the user; this command never fixes them. Use `/ow-team` to implement fixes.
 - To keep a Minor from being re-raised later, record the decision instead of ignoring it silently:
 
