@@ -5,7 +5,7 @@ Use this reference when a change adds or modifies a user-facing component, inter
 ## Review checklist
 
 1. Build UI with the highest supported ODSP-Web design-system layer that meets the UX requirement. Do not skip a higher layer merely to obtain a small styling or API preference.
-2. Prefer SPDS from `@msinternal/sharepoint-ui-react-stable`.
+2. Prefer SPDS from the path-appropriate stable package: use `@msinternal/sharepoint-ui-react-stable-bundle` under `sp-client/`, and use `@msinternal/sharepoint-ui-react-stable` under `odsp-common/`.
 3. If SPDS does not provide the required component, behavior, slot, token, or accessibility capability, the author may use either `@msinternal/sharepoint-ui-react` or Fluent UI React V9.
 4. Choose between `@msinternal/sharepoint-ui-react` and Fluent UI React V9 based on which supported component best meets the UX, semantic, accessibility, and theming requirement.
 5. Build a custom HTML/CSS component only when all three layers cannot meet the requirement.
@@ -159,4 +159,4 @@ Bad:
 
 ## Short enforcement
 
-Use SPDS stable bundle first. If it lacks the required component, either SharePoint UI or Fluent V9 is acceptable when it is the best supported fit. Treat SPDS and Fluent controls as semantic compound APIs: use only their documented items, slots, and wrapper structure, and keep unrelated controls outside. When a finding involves compound-component composition, verify the remediation against the official story, source, or component docs so action-vs-navigation semantics stay correct. Custom HTML/CSS requires a documented gap in all three layers and must preserve the full semantic, accessibility, theme, localization, and responsiveness contract.
+Use the path-appropriate SPDS stable package first: `@msinternal/sharepoint-ui-react-stable-bundle` in `sp-client/` and `@msinternal/sharepoint-ui-react-stable` in `odsp-common/`. If it lacks the required component, either SharePoint UI or Fluent V9 is acceptable when it is the best supported fit. Treat SPDS and Fluent controls as semantic compound APIs: use only their documented items, slots, and wrapper structure, and keep unrelated controls outside. When a finding involves compound-component composition, verify the remediation against the official story, source, or component docs so action-vs-navigation semantics stay correct. Custom HTML/CSS requires a documented gap in all three layers and must preserve the full semantic, accessibility, theme, localization, and responsiveness contract.
