@@ -29,6 +29,66 @@ Use this Fluent V9 accessibility reference map to choose the corresponding doc b
 | toast/status/alert messaging, announcements, or notification timing/behavior | [Notification best practices](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-notification-best-practices--docs) |
 | text truncation, clipped labels/content, tooltip fallback for truncated text, or loss of meaning from overflow | [Truncation](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-truncation--docs) |
 
+## Repository accessibility utilities when Fluent or SPDS does not already own the behavior
+
+Main authoring rule: first use the SPDS or Fluent component that models the interaction. Its documented composition, slots, keyboard handling, focus behavior, semantics, and high-contrast support are the default accessibility implementation. Use the repository utilities below only for behavior Fluent or SPDS does not already own.
+
+### 1. Screen-reader announcements — preferred shared React API
+
+Use `@msinternal/screen-reader-alert` for dynamic status, save/error results, or other information that is not naturally announced by moving focus.
+
+```ts
+import { ReadingMode, useScreenReaderAlert } from '@msinternal/screen-reader-alert';
+
+useScreenReaderAlert(
+  strings.SaveSucceeded,
+  ReadingMode.ReadAfterOtherContent,
+  saveState === 'succeeded'
+);
+```
+
+It also provides `<ScreenReaderAlert message={message} />` and `ScreenReaderAlert.read(message, mode)`. Prefer `ReadAfterOtherContent` for routine state changes; reserve `ReadImmediately` for urgent errors. When the same message must be announced again, require the implementation to increment the component `indicator`.
+
+There is also an older `ScreenReader.alert(id, message)` API exported by `@msinternal/sp-a11y` and implemented in `odsp-common/utilities/browser/src/accessibility/ScreenReader.ts`. It always creates an assertive alert, so prefer the newer shared React package for new component work unless the host already follows the legacy `sp-a11y` pattern.
+
+### 2. Focus management and keyboard navigation — `@msinternal/sp-a11y`
+
+`sp-client/libraries/sp-a11y/src/index.ts` exports reusable primitives:
+
+- `Focus` for finding focusable descendants, parents, and siblings; testing focusability; calling `focusInside`, `focusTo`, `focusOutOf`; and checking `hasFocus`, including shadow-DOM-aware variants where needed.
+- `FocusTransition` for representing and walking source-to-destination focus movement.
+- `Keyboard` for consistent `isEscape`, `isEnter`, `isTab`, `isShiftTab`, and modifier-aware `isKey`, including Ctrl versus Cmd handling on macOS.
+- `A11yManager` and `A11yAttribute` for legacy declarative accessibility navigation on already managed surfaces. Supported attributes include `AlertOnFocusIn`, `AlertOnFocusOut`, `NavigateOnKey`, `NavigateByHierarchy`, `SkipKeys`, and `StopKeys`.
+
+Use `A11yManager` only when extending a surface that already depends on it; do not introduce it instead of native or SPDS interactions.
+
+For a modal or panel implemented through the Fluent migration layer, prefer `useRestoreFocusOnDismiss`, `ModalShim`, and `FocusTrapZoneShim` support rather than hand-writing focus restoration. Those utilities capture the trigger before focus enters the modal, restore after dismissal animation, and cover abrupt unmounts.
+
+### 3. Rich-text or content accessibility checks — `@msinternal/sp-a11y-checker-util`
+
+For RTE, authored HTML, or page-content scanning, use `@msinternal/sp-a11y-checker-util`, not new local validators. Its public entry points include:
+
+- `checkA11yForRte` and `runH1A11yChecks`
+- heading order, H1, and heading-before-H1 validation
+- empty-link, table-header, image-alt-text, and text/image/overlay contrast checks
+
+This package is primarily for editor or content validation, not a general replacement for semantic component authoring.
+
+### 4. Keyboard-accessible drag and drop — `@msinternal/sp-dragzone`
+
+When a UI requires drag or reorder behavior, use `@msinternal/sp-dragzone` rather than a mouse-only drag implementation. It exports `IDragZoneA11yStrings`; its keyboard implementation supports Enter or Space to begin, arrow-key movement, Escape to cancel, focus return to the handle, and screen-reader move-state announcements. Require localized strings for `moveStarted`, `moveComplete`, `moveCancelled`, and `moveNotAllowed`.
+
+### 5. Test and audit tools
+
+- In Playwright tests, use `runAccessibilityScanAsync` from `tools/playwright-utilities`. It runs axe, supports scoped scans with `includeSelectors`, attaches detailed results and screenshots, and returns the violation count. Disabled rules need a documented, specific justification.
+- For SharePoint authoring-page scenarios, use `verifyAccessibilityWithSPA11yAssistant(page)` to open the product Accessibility Assistant and assert the no-issues state.
+- For code and diff review, use the repo's `/a11y-audit` command from `.ai/a11y-tools`. It combines jsx-a11y detection with checks for semantics, ARIA, keyboard, focus, screen-reader compatibility, and design tokens, and can target a component, folder, file, or current diff.
+- Follow the repository checklist in `odsp-next/docs/Accessibility.md`: Accessibility Insights FastPass, keyboard and Narrator flow, sensible focus, correct name/role/value, announced status messages, and Windows High Contrast verification.
+
+Do not treat the following as general reusable component APIs: the Pages Accessibility Assistant, canvas or RTE-local helpers, `items-view/web/private` alert components, copied `screenReaderAlert` implementations, and ARIA-named telemetry or parser packages. Reuse them only inside their owning area.
+
+Gap identified: the repo has no central author-facing `VisuallyHidden` or `sr-only` React component. Do not copy private or ad hoc CSS to invent one; prefer native or SPDS semantics or the shared screen-reader alert package. If a screen-reader-only control is genuinely required, first find the owning surface's established pattern and consider a shared utility only when there is a real cross-feature need.
+
 ## Review checklist
 
 ### Scenario 1: SPDS or Fluent V9 component usage
@@ -40,31 +100,32 @@ Use this Fluent V9 accessibility reference map to choose the corresponding doc b
 5. Verify accessible descriptions are supplied when the component needs extra context beyond its accessible name, using the documented component pattern rather than ad hoc duplicated text.
 6. Verify component state and relationships are exposed through the documented APIs, such as expanded, selected, checked, pressed, invalid, required, busy, dialog labeling, table header relationships, tab relationships, and menu trigger state.
 7. Verify the composition preserves the component's expected keyboard, focus, and screen-reader behavior. Do not accept wrappers, slot misuse, or DOM reshaping that breaks the built-in interaction model.
-8. Verify transient UI built from Fluent or SPDS components, such as dialogs, menus, popovers, tooltips, toasts, and disclosures, is wired with the documented trigger, focus, dismissal, and labeling pattern.
-9. Verify decorative icons remain hidden from assistive technology and meaningful icons do not become the only accessible name source unless that is the documented pattern.
-10. Verify tests cover the changed accessibility contract when behavior changes. Prefer assertions on roles, names, states, focus movement, and announcements rather than implementation details.
+8. When Fluent or SPDS does not already own the needed behavior, verify the implementation reuses the repository's shared accessibility utilities rather than inventing local patterns for announcements, focus management, drag and drop, rich-text validation, or audits.
+9. Verify transient UI built from Fluent or SPDS components, such as dialogs, menus, popovers, tooltips, toasts, and disclosures, is wired with the documented trigger, focus, dismissal, and labeling pattern.
+10. Verify decorative icons remain hidden from assistive technology and meaningful icons do not become the only accessible name source unless that is the documented pattern.
+11. Verify tests cover the changed accessibility contract when behavior changes. Prefer assertions on roles, names, states, focus movement, and announcements rather than implementation details.
 
 ### Scenario 2: Custom component authoring when no suitable SPDS or Fluent V9 component fits
 
-11. Preserve semantic HTML first. Use native elements such as `button`, `a`, `input`, `select`, `textarea`, `table`, `ul`, and heading tags before adding ARIA roles to generic containers.
-12. Require the semantic interaction to match the user action. Use links for navigation, buttons for actions, checkboxes for binary selection, radios for mutually exclusive choices, and tables only for tabular relationships.
-13. Do not accept clickable `div` or `span` implementations when a native control would work. Adding `role="button"` and key handlers to generic elements is a fallback, not the preferred solution.
-14. Verify keyboard access for every interactive path. A keyboard user must be able to reach, operate, and dismiss the UI without requiring a mouse.
-15. Reject positive `tabIndex` values and focus-order hacks unless there is a documented, exceptional reason. Prefer DOM order that already produces the intended tab sequence.
-16. Verify visible focus indication remains clear in default, themed, and high-contrast modes. Do not remove outlines without a replacement that is at least as visible.
-17. Require an accessible name for every interactive control and meaningful form field. Derive it from visible text, associated labels, `aria-label`, `aria-labelledby`, or other valid naming mechanisms.
-18. Require accessible descriptions only when they add necessary context beyond the accessible name. Do not duplicate the same text in both name and description paths.
-19. Treat placeholder text as supplementary only. It does not replace a real label or an accessible name.
-20. When content updates without a page reload, verify assistive technologies receive the update through the correct pattern, such as `aria-live`, `role="status"`, `role="alert"`, focus movement, or semantic state changes. Do not announce the same event multiple times through overlapping mechanisms.
-21. For dialogs, popovers, flyouts, menus, and disclosure UI, verify trigger semantics, focus entry, focus containment when required, Escape handling, restore-focus behavior, and correct relationships such as `aria-expanded`, `aria-controls`, or dialog labeling.
-22. Reject ARIA that conflicts with visible behavior or native semantics. No ARIA is better than incorrect ARIA.
-23. Verify validation and error flows are accessible. Associate error text to the field, expose invalid state, and ensure summary or inline feedback is reachable and announced when it appears.
-24. Verify heading order, list structure, landmarks, and region labels remain meaningful after the change. Do not skip heading levels solely for visual styling.
-25. For tables and grids, verify the chosen pattern matches the interaction complexity. Simple data should stay a semantic table with proper header associations; only use grid patterns when the richer keyboard model is truly required.
-26. For images and media, require meaningful alternative text only when the asset conveys information not already present in adjacent text. Decorative images should use empty alt text or equivalent hiding.
-27. Do not rely on color, position, shape, or hover-only behavior as the sole way to understand content or discover an action. The state and action must remain available through text, semantics, or another non-visual cue.
-28. When custom widgets are unavoidable, require the full interaction contract: semantics, keyboard behavior, focus management, state announcements, high-contrast support, and tests. Reject partial reimplementations.
-29. Verify claimed accessibility fixes in the current PR source. A resolved thread or follow-up promise is not evidence that the current implementation is accessible.
+12. Preserve semantic HTML first. Use native elements such as `button`, `a`, `input`, `select`, `textarea`, `table`, `ul`, and heading tags before adding ARIA roles to generic containers.
+13. Require the semantic interaction to match the user action. Use links for navigation, buttons for actions, checkboxes for binary selection, radios for mutually exclusive choices, and tables only for tabular relationships.
+14. Do not accept clickable `div` or `span` implementations when a native control would work. Adding `role="button"` and key handlers to generic elements is a fallback, not the preferred solution.
+15. Verify keyboard access for every interactive path. A keyboard user must be able to reach, operate, and dismiss the UI without requiring a mouse.
+16. Reject positive `tabIndex` values and focus-order hacks unless there is a documented, exceptional reason. Prefer DOM order that already produces the intended tab sequence.
+17. Verify visible focus indication remains clear in default, themed, and high-contrast modes. Do not remove outlines without a replacement that is at least as visible.
+18. Require an accessible name for every interactive control and meaningful form field. Derive it from visible text, associated labels, `aria-label`, `aria-labelledby`, or other valid naming mechanisms.
+19. Require accessible descriptions only when they add necessary context beyond the accessible name. Do not duplicate the same text in both name and description paths.
+20. Treat placeholder text as supplementary only. It does not replace a real label or an accessible name.
+21. When content updates without a page reload, verify assistive technologies receive the update through the correct pattern, such as `aria-live`, `role="status"`, `role="alert"`, focus movement, or semantic state changes. Do not announce the same event multiple times through overlapping mechanisms.
+22. For dialogs, popovers, flyouts, menus, and disclosure UI, verify trigger semantics, focus entry, focus containment when required, Escape handling, restore-focus behavior, and correct relationships such as `aria-expanded`, `aria-controls`, or dialog labeling.
+23. Reject ARIA that conflicts with visible behavior or native semantics. No ARIA is better than incorrect ARIA.
+24. Verify validation and error flows are accessible. Associate error text to the field, expose invalid state, and ensure summary or inline feedback is reachable and announced when it appears.
+25. Verify heading order, list structure, landmarks, and region labels remain meaningful after the change. Do not skip heading levels solely for visual styling.
+26. For tables and grids, verify the chosen pattern matches the interaction complexity. Simple data should stay a semantic table with proper header associations; only use grid patterns when the richer keyboard model is truly required.
+27. For images and media, require meaningful alternative text only when the asset conveys information not already present in adjacent text. Decorative images should use empty alt text or equivalent hiding.
+28. Do not rely on color, position, shape, or hover-only behavior as the sole way to understand content or discover an action. The state and action must remain available through text, semantics, or another non-visual cue.
+29. When custom widgets are unavoidable, require the full interaction contract: semantics, keyboard behavior, focus management, state announcements, high-contrast support, and tests. Reject partial reimplementations.
+30. Verify claimed accessibility fixes in the current PR source. A resolved thread or follow-up promise is not evidence that the current implementation is accessible.
 
 ## Review questions
 
