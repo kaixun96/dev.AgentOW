@@ -217,6 +217,7 @@ For UI-visible changes, visual validation is mandatory and the evaluator owns it
 - Optional close-up crops belong only in `beforeCropPath` / `afterCropPath`; they are supplemental evidence.
 - When the plan/context marks a repeated or dense UI surface, close-up BEFORE/AFTER crops are mandatory supplemental evidence, not optional. They must contain at least two adjacent items at the same scale.
 - For repeated Cards/rows/tiles/items, the evaluator must record BEFORE/AFTER `getBoundingClientRect()` data and computed adjacent gap. A non-zero BEFORE gap becoming zero/negative AFTER is a product FAIL unless explicitly required.
+- For Dialog/Drawer/Panel surfaces with grouped footer or toolbar controls, the evaluator must also inspect adjacent control spacing/alignment even when the surface is otherwise styled. If buttons or adjacent actions that were visibly separated in the legacy branch collapse together, lose their gap, or drift into the wrong alignment in AFTER, treat it as **FAIL** with blocker `component-layout-regressed`.
 - If screenshots are missing, visual validation failed, or the evaluator says Playwright/browser tools were unavailable, treat the evaluator result as **FAIL** even if code inspection passed.
 - Before accepting PASS, independently `view` both primary images and run `file -- "<beforePath>" "<afterPath>"`; do not trust filenames, `captureMethod`, `dimensionEvidence`, or the evaluator's dimension claim without this cross-check.
 - If either primary image lacks surrounding page context or its actual PNG dimensions do not match the recorded viewport, classify it as `evaluator-spec` and re-dispatch the evaluator once in the same implementation cycle.
@@ -226,6 +227,7 @@ For UI-visible changes, visual validation is mandatory and the evaluator owns it
 - Screenshots created manually by the main session do **not** satisfy evaluator validation. If the main session writes a temporary spec to unblock an investigation, move that logic into the evaluator retry prompt and re-dispatch the evaluator.
 - Surface the exact failure reason to the user and record it in `progress.log`, `report.json`, and `final.md` if the run stops.
 - Do not claim the UI was verified without screenshot evidence.
+- If the run is still blocked on the **same screenshot step** after another attempt and you have no materially new evidence, say that explicitly instead of going silent. Append a progress line naming the unchanged blocker and the next single-variable experiment (for example: `still blocked at app shell mount; next retry keeps the same page and adds only a 2s settle before screenshot`). Silence makes the user think the run is abandoned.
 - Failing visual validation blocks the *claim*, not the *delivery*. If the implementation is already committed and green, do not end the run empty-handed — see the environment-discovery branch of Step 6 and ship an explicitly unverified draft instead.
 
 Before accepting any evaluator claim about auth, FIC, tenant suitability, test-page availability, or a fixture gap, inspect its `coverageManifest`. A single URL, credential, tenant, or site failure is resource-local evidence only.
