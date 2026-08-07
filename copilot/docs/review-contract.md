@@ -58,6 +58,15 @@ Trace the risky paths through the full changed files and relevant consumers. Che
 - repository instructions and routed context;
 - dependencies, generated artifacts, and tooling.
 
+Use an explicit adversarial challenge protocol rather than reading only to confirm the author's intended path:
+
+1. For every high-risk file or behavior unit, write at least one falsifiable failure hypothesis before deciding it is correct.
+2. Try to trigger each hypothesis through the strongest applicable counterexample: invalid or adversarial input, null/empty/boundary values, partial failure, retry, cancellation, stale state, concurrent execution, disabled rollout state, or a direct consumer with different assumptions.
+3. Inspect negative and fallback paths independently of the happy path. Tests that only restate the implementation or prove mocks were called do not defeat a failure hypothesis.
+4. Before `APPROVE`, perform a final dissent pass: identify the strongest credible reason the change should not merge, then cite the concrete code, contract, or test evidence that defeats it. If it cannot be defeated, investigate further or raise a finding.
+
+Adversarial means skeptical of the change, not careless with evidence. Do not manufacture findings, inflate severity, or report a concern whose failure mechanism and affected behavior cannot be explained concretely.
+
 Each dimension must be `reviewed` with `file:line`, `command:...`, or `artifact:...` evidence, or `not-applicable` with a specific reason explaining why the dimension cannot affect this diff. Generic claims such as "looks good", "standard change", or "not applicable" are invalid evidence.
 
 Every changed file must include non-empty consumer and test evidence. A file cannot cite itself (including through a normalized path alias) as its direct consumer, and file-based test evidence must point to a test/spec file or directory rather than a helper whose name merely contains "test". When no consumer or test exists, use the canonical safe form `command:rg <consumer-query|test-query> <repo-relative-bounded-path> => no matches` (an optional `--glob <glob>` is allowed). Shell composition, absolute/parent/root paths, arbitrary commands, and artifact references are invalid substitutes. Explain why absence is safe; an empty array or padded "not applicable" statement is invalid. Reviewed dimensions require distinct conclusions that name the dimension-specific concern, rather than repeated boilerplate with counters or dimension names appended.

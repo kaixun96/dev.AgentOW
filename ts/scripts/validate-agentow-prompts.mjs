@@ -194,6 +194,8 @@ const checks = [
     snippets: [
       "Pass 1: immutable scope and risk",
       "Pass 2: adversarial verification",
+      "at least one falsifiable failure hypothesis",
+      "final dissent pass",
       "direct callers/consumers",
       "Any Critical or Important → `REQUEST_CHANGES`.",
       "artifactJsonPath",
@@ -205,10 +207,12 @@ const checks = [
       "do not equate reading every line with reliable exhaustive review",
       "`preliminary-non-exhaustive` completeness claim",
       "git diff --no-renames",
-      "skills/ow-review/references/localization-and-formatting.md",
-      "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+      "localization-and-formatting.md",
+      "sharepoint-design-system-and-ux-components.md",
       "physical-direction CSS",
-      "non-visible assistive text read by screen readers"
+      "screen-reader or other assistive text",
+      "Reference routing",
+      "A data-provider-only PR therefore loads none"
     ]
   },
   {
@@ -226,6 +230,8 @@ const checks = [
     snippets: [
       "Pass 1: immutable scope and risk",
       "Pass 2: adversarial verification",
+      "at least one falsifiable failure hypothesis",
+      "final dissent pass",
       "Critical or Important present → `REQUEST_CHANGES`.",
       "review.json",
       "Never APPROVE without complete evidence.",
@@ -236,10 +242,12 @@ const checks = [
       "reading all files does not prove the review is reliable or exhaustive",
       "`preliminary-non-exhaustive`",
       "git diff --no-renames",
-      "skills/ow-review/references/localization-and-formatting.md",
-      "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+      "localization-and-formatting.md",
+      "sharepoint-design-system-and-ux-components.md",
       "physical-direction CSS",
-      "non-visible assistive text read by screen readers"
+      "screen-reader or other assistive text",
+      "Reference routing",
+      "A data-provider-only PR therefore loads none"
     ]
   },
   {
