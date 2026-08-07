@@ -35,9 +35,18 @@ Wait for `ow-orchestrator` or the team lead. Input includes `reportFile`, `branc
 Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before reviewing. It is normative. An unsupported APPROVE is a failed review.
 If any Git-changed path is under `sp-client/`, also read `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in `preReview.profiles`.
 Read `${CLAUDE_PLUGIN_ROOT}/docs/review-misses.md` before finalizing. It records defect classes this reviewer has demonstrably missed on real PRs, distilled from human review that caught what the agent did not. Treat each entry as a standing question to ask of the change in front of you.
-If the diff touches visible UI text, non-visible assistive text read by screen readers, resource files, placeholders, count/plural text, or physical-direction CSS, read `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/localization-and-formatting.md` and apply every relevant check.
-If the diff adds or changes user-facing UX components, layout, component styling, or imports from `@msinternal/sharepoint-ui-react-stable-bundle`, `@msinternal/sharepoint-ui-react`, or Fluent UI React V9, read `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/sharepoint-design-system-and-ux-components.md` and apply every relevant check.
-If the diff adds or changes interactive UI, custom controls, form fields, dialogs, flyouts, dynamic status text, focus behavior, visibility toggles, or accessibility attributes, read `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/accessibility.md` and apply every relevant check.
+
+### Reference routing
+
+Classify the changed behavior from the Git diff before loading optional reference documents. Evaluate each row independently and read only the references whose positive trigger matches; do not load all references by default.
+
+| Reference | Read when the change contains | Do not read solely because the change contains |
+|---|---|---|
+| `localization-and-formatting.md` | Added or changed visible UI text; screen-reader or other assistive text; resource/resx entries; localized placeholders or interpolation; count/plural handling; locale-sensitive date, time, number, currency, address, or phone formatting; physical-direction CSS that must support RTL | Data providers, API clients, models, business logic, telemetry-only fields, tests without changed user-facing strings, or internal error/debug text |
+| `sharepoint-design-system-and-ux-components.md` | Added or changed rendered user-facing components, layout, visual styling, typography, spacing, color, icons, responsive behavior, or runtime use of SharePoint/Fluent UI component APIs | Data providers, services, hooks with no rendered UI contract, models, state-only logic, package metadata, or type-only imports from UI libraries |
+| `accessibility.md` | Added or changed interactive or semantic UI: controls, links, forms, dialogs, flyouts, menus, focus/keyboard behavior, dynamic status announcements, visibility toggles, accessible names/roles/states, or DOM structure that affects reading or tab order | Data providers, API clients, models, pure formatting/business logic, non-rendered hooks, visual-token-only changes with unchanged semantics, or tests that do not alter product interaction |
+
+If no positive trigger matches, load none of these three references. A data-provider-only PR therefore loads none unless it also changes user-facing strings, rendered UX, or interaction/accessibility behavior. Record which optional references were applied, or that none were applicable, in the review evidence.
 Populate every profile-defined `preReview.profileChecks` entry with cited evidence or a specific not-applicable reason. For SP-Client, inspect the PR description before code, then populate structured `preReview.rolloutProtection`: enumerate every runtime path, identify the declared Flight/KS and direction, and trace each reachable entry through the actual gate to both the new and fallback paths plus disabled-state tests. A nearby gate is not coverage. Missing description, any unprotected path, wrong direction, fallback executing new abstractions, or missing disabled-state tests requires a `rolloutProtection` finding. Also review established UI primitives/typography tokens, SharePoint theme/Detheme flow, large-collection fetch plus rendering strategy, and automated tests.
 Review strictly: actively look for plausible bugs, regressions, edge-case failures, and design risks beyond the most obvious blockers. When in doubt, investigate further and surface the issue if the risk is evidence-backed; do not soften findings just because the change looks mostly reasonable. Still avoid style-only noise unless it has real maintainability or correctness impact.
 
@@ -64,7 +73,11 @@ Enumerate changed files from Git, not from summaries. Read every changed file in
 
 ## Pass 2: adversarial verification
 
-State concrete failure hypotheses and trace them through implementation, consumers, tests, edge paths, and run artifacts. Cover every canonical dimension from the contract:
+For every high-risk file or behavior unit, state at least one falsifiable failure hypothesis before deciding it is correct. Try to trigger it with the strongest applicable counterexample: adversarial input, null/empty/boundary values, partial failure, retry, cancellation, stale state, concurrency, rollout disabled, or a consumer with different assumptions. Trace each hypothesis through implementation, consumers, tests, edge paths, and run artifacts; happy-path evidence alone is insufficient.
+
+Before `APPROVE`, perform a final dissent pass: state the strongest credible reason the change should not merge and cite the concrete evidence that defeats it. If you cannot defeat it, investigate further or raise a finding. Be skeptical, but do not manufacture findings or inflate severity without a concrete failure mechanism and affected behavior.
+
+Cover every canonical dimension from the contract:
 
 - behavior and acceptance criteria;
 - design necessity and maintainability, including deprecated APIs, hardcoding, comments/docs, naming, TODO links, duplication, and strict typing;

@@ -142,7 +142,7 @@ contextDocuments:
   - <every routed feature/domain context document, when a context library is linked>
 ```
 
-State explicitly that this is a standalone review with no plan, implementation, or evaluation artifacts: the reviewer must ground `preReview.evidence` in the PR description, commit messages, linked work item, and the diff itself, and must never synthesize pipeline artifact paths. `rolloutProtection.reviewContext` is `existing-pr` in PR mode and `pre-pr` in branch mode.
+State explicitly that this is a standalone, adversarial review with no plan, implementation, or evaluation artifacts. Require the reviewer to apply the contract's adversarial challenge protocol: form falsifiable failure hypotheses for every high-risk file or behavior unit, test the strongest counterexamples and negative/fallback paths, and complete a final dissent pass before `APPROVE`. The reviewer must ground `preReview.evidence` in the PR description, commit messages, linked work item, and the diff itself, and must never synthesize pipeline artifact paths. Strictness never permits unsupported findings or inflated severity. `rolloutProtection.reviewContext` is `existing-pr` in PR mode and `pre-pr` in branch mode.
 
 ## Step 6: Validate before showing anything
 
