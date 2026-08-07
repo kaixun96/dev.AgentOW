@@ -599,25 +599,12 @@ if (host === "claude") {
 }
 
 capabilities.push(
-  ensurePlugin({
-    host,
-    pluginName: "playwright-mcp-servers",
-    id: "browser.playwright-mcp",
-    role: taskSignals.ui ? "fallback" : "optional",
-    shouldInstall: true,
-    firstRun,
-    probeOnly,
-    actions,
-    fallbackIds: ["browser.fic-heft"],
-  }),
-);
-capabilities.push(
   makeCapability(
     "browser.fic-heft",
-    taskSignals.ui ? "fallback" : "optional",
+    taskSignals.ui ? "required" : "optional",
     fs.existsSync(`${ODSP_ROOT}/common/config/rush`) && commandExists("rushx") ? "available" : "unknown",
-    "FIC availability is finalized after planning selects a Playwright project",
-    ["browser.playwright-mcp"],
+    "FIC Playwright/Heft is the only AgentOW screenshot engine; auth is finalized after planning selects a project",
+    [],
     false,
     "Run rush install and use a project Playwright harness",
   ),
@@ -719,19 +706,19 @@ if (azAvailable) {
 capabilities.push(ensureImageDependencies(taskSignals.ui, firstRun, probeOnly, actions));
 capabilities.push(
   makeCapability(
-    "fixture.playwright-profile",
-    taskSignals.ui ? "fallback" : "optional",
-    fs.existsSync("/workspaces/.playwright-profile") ? "unknown" : "missing",
-    fs.existsSync("/workspaces/.playwright-profile") ? "Playwright profile exists; login freshness is unknown" : "Playwright profile is absent",
-    ["browser.fic-heft"],
+    "fixture.fic-auth",
+    taskSignals.ui ? "required" : "optional",
+    taskSignals.ui ? "unknown" : "not-applicable",
+    taskSignals.ui ? "FIC authentication is verified by the selected project probe" : "No UI task signal",
+    [],
     false,
-    "Open the Playwright browser and sign in to SharePoint if MCP validation is used",
+    "Run the project Playwright probe and complete FIC authentication if prompted",
   ),
 );
 capabilities.push(
   makeCapability(
     "fixture.tenant-site",
-    taskSignals.ui ? "fallback" : "optional",
+    taskSignals.ui ? "required" : "optional",
     "unknown",
     "Tenant, site, and fixture eligibility are deferred until planning supplies predicates",
     [],

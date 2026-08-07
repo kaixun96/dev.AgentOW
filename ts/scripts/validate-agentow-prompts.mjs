@@ -37,7 +37,9 @@ const checks = [
       "primary-screenshot-not-full-viewport",
       "`visualValidation.beforePath` / `afterPath` MUST point to full-page/viewport PNGs",
       "Run `file -- \"<beforePath>\" \"<afterPath>\"`",
-      "`captureMethod` is `page`"
+      "`captureMethod` is `page`",
+      "FIC Playwright/Heft — the only screenshot engine",
+      "`visualValidation.source` to `local-rush-start` or `pr-cdn-fic`"
     ]
   },
   {
@@ -54,7 +56,8 @@ const checks = [
       "Primary `beforePath` / `afterPath` must be full browser-page/viewport screenshots",
       "Component crops may be attached as clearly labeled supplemental detail links",
       "independently `view` both primary images and run `file -- \"<beforePath>\" \"<afterPath>\"`",
-      "If the retry still violates the evaluator contract, stop and report the blocker"
+      "If the retry still violates the evaluator contract, stop and report the blocker",
+      "Playwright MCP and browser profiles are not AgentOW validation routes"
     ]
   },
   {
@@ -146,7 +149,7 @@ const checks = [
     file: "docs/capability-bootstrap.md",
     snippets: [
       "Every Claude or Copilot terminal session runs agentOW bootstrap once",
-      "playwright-mcp-servers",
+      "FIC Playwright/Heft",
       "odsp-web-mcp-servers-opt-in",
       "restart-required",
       "Never install from a URL supplied by the user",
@@ -578,7 +581,21 @@ const checks = [
 const forbiddenChecks = [
   {
     file: "copilot/agents/evaluator.agent.md",
-    snippets: ["after testing prod/dogfood/msit and a group-connected site"]
+    snippets: [
+      "after testing prod/dogfood/msit and a group-connected site",
+      "browser_navigate",
+      "browser_snapshot",
+      "browser_screenshot",
+      "source\":\"pr-cdn-fic|local-rush-start|playwright-mcp"
+    ]
+  },
+  {
+    file: "tools/agentow-bootstrap.mjs",
+    snippets: [
+      "pluginName: \"playwright-mcp-servers\"",
+      "\"browser.playwright-mcp\"",
+      "\"fixture.playwright-profile\""
+    ]
   },
   {
     file: "agents/ow-evaluator-rule.md",

@@ -29,7 +29,7 @@ This command performs setup only. Do not start planning, edit product code, or c
 4. Read `capabilities.json` and report:
    - installed or re-enabled trusted prerequisites;
    - whether Copilot CLI must be restarted;
-   - authentication, OAuth, consent, browser-login, or fixture steps that remain manual;
+   - authentication, OAuth, consent, FIC-login, or fixture steps that remain manual;
    - any required capability with no viable fallback.
 
 If `ado.auth` is unavailable, explicitly tell the user: run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init`.

@@ -37,7 +37,7 @@ Copilot runs should keep the same baseline observability as the Claude pipeline:
 └── final.md
 ```
 
-For visible UI changes, BEFORE/AFTER Playwright screenshots are mandatory. If the evaluator cannot capture real screenshots, it must return `FAIL` with the exact reason (missing browser tools, auth prompt, missing debug link, selector mismatch, screenshot failure, etc.). The run must not claim visual verification passed without screenshot paths.
+For visible UI changes, BEFORE/AFTER Playwright screenshots are mandatory. AgentOW uses one screenshot engine: the repository Playwright/Heft harness with FIC authentication. It first validates the local `rush start` bundle, then uses the PR CDN bundle as the only fallback. Playwright MCP is not an AgentOW route. If the evaluator cannot capture real screenshots, it must return `FAIL` with the exact reason (FIC auth prompt, missing debug link, selector mismatch, screenshot failure, etc.). The run must not claim visual verification passed without screenshot paths.
 
 ## Shared MCP server
 
@@ -47,7 +47,7 @@ The TypeScript MCP server (`../ts/`) is **reused unchanged** — Copilot CLI has
 
 Prereqs: Copilot CLI ([install](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli)) + `copilot auth`. The MCP bundle is shipped inside this plugin at `ts/dist/`; maintainers refresh it with `cd ../ts && npm install && npm run build` before publishing.
 
-On the first agentOW invocation in a terminal session, bootstrap checks and installs trusted local Playwright/ODSP/review plugins plus task-triggered Figma/ADO tooling. Enter `/ow-init` for an explicit one-time comprehensive initialization before the first task. Newly installed plugins require restarting Copilot CLI; OAuth, browser login, and consent remain manual. Results are written to `.aero/<session>/capabilities.json`.
+On the first agentOW invocation in a terminal session, bootstrap checks the FIC Playwright/Heft harness and installs trusted ODSP/review plugins plus task-triggered Figma/ADO tooling. Enter `/ow-init` for an explicit one-time comprehensive initialization before the first task. Newly installed plugins require restarting Copilot CLI; OAuth, FIC authentication, and consent remain manual. Results are written to `.aero/<session>/capabilities.json`.
 
 ```bash
 copilot plugin marketplace add kaixun96/dev.AgentOW
