@@ -2,8 +2,9 @@
 
 Defects that real human reviewers found in PRs this reviewer had already reviewed. Each entry
 records what was missed and the mechanism that caused the miss. General review standards live
-in `docs/review-contract.md`; older entries retain their original rule for historical context.
-Every claim is cited to code, not to the review comment that reported it.
+in `docs/review-contract.md`. Once a miss is fully encoded by the contract or a routed review
+reference, remove it here rather than maintaining the same rule twice. Every remaining claim is
+cited to code, not to the review comment that reported it.
 
 Read this before finalizing a review. These are not additional checklist items to recite; they
 are the failure modes this reviewer actually has.
@@ -16,47 +17,6 @@ comment. A comment that turned out to be wrong is recorded too, under "Calibrati
 a false positive costs the author's trust just as a miss costs the author a bug.
 
 ---
-
-## M1. Reporting the first instance and stopping
-
-**Missed:** an unvalidated `href` was reported at one render site while a second site in the
-same diff rendered a user-writable URL the same way. The fix for the first did not reach the
-second. The same review reported a response body reaching telemetry at one call site while two
-other call sites in the same file put a user-chosen file name into the same sink.
-
-**Mechanism:** a finding was treated as a location. Once the location was cited, the reviewer
-moved to the next dimension. Nothing required asking whether the defect *class* occurred
-elsewhere in the diff.
-
-## M2. Reasoning about a dependency without reading it
-
-**Missed, and both were blocking:**
-
-- A route wrapper was placed inside a fallback `<Switch>`. `Switch` reads `path` off its
-  **direct children**: `react-router@4.2.0/Switch.js` does
-  `React.Children.forEach(children, element => { var pathProp = element.props.path; ... })`,
-  and when `path` is undefined it falls back to `route.match`, which is always truthy — so the
-  first child always won and every URL rendered the same page. The wrapper hid `path` from
-  `Switch`. The proof is three hops outside the diff:
-  `sp-pages-core/src/core/ReactRouter.ts` → `sp-page-router-shared/src/ReactRouter.ts:4`
-  (`export { default as Switch } from 'react-router/Switch'`, `react-router: ~4.2.0`) →
-  `react-router/Switch.js`.
-- A DST window compared a Win32 `SYSTEMTIME` transition rule against a raw UTC instant. The
-  rule's `Hour`/`Minute` are **local wall-clock time in that zone**, so the comparison was
-  wrong by a whole base offset. The unit semantics are a property of the platform structure,
-  not of the changed file.
-
-Three more followed the same shape: a QoS monitor whose **constructor** already emits the Start
-event (`sp-diagnostics/src/Api/Qos/QosMonitor.ts:80` calls `QosLogger.instance.startQosMonitor`),
-so constructing it unconditionally and ending it conditionally leaks an unclosed event; a
-telemetry helper that classifies a plain `Error.message` as privacy-unsafe; and a type
-re-declared locally behind `as unknown as` when the package already imported in that same file
-exports the real shape.
-
-**Mechanism:** the reviewer's consumer analysis runs *downstream* — who calls the changed code.
-Every one of these defects is *upstream* — what the changed code calls, and what that thing
-actually promises. The changed file reads plausibly in isolation in all five cases; the defect
-is only visible in the dependency's source.
 
 ## M3. The diff contradicting itself
 
@@ -116,73 +76,6 @@ had "not loading" and "no data" simultaneously, flashing the empty state before 
 
 **Rule:** when two pieces of initial state encode the same condition, derive them from one
 expression. Check the first render for state combinations the component treats as impossible.
-
-## M7. Comments accepted as documentation instead of checked as claims
-
-**Missed:** a file header made three factual claims about the implementation — the endpoint it
-used, a search feature, and which columns sorted. All three contradicted the code in the same
-diff, one of them describing an approach the file itself explained it had abandoned.
-
-**Mechanism:** comments were reviewed for style ("explain why, not what") rather than for truth.
-
-**Rule:** a comment that states a fact about the code is an assertion to verify. Check header
-comments, endpoint and contract claims, and "NOT covered" lists against the code they describe.
-Stale claims are worst in new files, because they become the next reader's mental model.
-
-## M8. Capability reinvented because nothing asked what already exists
-
-**Missed:** a change hand-rolled a screen-reader announcement helper in a shared `styles.ts`.
-The review produced 26 findings — three blockers, several correct parity defects in 64-bit
-permission math — and never asked whether the platform already provided it. A human reviewer
-named the existing hook from memory: `useScreenReaderAlert`, which ships in *two* places
-(`odsp-common/shared-react/screen-reader-alert/` and
-`sp-client/libraries/sp-component-utilities/src/hooks/`). The same reviewer, on a different PR
-by a different author, caught a wrapper around string formatting when `Text.format` /
-`StringHelper.format` were already used in 355 files, and hardcoded literals where a design
-token with that exact value existed.
-
-**Mechanism:** every dimension in the contract asks whether the code in front of the reviewer
-is *wrong*. None asks whether it should *exist*. The profile's one prior-art rule is scoped to
-"navigation, menus, lists, or other interactive structures" — UI components only — so hooks,
-utilities, and style helpers fall outside it entirely.
-
-## M9. Comment volume treated as a style preference
-
-**Missed:** across two PRs, one human reviewer raised unnecessary comments **seven** times —
-"we usually only add comments for unavoidable hack methods", "not needed comment", "simplify
-comments, only add when we cannot understand why", "confusing comments, do it by TypeScript
-typing instead". The authors' own before/after measurements ran 43%→22%, 41%→21%, 36%→22%.
-The review agent raised it zero times in either PR.
-
-**Mechanism:** "comments/docs" is three words inside one design bullet listing eight concerns.
-A dimension that only appears as a clause never fires. The same burial explains M4.
-
-## M10. Localization checked for extraction, not for contract
-
-**Missed:** new `.resx` strings without `{Locked=...}` on their placeholders; a count-bearing
-string with no singular/plural pair ("1 more breadcrumb items"); English fallback strings
-sitting in code with no answer to whether they are user-visible. Human reviewers raised these
-five times across the two PRs; the agent raised none.
-
-**Mechanism:** the contract lists `localization` as a dimension, which the agent satisfies by
-confirming strings are externalized. Externalization is the easy half. The `{Locked=}`
-convention is real and repo-wide — 85 occurrences across 43 `.resx` files.
-
-## M11. Sibling files reviewed one at a time
-
-**Missed:** three new page layouts with, in the human reviewer's words, "the same private
-members/functions, the only difference is the component it renders" — and separately, "the 3
-pages look like totally the same structure and similar UX, should we split them into 3 pages?"
-The agent reviewed each file's contents correctly and never compared them to each other.
-
-**Mechanism:** this is M1 pointed at structure instead of defects. The class sweep asks whether
-a *defect* recurs across the change; nothing asks whether the change's *files* are copies.
-
-**Rule:** when a change adds several files of the same kind, diff them against each other
-before reviewing them individually. Near-identical siblings are a design finding about the
-change, not a defect in any one file.
-
----
 
 ---
 
