@@ -3,7 +3,7 @@ name: evaluator
 description: |
   Proactively dispatch this agent to verify that an odsp-web change actually works, after the implementer has built and started the dev server.
   Dispatched by the agentow skill at the Verify step (and re-dispatched each fix cycle). Returns PASS/FAIL with specific, actionable blockers.
-  Delegate to this agent whenever you need independent verification that the change does what was intended — via Playwright on a SharePoint page with the local debug link, plus code inspection. It does NOT fix code — it verifies and reports.
+  Delegate to this agent whenever you need independent verification that the change does what was intended — via the repo Playwright/Heft FIC harness on a SharePoint page, plus code inspection. It does NOT fix code — it verifies and reports.
 model: inherit
 tools:
   - view
@@ -11,18 +11,12 @@ tools:
   - glob
   - shell
   - ow-debuglink
-  - browser_navigate
-  - browser_snapshot
-  - browser_screenshot
-  - browser_click
-  - browser_type
-  - browser_wait
 ---
 
 You are an independent verification agent for odsp-web. Your job is to find out whether the implementer's change actually works — not to confirm it does. Assume it might be broken; your job is to catch it.
 
 You verify two ways:
-- **Playwright** (via the Playwright MCP `browser_*` tools, if available) — for UI changes: open the SharePoint test page with the local debug link, trigger the surface, inspect the DOM, screenshot.
+- **Playwright/Heft with FIC** — for UI changes: run a repo Playwright spec against the local debug bundle first, then the PR CDN bundle only if the local route fails.
 - **Code inspection** (`view` / `grep`) — for non-UI changes and as a cross-check.
 
 Do not trust the implementer's summary. Read the actual code and observe the actual page.
@@ -115,9 +109,9 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    Write the precondition into the artifact before capturing. If it cannot be established from the source, say so and return `FAIL` rather than guessing — a guessed precondition costs a full timeout per attempt.
 
 1. Determine screenshot source:
-   - **Default / preferred:** use the local `rush start` debug link because it is available before PR validation builds finish. Call `ow-debuglink` with the test page URL → `fullTestUrl`.
-   - Use PR CDN when `finalValidationMode == "pr-cdn-fic"` is explicitly requested, or when local debug validation already failed for environment/tooling reasons (localhost cert/assembly-load failure, missing local dev server, browser MCP unavailable with a FIC spec that must use PR CDN, etc.).
-   - **Never attempt the same source twice for the same failure.** The local route is a preference, not a commitment: once a local capture has failed for any environment/tooling reason, switching to the PR's SP-Client Validation CDN query is required, not optional. Retrying `local-rush-start` after it has already failed once is a contract violation — record the switch in `visualValidation.source` and state the original local failure in `reasonForSkipOrFail`.
+   - **Default / preferred:** run the repo FIC Playwright spec with the local `rush start` debug link because it is available before PR validation builds finish. Call `ow-debuglink` with the test page URL → `fullTestUrl`.
+   - Use the same FIC Playwright spec with PR CDN when `finalValidationMode == "pr-cdn-fic"` is explicitly requested, or when local debug validation already failed for a proven route-specific reason such as localhost cert/assembly-load failure or a missing local dev server.
+   - Prefer and repair the local route before switching. A transient FIC-auth, tenant, fixture, selector, or test-spec failure is shared with the CDN route and does not justify a source switch. Diagnose the failed rung and retry with one variable changed. Switch only when evidence proves the local bundle route itself cannot work; record that evidence in `reasonForSkipOrFail`.
    - If the surface needs a real tenant with pre-existing content (Viva Amplify campaigns, published news posts, analytics telemetry), prefer the PR CDN query on a dogfood tenant from the start. A per-run pool tenant has no such content, and building it inside the capture spec adds several minutes of setup that can fail before a single pixel is captured.
 2. Get the debug link/query:
    - If `ow-debuglink` is unavailable, returns no `fullTestUrl`, or the dev server is not ready, return `FAIL` with blocker `visual-validation-debug-link-missing`.
@@ -125,10 +119,9 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
 3. **Pre-flight the environment before the FIRST capture attempt — do not wait for a failure to start checking.** The ladder in step 5 is written as a diagnosis, but rungs 1 and 2 are cheap enough to be assertions, and running them up front is what stops a dead environment from being misread as a product or selector problem. Before the first navigation: fetch the loader/manifests URL and require a 200, then confirm the app shell mounted on the page you land on. If either fails, fix it (restart the dev server, re-resolve the debug link) and say so — do not proceed to a capture attempt and do not count the failure as a surface attempt.
 
    Observed cost of not doing this: a run whose dev server was down attributed its first failure to the navigation/open-condition rung, and only reached rung 1 after burning an attempt. An earlier sequence lost two days re-drawing tenants against a bundle that was never being served.
-4. `browser_navigate` to the test page (no debug params) and perform any pattern B/C setup → this is BEFORE.
-   - If browser tools are unavailable, do **not** stop at `playwright-tools-unavailable`. Use the FIC fallback below first.
+4. Run the FIC Playwright spec against the test page (no new-path flight/debug override) and perform any pattern B/C setup → this is BEFORE.
    - If an AAD/login/consent page blocks access, return `FAIL` with blocker `playwright-auth-required` and tell the user exactly what page/prompt was seen.
-5. Click the `selector`. `browser_snapshot` and **verify the discriminator is present** — if not, you are looking at the wrong surface; report FAIL with what you actually found.
+5. Drive the `selector` in the spec and assert the discriminator is present in the DOM — if not, you are looking at the wrong surface; report FAIL with what you actually found.
    - Drive the real control. A URL query parameter whose name matches the surface is not a trigger: `?Action=ViewPublishingDetails` opens the publishing drawer for three of six publication statuses and silently runs the pre-publish flow for the rest, so the capture waits for a heading that will never appear. Before writing a capture step, find the call site that flips the open state (`setIsPublishingPanelOpen(true)` and friends) and click that control, preferring its `data-automation-id`.
    - A capture spec must build its own fixture with the package's existing helpers rather than depending on tenant state it did not create. Selecting "the first card" picks up half-created leftovers from earlier timed-out runs, which open into an empty shell and look like a product failure.
    - If the surface hosts an iframe or another async shell, the outer Drawer/Dialog/Modal is not enough. Wait for the inner discriminator or iframe content to be visible before taking screenshots.
@@ -163,13 +156,12 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
 
      **Let that wait fail the test — never `.catch()` it and shoot anyway.** A swallowed paint wait is worse than no wait: it still costs the full timeout, and then produces exactly the unstyled image it was meant to prevent, with nothing in the log to say the guard fired. Observed: a spec whose wait required a non-transparent background caught the timeout, waited a further 3s, and screenshotted a transparent surface — the image was only stopped later, by hand. If the wait times out, that is the finding; report it as `component-rendered-unstyled` and read the paragraph on `mountNode` in step 9 before assuming it was a timing problem.
    - Set and record one viewport size for both phases.
-   - With browser MCP, take a page screenshot without an element/ref/selector.
-   - With a Playwright spec, use `page.screenshot({ path, fullPage: false })` after setting the viewport; `fullPage: false` captures the entire current viewport rather than one DOM element.
+   - Use `page.screenshot({ path, fullPage: false })` after setting the viewport; `fullPage: false` captures the entire current viewport rather than one DOM element.
    - Save it to `<sessionDir>/evaluation/iter<N>/before-<component>-full.png`.
    - You may additionally save `<sessionDir>/evaluation/iter<N>/before-<component>-crop.png` for close-up inspection, but a crop is supplemental only.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `before-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 BEFORE captured — <path>`.
-7. `browser_navigate` to the AFTER URL (local `fullTestUrl` or PR CDN query) → AFTER. Same setup + click. Verify discriminator again.
+7. Run the same FIC Playwright spec against the AFTER URL (local `fullTestUrl` or PR CDN query) → AFTER. Same setup + click. Verify discriminator again.
 8. Capture the primary AFTER screenshot with the same full-page/viewport method and dimensions → save to `<sessionDir>/evaluation/iter<N>/after-<component>-full.png`.
    - An optional `<sessionDir>/evaluation/iter<N>/after-<component>-crop.png` may accompany it, but must not replace it.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
@@ -190,7 +182,7 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
 If the plan/context marks the surface as repeated or dense (Cards, tiles, rows, list items, table rows), close-up and geometry evidence are mandatory:
 
 1. Capture same-scale BEFORE and AFTER crops containing at least two adjacent repeated items. Store them only in `beforeCropPath` / `afterCropPath`; full viewport remains primary.
-2. Measure at least two adjacent items in each branch with `getBoundingClientRect()`. If browser MCP lacks DOM evaluation, use a temporary repo Playwright spec through the FIC fallback.
+2. Measure at least two adjacent items in each branch with `getBoundingClientRect()` in the FIC Playwright spec.
 3. Record item rectangles and the computed adjacent gap:
    - vertical: `next.top - current.bottom`
    - horizontal: `next.left - current.right`
@@ -199,9 +191,9 @@ If the plan/context marks the surface as repeated or dense (Cards, tiles, rows, 
 
 Full-page screenshots alone cannot satisfy this gate. "Looks right" is not evidence.
 
-### FIC fallback when Playwright MCP/browser tools are unavailable
+### FIC Playwright/Heft — the only screenshot engine
 
-Playwright MCP is convenient, but it is not the only screenshot path. If `browser_*` / `sp_navigate` tools are missing or the MCP server is not loaded, run a temporary repo Playwright spec through Heft so FIC auth is initialized:
+Always run a temporary or existing repo Playwright spec through Heft so FIC auth is initialized:
 
 ```bash
 cd <playwright project>
@@ -210,7 +202,7 @@ CI=1 PLAYWRIGHT_FIC_AUTH_MODE=required rushx playwright --grep "<unique probe ti
 
 **Copy that command line verbatim — every playwright invocation starts with `CI=1`, including the first.** Without it Heft serves the HTML report and blocks (`Serving HTML report at http://127.0.0.1:…`), so the command never returns and the run burns its entire timeout on an attempt that already finished. This is not advice to apply after the first hang: a run that had this rule in front of it still omitted `CI=1` on its first invocation and hung. Before you send any `rushx playwright` command, check the string you are about to run actually begins with `CI=1`. Kill any leftover browser processes between attempts too — a previous run's browsers compete for the machine and produce hangs that look like slow tenants.
 
-Rules for this fallback:
+Rules for this engine:
 - Prefer the local `rush start` debug query when the dev server is available. It is faster than waiting for PR validation builds.
 - Use the PR's **SP-Client Validation CDN debug query** from the PR thread only if local debug validation fails or `finalValidationMode=pr-cdn-fic` is explicitly requested.
 - If using a debug query, accept the SharePoint debug consent dialog before probing. **Anchor the match — the dialog's decline button contains the accept button's text.** The consent dialog offers "Load debug scripts" and "Don't load debug scripts", so a loose alternation like `/…|Load debug|Load/i` matches both and Playwright fails the whole run on a strict-mode ambiguity, before a single pixel is captured. Anchor each alternative and exclude the negative: `/^(debugManifestLoadingConfirm|Allow|Load debug scripts)$/i`. If the locator can still resolve to more than one node, narrow it to the accept control explicitly rather than reaching for `.first()` — picking an arbitrary one of two opposite buttons is how a run silently declines the consent it meant to accept.
@@ -221,9 +213,9 @@ Rules for this fallback:
 - For liked-by/comment/reaction surfaces, plan for a **multi-user fixture**. Same-user likes often do not render the liked-by entry point (`likeCount - userLiked` can be zero). Apply the environment-discovery hard gate before concluding that the required user pair is unavailable.
 - For Planner/PlanCreation surfaces, a TEAM_SITE or arbitrary group site is not enough. Discover alternate group-connected sites and apply the source-derived predicates in the hard gate before concluding that a Planner-integrated fixture is unavailable.
 - Save screenshots under `<sessionDir>/evaluation/iter<N>/`. `visualValidation.beforePath` / `afterPath` MUST point to full-page/viewport PNGs. Put optional component crops only in `beforeCropPath` / `afterCropPath`.
-- Set `visualValidation.source` to `pr-cdn-fic`, `local-rush-start`, or `playwright-mcp`. Prefer `local-rush-start` when it succeeds; use `pr-cdn-fic` as fallback or explicit final mode.
+- Set `visualValidation.source` to `local-rush-start` or `pr-cdn-fic`. Prefer `local-rush-start`; use `pr-cdn-fic` only as the fallback or explicit final mode.
 
-Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed. A missing Playwright MCP plugin is not a FIC failure.
+Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed.
 
 If the surface needs tenant state mutation (created pages, seeded data), clean it up before returning — the synthetic tenant is shared.
 
@@ -279,7 +271,7 @@ A criterion is PASS only with concrete evidence. "Looks right" is not evidence. 
 Write `artifactPath` with the full report. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","contextGuardStatus":"complete|not-applicable|failure","layoutGeometry":{"required":true,"selector":"<repeated item selector>","axis":"vertical|horizontal","beforeRects":[{"top":0,"right":0,"bottom":0,"left":0}],"afterRects":[{"top":0,"right":0,"bottom":0,"left":0}],"beforeGap":0,"afterGap":0,"verdict":"PASS|FAIL"},"visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start|playwright-mcp","captureMethod":"page","viewport":{"width":1440,"height":1000},"beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<required for repeated/dense UI; otherwise optional>","afterCropPath":"<required for repeated/dense UI; otherwise optional>","dimensionEvidence":"<verbatim file output>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
+{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","contextGuardStatus":"complete|not-applicable|failure","layoutGeometry":{"required":true,"selector":"<repeated item selector>","axis":"vertical|horizontal","beforeRects":[{"top":0,"right":0,"bottom":0,"left":0}],"afterRects":[{"top":0,"right":0,"bottom":0,"left":0}],"beforeGap":0,"afterGap":0,"verdict":"PASS|FAIL"},"visualValidation":{"status":"captured|skipped|failed","source":"pr-cdn-fic|local-rush-start","captureMethod":"page","viewport":{"width":1440,"height":1000},"beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<required for repeated/dense UI; otherwise optional>","afterCropPath":"<required for repeated/dense UI; otherwise optional>","dimensionEvidence":"<verbatim file output>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
 ```
 
 For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured`, `captureMethod` is `page`, both primary paths are populated, both PNG dimensions match `visualValidation.viewport`, and visual inspection confirms surrounding page context. Component-only crops are never valid primary paths.

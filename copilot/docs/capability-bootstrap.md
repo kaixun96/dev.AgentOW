@@ -29,7 +29,6 @@ Only fixed packages from the trusted local marketplace `/workspaces/odsp-web/.ai
 
 | Capability | Install policy |
 |---|---|
-| `playwright-mcp-servers` | Baseline |
 | `odsp-web-mcp-servers-opt-out` | Baseline |
 | `code-review-tools` | Baseline |
 | `odsp-web-mcp-servers-opt-in` (Figma, ADO, Bluebird, Learn) | When the request references those sources |
@@ -57,7 +56,7 @@ The bootstrap reports but cannot safely complete:
 - Claude auto-accept mode;
 - `copilot auth`, Figma OAuth, AAD consent;
 - Azure authentication: explicitly tell the user to run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init` or the original agentOW command;
-- first Playwright browser login or expired cookies;
+- FIC authentication or expired FIC credentials;
 - tenant/site/fixture eligibility and seeded test data;
 - context-repository push permission.
 
@@ -85,13 +84,13 @@ If a newly installed capability is required for the current request, the run sto
   "restartRequired": false,
   "capabilities": [
     {
-      "id": "browser.playwright-mcp",
+      "id": "browser.fic-heft",
       "role": "required|fallback|optional",
       "status": "available|installed-restart-required|missing|misconfigured|unknown|not-applicable",
       "redactedEvidence": "No tokens, cookies, tenant IDs, or credential contents",
-      "fallbackIds": ["browser.fic-heft"],
+      "fallbackIds": [],
       "blocksPlanning": false,
-      "remediation": "Restart Copilot CLI"
+      "remediation": "Run the selected project's FIC Playwright probe"
     }
   ],
   "actions": []
@@ -102,7 +101,7 @@ Canonical capability groups:
 
 - `core.source-repo`, `core.rush-node-tmux`
 - `host.claude-agent-teams`, `host.claude-auto-accept`, `host.copilot-auth`
-- `browser.playwright-mcp`, `browser.fic-heft`, `fixture.playwright-profile`, `fixture.tenant-site`
+- `browser.fic-heft`, `fixture.fic-auth`, `fixture.tenant-site`
 - `design.figma`
 - `odsp.mcp-opt-out`, `odsp.mcp-opt-in`
 - `ado.cli`, `ado.azure-devops-extension`, `ado.auth`
@@ -111,3 +110,9 @@ Canonical capability groups:
 - `context.library`, `context.git-permissions`
 
 Unknown availability is not the same as missing. Optional capabilities and capabilities with a viable fallback never block planning.
+
+AgentOW deliberately has one screenshot engine: FIC Playwright/Heft from the repository harness.
+UI validation first uses that engine with a local `rush start` debug bundle
+(`local-rush-start`), then switches to the PR's SP-Client Validation CDN query
+(`pr-cdn-fic`) only when the local route fails for a route-specific reason. Playwright MCP,
+browser profiles, and `browser_*` tools are not AgentOW visual-validation capabilities.
