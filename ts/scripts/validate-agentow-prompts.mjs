@@ -2,6 +2,96 @@ import fs from "node:fs";
 
 const repoRootUrl = new URL("../../", import.meta.url);
 
+function mirroredSnippetChecks(sourceFile, mirrorFile, snippets) {
+  return [
+    { file: sourceFile, snippets },
+    { file: mirrorFile, snippets },
+  ];
+}
+
+const reviewMissSnippets = [
+  "## M1. The diff contradicting itself",
+  "## M2. Impossible first paint from independently derived state"
+];
+
+const sharedUtilityReuseSnippets = [
+  "Do not limit this pass to exported symbols",
+  "High-signal ODSP-Web reuse map",
+  "@msinternal/odsp-utilities",
+  "@msinternal/sp-component-utilities",
+  "@msinternal/odsp-utilities-bundle",
+  "@msinternal/sharepoint-ui-react-utilities",
+  "@msinternal/playwright-utilities",
+  "Prove contract fit before requesting reuse",
+  "A name match is not proof of compatibility",
+  "Count the copies and diff them mechanically",
+  "itself is not automatically blocking",
+  "This reference owns reuse discovery"
+];
+
+const commonReviewIssueSnippets = [
+  "Evaluate a Flight/KS before any gated helper",
+  "Gate execution, not merely value selection",
+  "For `Promise.all`, decide whether any failure should fail the feature",
+  "Use `useCallback` only when identity reaches a memoized/expensive child",
+  "Put API operation QoS at the provider/data-source boundary",
+  "Consume `ServiceScope`/`PageContext` only after readiness",
+  "Use one shared, normalized, same-origin, fail-closed navigation resolver",
+  "Do not turn this reference into mechanical policy"
+];
+
+const localizationFormattingSnippets = [
+  "hard-coded user-visible strings and non-visible assistive text",
+  "announcements, and live-region content",
+  "dynamic data from an API, such as a user name",
+  "translator comment for each string",
+  "explain every placeholder",
+  "Do not lock placeholders",
+  "formatter argument matches the placeholder",
+  "Keep punctuation inside the localized string",
+  "Localize complete sentences, not fragments assembled in code",
+  "StringHelper.formatWithLocalizedCountValue",
+  "Use plural wording for `0`",
+  "all three cases in tests",
+  "physical-direction CSS",
+  "CSS-in-JS, and inline styles",
+  "Created at {0} by {1}",
+  "name + \" - \" + description",
+  "resource.replace(\"{0}\", value)",
+  "local formatting helpers, and manual interpolation",
+  "props.text || strings.fallbackStr",
+  "split plural resources, interval metadata",
+  "machine-readable pipeline syntax",
+  "Duplicated resources can diverge across translations",
+  "site or user locale and locale skeletons",
+  "resource provenance and casing",
+  "Do not place interactive links inside checkbox or radio labels",
+  "Verify claimed resolutions in the actual PR source"
+];
+
+const sharepointDesignSystemSnippets = [
+  "highest supported ODSP-Web design-system layer",
+  "Do not skip a higher layer merely to obtain a small styling or API preference",
+  "@msinternal/sharepoint-ui-react-stable-bundle",
+  "@msinternal/sharepoint-ui-react-stable",
+  "under `sp-client/`",
+  "under `odsp-common/`",
+  "@msinternal/sharepoint-ui-react",
+  "Fluent UI React V9",
+  "custom HTML/CSS component only when all three layers cannot meet the requirement",
+  "documented props, slots, appearance options, typography presets, and design tokens",
+  "Do not target generated or private Fluent implementation selectors such as `.fui-*`",
+  "existing ODSP-Web shared wrapper, helper, or component",
+  "semantic structure, keyboard behavior, focus handling, high-contrast and theme support",
+  "documented gap showing why SPDS",
+  "preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience",
+  "Can SPDS meet this requirement?",
+  "Custom HTML/CSS requires a documented gap in all three layers",
+  "Breadcrumb overflow action versus navigation",
+  "`BreadcrumbItem > Menu > MenuTrigger > Button`",
+  "`BreadcrumbButton` only for genuine breadcrumb navigation nodes"
+];
+
 const checks = [
   {
     file: "copilot/skills/agentow/SKILL.md",
@@ -260,192 +350,27 @@ const checks = [
       "A data-provider-only PR loads `common-review-issues.md` only"
     ]
   },
-  {
-    file: "docs/review-misses.md",
-    snippets: [
-      "## M1. The diff contradicting itself",
-      "## M2. Impossible first paint from independently derived state"
-    ]
-  },
-  {
-    file: "copilot/docs/review-misses.md",
-    snippets: [
-      "## M1. The diff contradicting itself",
-      "## M2. Impossible first paint from independently derived state"
-    ]
-  },
-  {
-    file: "skills/ow-review/references/shared-utility-reuse.md",
-    snippets: [
-      "Do not limit this pass to exported symbols",
-      "High-signal ODSP-Web reuse map",
-      "@msinternal/odsp-utilities",
-      "@msinternal/sp-component-utilities",
-      "@msinternal/odsp-utilities-bundle",
-      "@msinternal/sharepoint-ui-react-utilities",
-      "@msinternal/playwright-utilities",
-      "Prove contract fit before requesting reuse",
-      "A name match is not proof of compatibility",
-      "Count the copies and diff them mechanically",
-      "itself is not automatically blocking",
-      "This reference owns reuse discovery"
-    ]
-  },
-  {
-    file: "copilot/skills/ow-review/references/shared-utility-reuse.md",
-    snippets: [
-      "Do not limit this pass to exported symbols",
-      "High-signal ODSP-Web reuse map",
-      "@msinternal/odsp-utilities",
-      "@msinternal/sp-component-utilities",
-      "@msinternal/odsp-utilities-bundle",
-      "@msinternal/sharepoint-ui-react-utilities",
-      "@msinternal/playwright-utilities",
-      "Prove contract fit before requesting reuse",
-      "A name match is not proof of compatibility",
-      "Count the copies and diff them mechanically",
-      "itself is not automatically blocking",
-      "This reference owns reuse discovery"
-    ]
-  },
-  {
-    file: "skills/ow-review/references/common-review-issues.md",
-    snippets: [
-      "Evaluate a Flight/KS before any gated helper",
-      "Gate execution, not merely value selection",
-      "For `Promise.all`, decide whether any failure should fail the feature",
-      "Use `useCallback` only when identity reaches a memoized/expensive child",
-      "Put API operation QoS at the provider/data-source boundary",
-      "Consume `ServiceScope`/`PageContext` only after readiness",
-      "Use one shared, normalized, same-origin, fail-closed navigation resolver",
-      "Do not turn this reference into mechanical policy"
-    ]
-  },
-  {
-    file: "copilot/skills/ow-review/references/common-review-issues.md",
-    snippets: [
-      "Evaluate a Flight/KS before any gated helper",
-      "Gate execution, not merely value selection",
-      "For `Promise.all`, decide whether any failure should fail the feature",
-      "Use `useCallback` only when identity reaches a memoized/expensive child",
-      "Put API operation QoS at the provider/data-source boundary",
-      "Consume `ServiceScope`/`PageContext` only after readiness",
-      "Use one shared, normalized, same-origin, fail-closed navigation resolver",
-      "Do not turn this reference into mechanical policy"
-    ]
-  },
-  {
-    file: "skills/ow-review/references/localization-and-formatting.md",
-    snippets: [
-      "hard-coded user-visible strings and non-visible assistive text",
-      "announcements, and live-region content",
-      "dynamic data from an API, such as a user name",
-      "translator comment for each string",
-      "explain every placeholder",
-      "Do not lock placeholders",
-      "formatter argument matches the placeholder",
-      "Keep punctuation inside the localized string",
-      "Localize complete sentences, not fragments assembled in code",
-      "StringHelper.formatWithLocalizedCountValue",
-      "Use plural wording for `0`",
-      "all three cases in tests",
-      "physical-direction CSS",
-      "CSS-in-JS, and inline styles",
-      "Created at {0} by {1}",
-      "name + \" - \" + description",
-      "resource.replace(\"{0}\", value)",
-      "local formatting helpers, and manual interpolation",
-      "props.text || strings.fallbackStr",
-      "split plural resources, interval metadata",
-      "machine-readable pipeline syntax",
-      "Duplicated resources can diverge across translations",
-      "site or user locale and locale skeletons",
-      "resource provenance and casing",
-      "Do not place interactive links inside checkbox or radio labels",
-      "Verify claimed resolutions in the actual PR source"
-    ]
-  },
-  {
-    file: "copilot/skills/ow-review/references/localization-and-formatting.md",
-    snippets: [
-      "hard-coded user-visible strings and non-visible assistive text",
-      "announcements, and live-region content",
-      "dynamic data from an API, such as a user name",
-      "translator comment for each string",
-      "explain every placeholder",
-      "Do not lock placeholders",
-      "formatter argument matches the placeholder",
-      "Keep punctuation inside the localized string",
-      "Localize complete sentences, not fragments assembled in code",
-      "StringHelper.formatWithLocalizedCountValue",
-      "Use plural wording for `0`",
-      "all three cases in tests",
-      "physical-direction CSS",
-      "CSS-in-JS, and inline styles",
-      "Created at {0} by {1}",
-      "name + \" - \" + description",
-      "resource.replace(\"{0}\", value)",
-      "local formatting helpers, and manual interpolation",
-      "props.text || strings.fallbackStr",
-      "split plural resources, interval metadata",
-      "machine-readable pipeline syntax",
-      "Duplicated resources can diverge across translations",
-      "site or user locale and locale skeletons",
-      "resource provenance and casing",
-      "Do not place interactive links inside checkbox or radio labels",
-      "Verify claimed resolutions in the actual PR source"
-    ]
-  },
-  {
-    file: "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
-    snippets: [
-      "highest supported ODSP-Web design-system layer",
-      "Do not skip a higher layer merely to obtain a small styling or API preference",
-      "@msinternal/sharepoint-ui-react-stable-bundle",
-      "@msinternal/sharepoint-ui-react-stable",
-      "under `sp-client/`",
-      "under `odsp-common/`",
-      "@msinternal/sharepoint-ui-react",
-      "Fluent UI React V9",
-      "custom HTML/CSS component only when all three layers cannot meet the requirement",
-      "documented props, slots, appearance options, typography presets, and design tokens",
-      "Do not target generated or private Fluent implementation selectors such as `.fui-*`",
-      "existing ODSP-Web shared wrapper, helper, or component",
-      "semantic structure, keyboard behavior, focus handling, high-contrast and theme support",
-      "documented gap showing why SPDS",
-      "preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience",
-      "Can SPDS meet this requirement?",
-      "Custom HTML/CSS requires a documented gap in all three layers",
-      "Breadcrumb overflow action versus navigation",
-      "`BreadcrumbItem > Menu > MenuTrigger > Button`",
-      "`BreadcrumbButton` only for genuine breadcrumb navigation nodes"
-    ]
-  },
-  {
-    file: "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
-    snippets: [
-      "highest supported ODSP-Web design-system layer",
-      "Do not skip a higher layer merely to obtain a small styling or API preference",
-      "@msinternal/sharepoint-ui-react-stable-bundle",
-      "@msinternal/sharepoint-ui-react-stable",
-      "under `sp-client/`",
-      "under `odsp-common/`",
-      "@msinternal/sharepoint-ui-react",
-      "Fluent UI React V9",
-      "custom HTML/CSS component only when all three layers cannot meet the requirement",
-      "documented props, slots, appearance options, typography presets, and design tokens",
-      "Do not target generated or private Fluent implementation selectors such as `.fui-*`",
-      "existing ODSP-Web shared wrapper, helper, or component",
-      "semantic structure, keyboard behavior, focus handling, high-contrast and theme support",
-      "documented gap showing why SPDS",
-      "preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience",
-      "Can SPDS meet this requirement?",
-      "Custom HTML/CSS requires a documented gap in all three layers",
-      "Breadcrumb overflow action versus navigation",
-      "`BreadcrumbItem > Menu > MenuTrigger > Button`",
-      "`BreadcrumbButton` only for genuine breadcrumb navigation nodes"
-    ]
-  },
+  ...mirroredSnippetChecks("docs/review-misses.md", "copilot/docs/review-misses.md", reviewMissSnippets),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/shared-utility-reuse.md",
+    "copilot/skills/ow-review/references/shared-utility-reuse.md",
+    sharedUtilityReuseSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/common-review-issues.md",
+    "copilot/skills/ow-review/references/common-review-issues.md",
+    commonReviewIssueSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/localization-and-formatting.md",
+    "copilot/skills/ow-review/references/localization-and-formatting.md",
+    localizationFormattingSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    sharepointDesignSystemSnippets,
+  ),
   {
     file: "agents/ow-orchestrator.md",
     snippets: [
@@ -804,25 +729,25 @@ for (const check of forbiddenChecks) {
       console.error(`Forbidden prompt regression in ${check.file}: ${snippet}`);
       failures++;
     }
+  }
+}
 
-    for (const check of orderedChecks) {
-      const content = fs.readFileSync(new URL(check.file, repoRootUrl), "utf8");
-      const firstIndex = content.indexOf(check.first);
-      const secondIndex = content.indexOf(check.second);
-      if (firstIndex < 0 || secondIndex < 0 || firstIndex >= secondIndex) {
-        console.error(`Prompt ordering regression in ${check.file}: ${check.first} must precede ${check.second}`);
-        failures++;
-      }
-    }
+for (const check of orderedChecks) {
+  const content = fs.readFileSync(new URL(check.file, repoRootUrl), "utf8");
+  const firstIndex = content.indexOf(check.first);
+  const secondIndex = content.indexOf(check.second);
+  if (firstIndex < 0 || secondIndex < 0 || firstIndex >= secondIndex) {
+    console.error(`Prompt ordering regression in ${check.file}: ${check.first} must precede ${check.second}`);
+    failures++;
+  }
+}
 
-    for (const [sourceFile, mirrorFile] of mirroredChecks) {
-      const source = fs.readFileSync(new URL(sourceFile, repoRootUrl), "utf8");
-      const mirrorUrl = new URL(mirrorFile, repoRootUrl);
-      if (!fs.existsSync(mirrorUrl) || fs.readFileSync(mirrorUrl, "utf8") !== source) {
-        console.error(`Generated Copilot mirror is stale: ${mirrorFile}`);
-        failures++;
-      }
-    }
+for (const [sourceFile, mirrorFile] of mirroredChecks) {
+  const source = fs.readFileSync(new URL(sourceFile, repoRootUrl), "utf8");
+  const mirrorUrl = new URL(mirrorFile, repoRootUrl);
+  if (!fs.existsSync(mirrorUrl) || fs.readFileSync(mirrorUrl, "utf8") !== source) {
+    console.error(`Generated Copilot mirror is stale: ${mirrorFile}`);
+    failures++;
   }
 }
 

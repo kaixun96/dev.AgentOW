@@ -33,6 +33,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const SCHEMA_VERSION = 1;
 const BLOCK_OPEN = "<!-- agentow-review-ledger";
@@ -348,4 +349,6 @@ function main() {
   fail("expected one of: fingerprint, match, accept, render, parse");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  main();
+}
