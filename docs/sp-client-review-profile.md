@@ -14,15 +14,15 @@ Runtime behavior and styling changes must be protected by a flight or killswitch
 
 ## Rollout and rollback
 
-For every review with SP-Client runtime changes, perform this sequence before the rest of the code review:
+For every review with SP-Client runtime changes, first apply the rollout-isolation rules in
+`skills/ow-review/references/common-review-issues.md`. That reference is authoritative for gate
+ordering, invocation-boundary protection, legacy equivalence, call-time evaluation, both-state
+testing, and graduation cleanup. This profile adds the SP-Client-specific requirements below:
 
 - Read the PR description first. It must identify the flight/KS, state whether it is a Flight, KS, or KS+Flight, explain the enabled/disabled direction, and name the fallback. If reviewing before PR creation, require this information in the plan and ensure the generated PR description puts it on the first line.
 - Enumerate every changed runtime path, then trace protection from each reachable entry point to the changed page/component. An upstream flight or killswitch counts only when it gates every new execution and style path; do not infer protection from a nearby check.
 - Identify the rollback strategy and whether KS, flight/Feature, experiment, or an existing gate is appropriate.
-- Verify new behavior runs when the KS is **not** activated and the activated state preserves a safe old/fallback path.
-- Verify Flight off enters the original path before any new hook, effect, wrapper, callback, style, or adapter executes. Matching output is not enough.
-- Test enabled and disabled/fallback states.
-- For SP-Client KS code, use `_SPKillSwitch`, a lowercase unique GUID, function-time evaluation (never module evaluation), and the comment form `/* 'MM/DD/YYYY', 'alias - Description' */`.
+- For SP-Client KS code, use `_SPKillSwitch`, a lowercase unique GUID, and the comment form `/* 'MM/DD/YYYY', 'alias - Description' */`; apply the reference's call-time evaluation requirement.
 - For flights, use the established ID/name and attribution comment convention. For performance comparisons, require an experiment and exposure logging; a flight alone is not valid measurement.
 - Flag composite KS logic when one KS over a flight provides a clearer emergency control.
 - Check whether an old KS should graduate. A graduation change needs evidence that the KS is inactive in all rings (for example Merlin `Test-GridKillSwitch` output), and must remove obsolete fallback complexity safely.

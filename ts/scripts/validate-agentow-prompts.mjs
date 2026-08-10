@@ -180,7 +180,8 @@ const checks = [
     snippets: [
       "Runtime behavior and styling changes must be protected by a flight or killswitch.",
       "Activated means old/fallback behavior; not activated means new behavior.",
-      "never module evaluation",
+      "common-review-issues.md",
+      "call-time evaluation requirement",
       "bundle delta of 2 KB or more is a review trigger",
       "server-side filtering, transport pagination/continuation, and bounded viewport rendering",
       "typographyStyles",
@@ -210,12 +211,13 @@ const checks = [
       "do not equate reading every line with reliable exhaustive review",
       "`preliminary-non-exhaustive` completeness claim",
       "git diff --no-renames",
+      "common-review-issues.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
-      "A data-provider-only PR therefore loads none"
+      "A data-provider-only PR loads `common-review-issues.md` only"
     ]
   },
   {
@@ -245,12 +247,39 @@ const checks = [
       "reading all files does not prove the review is reliable or exhaustive",
       "`preliminary-non-exhaustive`",
       "git diff --no-renames",
+      "common-review-issues.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
-      "A data-provider-only PR therefore loads none"
+      "A data-provider-only PR loads `common-review-issues.md` only"
+    ]
+  },
+  {
+    file: "skills/ow-review/references/common-review-issues.md",
+    snippets: [
+      "Evaluate a Flight/KS before any gated helper",
+      "Gate execution, not merely value selection",
+      "For `Promise.all`, decide whether any failure should fail the feature",
+      "Use `useCallback` only when identity reaches a memoized/expensive child",
+      "Put API operation QoS at the provider/data-source boundary",
+      "Consume `ServiceScope`/`PageContext` only after readiness",
+      "Use one shared, normalized, same-origin, fail-closed navigation resolver",
+      "Do not turn this reference into mechanical policy"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-review/references/common-review-issues.md",
+    snippets: [
+      "Evaluate a Flight/KS before any gated helper",
+      "Gate execution, not merely value selection",
+      "For `Promise.all`, decide whether any failure should fail the feature",
+      "Use `useCallback` only when identity reaches a memoized/expensive child",
+      "Put API operation QoS at the provider/data-source boundary",
+      "Consume `ServiceScope`/`PageContext` only after readiness",
+      "Use one shared, normalized, same-origin, fail-closed navigation resolver",
+      "Do not turn this reference into mechanical policy"
     ]
   },
   {
