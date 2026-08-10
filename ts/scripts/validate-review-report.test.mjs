@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 
-const validator = new URL("../../tools/validate-review-report.mjs", import.meta.url);
+const validator = fileURLToPath(new URL("../../tools/validate-review-report.mjs", import.meta.url));
 const tempDir = fs.mkdtempSync(`${os.tmpdir()}/agentow-review-contract-`);
 const changedFilesPath = `${tempDir}/changed-files.txt`;
 const diffNumstatPath = `${tempDir}/numstat.txt`;
@@ -144,7 +145,7 @@ function validate(report) {
   return spawnSync(
     process.execPath,
     [
-      validator.pathname,
+      validator,
       reportPath,
       "--expected-head",
       "a".repeat(40),

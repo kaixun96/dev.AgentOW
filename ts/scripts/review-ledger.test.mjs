@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 
-const ledgerTool = new URL("../../tools/review-ledger.mjs", import.meta.url).pathname;
-const validator = new URL("../../tools/validate-review-report.mjs", import.meta.url).pathname;
+const ledgerTool = fileURLToPath(new URL("../../tools/review-ledger.mjs", import.meta.url));
+const validator = fileURLToPath(new URL("../../tools/validate-review-report.mjs", import.meta.url));
 
 function run(args, cwd) {
   return spawnSync(process.execPath, args, { encoding: "utf8", cwd });

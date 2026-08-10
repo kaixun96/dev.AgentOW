@@ -6,6 +6,23 @@ import { fileURLToPath } from "node:url";
 const tsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(tsDir, "..");
 const distDir = path.join(tsDir, "dist");
+const copilotMirrorDirectories = [
+  [distDir, path.join(repoRoot, "copilot", "ts", "dist")],
+  [path.join(repoRoot, "skills", "ow-review", "references"), path.join(repoRoot, "copilot", "skills", "ow-review", "references")],
+];
+const copilotMirrorFileSets = [
+  {
+    source: path.join(repoRoot, "tools"),
+    destination: path.join(repoRoot, "copilot", "tools"),
+    predicate: (name) => name.endsWith(".mjs") || name === "package.json" || name === "package-lock.json",
+  },
+];
+const copilotMirrorFiles = [
+  ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
+  ["docs/review-contract.md", "copilot/docs/review-contract.md"],
+  ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
+  ["docs/review-misses.md", "copilot/docs/review-misses.md"],
+];
 
 function copyDirectoryContents(source, destination) {
   if (!fs.existsSync(source)) {
@@ -33,31 +50,18 @@ function copyMatchingFiles(source, destination, predicate) {
   return true;
 }
 
-copyDirectoryContents(distDir, path.join(repoRoot, "copilot", "ts", "dist"));
-copyMatchingFiles(path.join(repoRoot, "tools"), path.join(repoRoot, "copilot", "tools"), (name) =>
-  name.endsWith(".mjs") || name === "package.json" || name === "package-lock.json"
-);
-copyDirectoryContents(
-  path.join(repoRoot, "skills", "ow-review", "references"),
-  path.join(repoRoot, "copilot", "skills", "ow-review", "references"),
-);
+for (const [source, destination] of copilotMirrorDirectories) {
+  copyDirectoryContents(source, destination);
+}
+
+for (const fileSet of copilotMirrorFileSets) {
+  copyMatchingFiles(fileSet.source, fileSet.destination, fileSet.predicate);
+}
+
 fs.mkdirSync(path.join(repoRoot, "copilot", "docs"), { recursive: true });
-fs.copyFileSync(
-  path.join(repoRoot, "docs", "capability-bootstrap.md"),
-  path.join(repoRoot, "copilot", "docs", "capability-bootstrap.md"),
-);
-fs.copyFileSync(
-  path.join(repoRoot, "docs", "review-contract.md"),
-  path.join(repoRoot, "copilot", "docs", "review-contract.md"),
-);
-fs.copyFileSync(
-  path.join(repoRoot, "docs", "sp-client-review-profile.md"),
-  path.join(repoRoot, "copilot", "docs", "sp-client-review-profile.md"),
-);
-fs.copyFileSync(
-  path.join(repoRoot, "docs", "review-misses.md"),
-  path.join(repoRoot, "copilot", "docs", "review-misses.md"),
-);
+for (const [source, destination] of copilotMirrorFiles) {
+  fs.copyFileSync(path.join(repoRoot, source), path.join(repoRoot, destination));
+}
 console.log("copilot MCP dist synced");
 
 const pluginJson = JSON.parse(
