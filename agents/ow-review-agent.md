@@ -43,6 +43,7 @@ Classify the changed behavior from the Git diff before loading optional referenc
 | Reference | Read when the change contains | Do not read solely because the change contains |
 |---|---|---|
 | `common-review-issues.md` | Runtime rollout gates; promises/concurrency/cancellation; React state or memoization; data fetching/caching; lazy imports or bundle boundaries; telemetry/QoS; optional data or assertions; `ServiceScope`/`PageContext`; navigation URL handling; serialization/migration; listeners/subscriptions; or changed behavioral tests | Documentation-only, generated-only, dependency metadata-only, style-token-only, localization-only, or test-only changes that introduce no changed runtime contract |
+| `shared-utility-reuse.md` | Added or substantially rewritten helpers, utilities, formatters, parsers, normalizers, wrappers, adapters, REST/OData clients, cross-cutting hooks/components, design constants, test harness helpers, or copied/repeated implementations in any changed path | Ordinary feature composition, a small single-use local expression, generated code, type-only declarations, or dependency metadata with no new helper behavior |
 | `localization-and-formatting.md` | Added or changed visible UI text; screen-reader or other assistive text; resource/resx entries; localized placeholders or interpolation; count/plural handling; locale-sensitive date, time, number, currency, address, or phone formatting; physical-direction CSS that must support RTL | Data providers, API clients, models, business logic, telemetry-only fields, tests without changed user-facing strings, or internal error/debug text |
 | `sharepoint-design-system-and-ux-components.md` | Added or changed rendered user-facing components, layout, visual styling, typography, spacing, color, icons, responsive behavior, or runtime use of SharePoint/Fluent UI component APIs | Data providers, services, hooks with no rendered UI contract, models, state-only logic, package metadata, or type-only imports from UI libraries |
 | `accessibility.md` | Added or changed interactive or semantic UI: controls, links, forms, dialogs, flyouts, menus, focus/keyboard behavior, dynamic status announcements, visibility toggles, accessible names/roles/states, or DOM structure that affects reading or tab order | Data providers, API clients, models, pure formatting/business logic, non-rendered hooks, visual-token-only changes with unchanged semantics, or tests that do not alter product interaction |
@@ -141,12 +142,15 @@ Every pass above asks whether the change is wrong. This one asks whether it shou
 review can be right about all 26 things it reports and still approve a hand-rolled copy of
 something the platform ships.
 
-For every symbol exported from a shared-code path — any path with a `common`, `shared`,
-`utilities`, `utils`, `helpers`, `hooks`, or `components` segment — search the repo before
-judging the implementation. Search by capability, not by the author's chosen name: an
-announcement helper is `useScreenReaderAlert`, a string formatter is `Text.format`, a spacing
-literal is a design token. Record each answer in `preReview.priorArt` as `none`, `reused`, or
-`justified`. Feature pages and layouts are exempt.
+When the reuse reference's positive trigger matches, read `shared-utility-reuse.md` and apply its
+capability search, ODSP package map, contract-fit checks, and severity guidance. Do not limit
+discovery to exported symbols or shared-looking directories.
+
+The artifact requirement remains narrower and mandatory: for every symbol exported from a
+shared-code path — any path with a `common`, `shared`, `utilities`, `utils`, `helpers`, `hooks`,
+or `components` segment — record the answer in `preReview.priorArt` as `none`, `reused`, or
+`justified`. Feature pages and layouts are exempt from that required artifact entry, not from
+reuse discovery when they add likely utility code.
 
 When a change adds several files of the same kind, diff them against each other before
 reviewing them individually. Three layouts differing only in the component they render is a

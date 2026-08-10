@@ -18,7 +18,7 @@ a false positive costs the author's trust just as a miss costs the author a bug.
 
 ---
 
-## M3. The diff contradicting itself
+## M1. The diff contradicting itself
 
 **Missed:** five post-action navigations used root-relative constants, which resolve against the
 site-collection root rather than the current web, so every one of them broke on a sub-web —
@@ -35,38 +35,7 @@ wrong. Before finalizing, name the operations the diff performs more than once �
 construction, permission resolution, error mapping, resource definition, styling location — and
 check that every occurrence agrees. Prefer the form the codebase already uses.
 
-## M4. Duplication reported as taste instead of as divergence
-
-**Missed:** a permission ladder hand-written in three page components and a settings overlay
-hand-written in four layouts — and **the copies had already diverged on the same flag**. Also
-two byte-identical provider methods, a row model declared twice over one list, and eleven
-byte-identical style blocks across two files.
-
-**Mechanism:** "duplicated logic" was one clause in a design bullet, so duplication was treated
-as a style preference and dropped as non-blocking. The reviewer never counted the copies, so it
-never noticed that they had stopped agreeing.
-
-**Rule:** duplication is a correctness finding the moment the copies disagree. Count the copies,
-diff them, and report the divergence, not the repetition. Copies that still agree are Minor;
-copies that have already diverged are at least Important, because one of them is now wrong.
-
-## M5. Telemetry judged by content instead of by lifecycle
-
-**Missed:** a page's headline `Load` scenario constructed its monitor unconditionally but wrote
-success only inside the branch where data was present. The Start is emitted by the constructor,
-and only the end call removes the event, so the cold-navigation path — the exact case worth
-measuring — emitted a Start that was never closed and never reported. The signal was inverted:
-success was recorded only when the page had *not* done the work.
-
-**Mechanism:** the telemetry dimension asks whether events carry the right data and no sensitive
-payload. It does not ask whether every start has an end on every path.
-
-**Rule:** for each telemetry scope in the diff, trace start and end across *all* paths including
-early returns, error branches, and the not-found case. A start without a guaranteed end is a
-defect, and a scenario whose success branch excludes the work it names is worse than no
-telemetry.
-
-## M6. Impossible first paint from independently derived state
+## M2. Impossible first paint from independently derived state
 
 **Missed:** a preload was rejected as untrustworthy so the data state initialized to
 `undefined`, but the loading flag initialized from the raw prop instead. First paint therefore
