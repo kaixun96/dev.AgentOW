@@ -37,6 +37,10 @@ copyDirectoryContents(distDir, path.join(repoRoot, "copilot", "ts", "dist"));
 copyMatchingFiles(path.join(repoRoot, "tools"), path.join(repoRoot, "copilot", "tools"), (name) =>
   name.endsWith(".mjs") || name === "package.json" || name === "package-lock.json"
 );
+copyDirectoryContents(
+  path.join(repoRoot, "skills", "ow-review", "references"),
+  path.join(repoRoot, "copilot", "skills", "ow-review", "references"),
+);
 fs.mkdirSync(path.join(repoRoot, "copilot", "docs"), { recursive: true });
 fs.copyFileSync(
   path.join(repoRoot, "docs", "capability-bootstrap.md"),
