@@ -212,11 +212,13 @@ const checks = [
       "`preliminary-non-exhaustive` completeness claim",
       "git diff --no-renames",
       "common-review-issues.md",
+      "shared-utility-reuse.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
+      "The artifact requirement remains narrower and mandatory",
       "A data-provider-only PR loads `common-review-issues.md` only"
     ]
   },
@@ -248,12 +250,62 @@ const checks = [
       "`preliminary-non-exhaustive`",
       "git diff --no-renames",
       "common-review-issues.md",
+      "shared-utility-reuse.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
+      "The artifact requirement remains narrower and mandatory",
       "A data-provider-only PR loads `common-review-issues.md` only"
+    ]
+  },
+  {
+    file: "docs/review-misses.md",
+    snippets: [
+      "## M1. The diff contradicting itself",
+      "## M2. Impossible first paint from independently derived state"
+    ]
+  },
+  {
+    file: "copilot/docs/review-misses.md",
+    snippets: [
+      "## M1. The diff contradicting itself",
+      "## M2. Impossible first paint from independently derived state"
+    ]
+  },
+  {
+    file: "skills/ow-review/references/shared-utility-reuse.md",
+    snippets: [
+      "Do not limit this pass to exported symbols",
+      "High-signal ODSP-Web reuse map",
+      "@msinternal/odsp-utilities",
+      "@msinternal/sp-component-utilities",
+      "@msinternal/odsp-utilities-bundle",
+      "@msinternal/sharepoint-ui-react-utilities",
+      "@msinternal/playwright-utilities",
+      "Prove contract fit before requesting reuse",
+      "A name match is not proof of compatibility",
+      "Count the copies and diff them mechanically",
+      "itself is not automatically blocking",
+      "This reference owns reuse discovery"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-review/references/shared-utility-reuse.md",
+    snippets: [
+      "Do not limit this pass to exported symbols",
+      "High-signal ODSP-Web reuse map",
+      "@msinternal/odsp-utilities",
+      "@msinternal/sp-component-utilities",
+      "@msinternal/odsp-utilities-bundle",
+      "@msinternal/sharepoint-ui-react-utilities",
+      "@msinternal/playwright-utilities",
+      "Prove contract fit before requesting reuse",
+      "A name match is not proof of compatibility",
+      "Count the copies and diff them mechanically",
+      "itself is not automatically blocking",
+      "This reference owns reuse discovery"
     ]
   },
   {
@@ -723,7 +775,9 @@ const orderedChecks = [
 const mirroredChecks = [
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
+  ["docs/review-misses.md", "copilot/docs/review-misses.md"],
   ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
+  ["skills/ow-review/references/shared-utility-reuse.md", "copilot/skills/ow-review/references/shared-utility-reuse.md"],
   ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"]
 ];
 
