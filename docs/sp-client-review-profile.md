@@ -10,6 +10,7 @@ Runtime behavior and styling changes must be protected by a flight or killswitch
 - A flight/Feature controls staged rollout. For a risky staged feature, prefer one killswitch over the flight rather than composite killswitch logic.
 - An `_SPExperiment` provides a clean control/treatment split for measuring performance changes. It does not replace a killswitch when emergency rollback is also warranted.
 - Pure renames, imports, declarations not reached by old code, tests, and documentation do not automatically need a new runtime gate. Review the behavioral blast radius and repository guidance instead.
+- String-only localization updates (`.resx` values/comments/approval tags) with no runtime call-site, execution, or style-path change are non-runtime edits. Missing Flight/KS in that case is not a rollout blocker; at most leave a `Nit:` guidance note.
 - Do not recommend activating a killswitch to hide a defect during development. Fix the new path.
 
 ## Rollout and rollback
@@ -35,40 +36,30 @@ testing, and graduation cleanup. This profile adds the SP-Client-specific requir
 
 ## TypeScript and maintainability
 
-- No unjustified `any`; use `unknown` only with narrowing. Prefer the strictest useful parameter and return types.
-- Async work is awaited and error-handled. A deliberately voided promise has a nearby reason and an established error-observation path.
-- Clean up event listeners/subscriptions. Avoid mixed promise/`async` styles without a reason.
-- No magic values, debug code, `console.log`, new deprecated APIs, or unexplained duplication.
-- `eslint-disable`, `@ts-ignore`, and `@ts-expect-error` require a specific nearby justification.
-- Deferred work/TODO comments cite an ADO work item.
+Apply `skills/ow-review/references/common-review-issues.md` for async, lifecycle, typing,
+cleanup, and maintainability defects. Keep this profile focused on SP-Client-specific rollout,
+profile checks, and evidence contracts.
 
 ## Reliability, telemetry, privacy, and security
 
-- Use the established `_QosMonitor` pattern for meaningful async operations where the owning component already reports QoS; do not add empty boilerplate monitoring to trivial promises.
-- Use `_EngagementLogger` for meaningful user actions according to local telemetry conventions; do not log every low-level event indiscriminately.
-- Use `_TraceLogger` instead of console output for actionable diagnostics such as race investigations, while avoiding noisy logs.
-- Never log PII or resource/tenant-location data prohibited by policy: usernames, emails, file names, paths, tenant URLs, or feedback-prefilled user/resource content.
-- Error text includes useful non-PII context. API/localized error-message strings are never used as control-flow conditions.
-- Inspect trust boundaries, URL/input handling, authorization, data exposure, and dependency changes for security regressions.
+Apply `skills/ow-review/references/common-review-issues.md` for telemetry ownership,
+security/privacy boundaries, navigation validation, and trust-boundary checks.
 
 ## Performance and UI quality
 
 - Assess bundle, latency, render, and memory impact. A bundle delta of 2 KB or more is a review trigger requiring measurement and justification or on-demand loading; it is not automatically a defect.
 - For large collections, review three separate concerns: server-side filtering, transport pagination/continuation, and bounded viewport rendering (progressive loading, paging, or virtualization). Do not recommend fetching every page without also proving the UI will not render an unbounded item set.
 - Performance changes use an experiment for statistically meaningful comparison and preserve an emergency rollback strategy when risk warrants it.
-- User-facing strings use resources; post-freeze additions follow localization review/locking policy.
-- Externalizing a string is the easy half. For each added `.resx` entry also check that every
-  `{N}` placeholder is locked with `{Locked="{N}"}` in the comment, that anything which can be
-  1 has a singular form, and that any English string left in code cannot reach a user.
-- Styling uses theme tokens rather than hardcoded colors and is checked in light, dark, and high-contrast modes.
-- Prefer semantic typography presets such as `typographyStyles` over manually composing individual font-family/size/weight tokens when a matching preset exists.
-- Before hand-rolling navigation, menus, lists, or other interactive structures, search the package and repository for an established Fluent V9/SPDS primitive. Record why the standard component is unsuitable if custom semantic markup remains.
-- The same applies beyond components. Before accepting a new hook, utility, or style helper,
-  search by capability rather than by the author's chosen name — screen-reader announcements,
-  string formatting, URL handling, and spacing or radius values all have established
-  implementations here.
-- Before adding theme-specific overrides, trace the established SharePoint theme/Detheme provider flow. Local overrides require evidence that the formal flow cannot provide the intended appearance across supported themes.
-- Interactive controls are keyboard accessible with correct role, state, and accessible name.
+- User-facing strings use resources; post-freeze additions follow localization review/locking policy. Use `skills/ow-review/references/localization-and-formatting.md` as the source of truth.
+- For design-system component choice, semantic structure, accessibility, styling APIs, and
+  typography guidance such as `typographyStyles`, follow
+  `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`.
+- For shared hook/utility reuse checks, use
+  `skills/ow-review/references/shared-utility-reuse.md`.
+- When validating local overrides, trace the established SharePoint theme/Detheme provider flow
+  and keep only evidence-backed exceptions.
+- Keep one explicit check for reviewer routing: when introducing new UI structure, confirm a
+  suitable Fluent V9/SPDS primitive was considered before custom semantic markup.
 
 ## Required profile checks
 
@@ -85,5 +76,7 @@ For every `sp-client/` review, record these IDs in `preReview.profileChecks`. Ea
 ## Blocking examples
 
 Request changes when evidenced: runtime changes with no Flight/KS protection, PR description missing the gate and direction, incomplete gate coverage, wrong KS/Flight direction, new code executing while Flight is off or KS is activated, module-evaluated SP-Client KS, missing safe fallback, performance work using only a flight, missing behavior/gate tests, unhandled meaningful async failure, PII logging, missing user-action telemetry where required by established conventions, unjustified bundle growth, unbounded collection rendering, bypassing an available Fluent/SPDS primitive without rationale, theme overrides that conflict with the formal Detheme flow, hardcoded user-facing strings/colors, inaccessible controls, or suppressions/deferred work without required rationale.
+
+Do not raise an Important rollout-protection finding for string-only localization metadata changes that do not alter runtime execution or styling paths.
 
 Use `Nit:` only for optional education. A checklist item is not automatically blocking when it is demonstrably inapplicable; document that disposition with evidence.
