@@ -147,6 +147,10 @@ Style preference and speculative redesign are not findings.
 
 `Nit:` is never mandatory for the current PR. If an issue must be resolved before merge, classify it as Critical or Important instead of disguising it as a nit.
 
+If a concern is found on lines outside the current PR diff hunk (for example, untouched lines in a changed file), treat it as non-blocking follow-up feedback: classify it as `Minor` and start the description with `Nit: [Not related to this PR]`.
+
+Non-diff concerns must not by themselves drive a `REQUEST_CHANGES` verdict for the current PR.
+
 Verdicts are deterministic:
 
 - `REQUEST_CHANGES`: one or more Critical or Important findings.
@@ -355,6 +359,8 @@ location and moving on is how a second instance of the same defect ships: the au
 line that was cited, and the one that was not stays broken.
 
 Every Critical and Important finding therefore carries `classSweep`:
+
+When a class sweep discovers additional instances outside the current diff hunk, report those instances as separate non-blocking comments using `Nit: [Not related to this PR] ...` and keep them at `Minor` severity.
 
 ```json
 "classSweep": {
