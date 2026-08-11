@@ -34,28 +34,37 @@ testing, and graduation cleanup. This profile adds the SP-Client-specific requir
 - Tests assert product behavior rather than mock implementation details.
 - Complex features add or update durable Markdown documentation when it materially helps future maintenance and AI-assisted follow-ups.
 
+## Delegation to shared references
+
+Use the shared review references as the normative source for cross-cutting quality rules:
+
+- `skills/ow-review/references/common-review-issues.md` for async, lifecycle, typing,
+  cleanup, maintainability, telemetry ownership, security/privacy boundaries, and navigation
+  validation.
+- `skills/ow-review/references/localization-and-formatting.md` for localization and
+  post-freeze string policy.
+- `skills/ow-review/references/sharepoint-design-system-and-ux-components.md` for design-system
+  component choice, semantic structure, accessibility, styling APIs, and typography guidance.
+- `skills/ow-review/references/shared-utility-reuse.md` for shared hook/utility reuse checks.
+
 ## TypeScript and maintainability
 
-Apply `skills/ow-review/references/common-review-issues.md` for async, lifecycle, typing,
-cleanup, and maintainability defects. Keep this profile focused on SP-Client-specific rollout,
-profile checks, and evidence contracts.
+Keep this profile focused on SP-Client-specific rollout, profile checks, and evidence contracts.
 
 ## Reliability, telemetry, privacy, and security
 
-Apply `skills/ow-review/references/common-review-issues.md` for telemetry ownership,
-security/privacy boundaries, navigation validation, and trust-boundary checks.
+Use the delegation section above for cross-cutting telemetry, security/privacy, and
+trust-boundary checks.
 
 ## Performance and UI quality
 
 - Assess bundle, latency, render, and memory impact. A bundle delta of 2 KB or more is a review trigger requiring measurement and justification or on-demand loading; it is not automatically a defect.
 - For large collections, review three separate concerns: server-side filtering, transport pagination/continuation, and bounded viewport rendering (progressive loading, paging, or virtualization). Do not recommend fetching every page without also proving the UI will not render an unbounded item set.
 - Performance changes use an experiment for statistically meaningful comparison and preserve an emergency rollback strategy when risk warrants it.
-- User-facing strings use resources; post-freeze additions follow localization review/locking policy. Use `skills/ow-review/references/localization-and-formatting.md` as the source of truth.
-- For design-system component choice, semantic structure, accessibility, styling APIs, and
-  typography guidance such as `typographyStyles`, follow
+- User-facing strings use resources; post-freeze additions follow localization review/locking policy.
+- Typography checks still apply: when semantic text styling is relevant, verify the chosen
+  preset path (for example `typographyStyles`) through
   `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`.
-- For shared hook/utility reuse checks, use
-  `skills/ow-review/references/shared-utility-reuse.md`.
 - When validating local overrides, trace the established SharePoint theme/Detheme provider flow
   and keep only evidence-backed exceptions.
 - Keep one explicit check for reviewer routing: when introducing new UI structure, confirm a
