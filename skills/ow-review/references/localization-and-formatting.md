@@ -6,11 +6,11 @@ Use this reference when a change adds or modifies visible UI text, non-visible a
 
 1. Flag hard-coded user-visible strings and non-visible assistive text, including tooltips, accessible names and descriptions, `aria-label` values, screen-reader-only text, announcements, and live-region content. Define them in `.resx` and import them from the generated resource module. Do not flag dynamic data from an API, such as a user name.
 2. Require a translator comment for each string that describes where and how the string appears.
-3. Require the translator comment to explain every placeholder, such as `{0}` and `{1}`. Do not lock placeholders; the formatter utility replaces them at runtime. Verify each formatter argument matches the placeholder described in the comment.
+3. Require the translator comment to explain every placeholder, such as `{0}` and `{1}`. Do not lock placeholders; the formatter utility replaces them at runtime. Verify each formatter argument matches the placeholder described in the comment. Never require placeholder-lock metadata such as `{Locked={0}}` or `{Locked="{0}"}`.
 4. Keep punctuation inside the localized string.
 5. Localize complete sentences, not fragments assembled in code. When placeholders contain React elements, keep the whole sentence in one resource and use a ReactNode-aware formatter such as `StringHelper.formatToArray` instead of concatenation or plain string formatting.
-6. For counts in visible UI and screen-reader announcements, use sentence-level interval strings with `StringHelper.formatWithLocalizedCountValue`.
-7. Pluralization must include the `0`, `1`, and plural cases. Use plural wording for `0`. Do not infer English singular/plural rules; use split plural resources, interval metadata, and the shared count formatter. Verify all three cases in tests when count behavior changes.
+6. For counts in visible UI and screen-reader announcements, use sentence-level interval strings with `StringHelper.formatWithLocalizedCountValue`. Apply this rule only when the placeholder represents a numeric count.
+7. Pluralization must include the `0`, `1`, and plural cases. Use plural wording for `0`. Do not infer English singular/plural rules; use split plural resources, interval metadata, and the shared count formatter. Verify all three cases in tests when count behavior changes. Do not force plural interval resources when `{0}` is not a count (for example, `{0}` is a skill name in `{0} deleted`).
 8. Validate remaining localization metadata exactly. Whole-string approval locks and valid-character annotations must use the machine-readable pipeline syntax, not explanatory prose.
 9. Consolidate identical strings into an appropriate shared resource when the repository has a suitable shared ownership boundary. Duplicated resources can diverge across translations.
 10. Require locale-aware dates and times using the site or user locale and locale skeletons. Reject fixed US field order, separators, AM/PM, and hour cycles, including code copied from legacy UI. Search for an existing repository utility before accepting new formatting logic.
@@ -52,6 +52,8 @@ Example `.resx` resource:
 ```
 
 Use this pattern when you review newly authored strings with approval-lock metadata. The reviewer should verify that the comment gives translators usable context, and that any lock or approval marker follows the repository's machine-readable metadata format instead of freeform prose. For newly added strings, if approval status is unclear, leave a comment prompting the author to lock the string when it is not yet approved; do not raise missing lock metadata alone as a blocking issue.
+
+Do not report placeholder metadata as missing lock tags. Placeholder tokens (`{0}`, `{1}`) should remain unlockable and described in the translator comment; lock tagging applies to whole-string approval workflows, not placeholder substitution.
 
 ### Separators and fragments
 
@@ -158,6 +160,8 @@ StringHelper.formatWithLocalizedCountValue(
 ```
 
 Review count text at the sentence level, not as singular/plural fragments assembled in code.
+
+When the placeholder is not a count, a sentence like `{0} deleted` is a valid complete translation unit. If `{0}` is documented as a skill name (or another entity label), do not raise a count/pluralization finding for that string.
 
 ### Repository formatters
 
