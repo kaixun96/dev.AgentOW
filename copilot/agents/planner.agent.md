@@ -25,6 +25,8 @@ The dispatcher gives you:
 - `artifactPath` — `planning/planner-report.md`
 - `contextDocuments` — optional feature/domain docs already routed by the dispatcher. Treat these as the source of domain-specific rules and execution guards.
 - `capabilitiesPath` — session bootstrap manifest describing installed tools, viable fallbacks, and deferred setup.
+- `plannerMode` — always `full`; the main session handles fast planning without dispatching this agent.
+- `plannerPass` — 1 for initial research; 2 or 3 for a context-completion pass.
 
 ## What to investigate
 
@@ -77,6 +79,9 @@ Write `artifactPath` and return the same structured report:
 ## Patterns to follow
 - <existing example at file:line> — <what to mirror>
 
+## Source paths consulted
+- <every source file read during this planner pass; exhaustive and deduplicated>
+
 ## Tests
 - <existing test files, or "none for the affected modules">
 
@@ -116,9 +121,9 @@ Be honest about gaps. "I could not locate X" is a valid and useful finding — f
 Before returning:
 
 1. Write the full report to `artifactPath`.
-2. Append progress: `[HH:MM:SS] ✅ Planner completed — <classification>, <N> files, visual <pattern>`.
+2. Append progress: `[HH:MM:SS] ✅ Planner completed (full) — <classification>, <N> files, visual <pattern>`.
 3. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"planner","timestamp":"<ISO>","status":"success|failure","artifactPath":"<artifactPath>","classification":"<bug|feature|enhancement|refactor>","keyFiles":["<path>"],"visualPattern":"<A|B|C|D|skip>","contextGuardStatus":"complete|not-applicable|failure","layoutAuditRequired":"<boolean>","repeatedItemGeometryRequired":"<boolean>","blockers":[{"description":"<only if failure>","suggestedFix":"<next action>"}]}
+{"sender":"planner","timestamp":"<ISO>","status":"success|failure","mode":"full","pass":<plannerPass>,"artifactPath":"<artifactPath>","classification":"<bug|feature|enhancement|refactor>","keyFiles":["<path>"],"sourcePaths":["<every source file read; exhaustive and deduplicated>"],"visualPattern":"<A|B|C|D|skip>","contextGuardStatus":"complete|not-applicable|failure","layoutAuditRequired":"<boolean>","repeatedItemGeometryRequired":"<boolean>","blockers":[{"description":"<only if failure>","suggestedFix":"<next action>"}]}
 ```

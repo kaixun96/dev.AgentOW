@@ -28,6 +28,7 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 ├── progress.log
 ├── report.json
 ├── planning/
+│   ├── planner-mode.json
 │   └── planner-report.md
 ├── implementation/
 │   └── iter<N>.md
@@ -49,8 +50,8 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 ```
 
 - `progress.log` is mandatory and user-visible. Append a timestamped line before every state transition. Treat it as a first-class product surface, not debug noise.
-- `report.json` is NDJSON. Append one JSON object for planner, each implementation cycle, evaluator, reviewer, and final status.
-- `planning/planner-report.md`, `implementation/iter<N>.md`, `evaluation/iter<N>/evaluator-report.md`, `review.md`, `review.json`, and `final.md` are mandatory unless the run stops before that phase.
+- `report.json` is NDJSON. Append one JSON object for planner mode, each planner pass, each implementation cycle, evaluator, reviewer, and final status.
+- `planning/planner-mode.json`, `planning/planner-report.md`, `implementation/iter<N>.md`, `evaluation/iter<N>/evaluator-report.md`, `review.md`, `review.json`, and `final.md` are mandatory unless the run stops before that phase.
 - `context/link.json` is mandatory and records either a resolved context library or `status: "unlinked"`.
 - Context evidence is append-only. Plan intent, actual code, evaluation, review, and later feedback must remain distinguishable.
 - Context maintenance is non-blocking. It follows the linked library's `auto-commit`, `patch-only`, or `disabled` policy and never adds a user prompt to interactive, AUTO, or batch execution.
@@ -67,8 +68,9 @@ Use this exact style. Each line starts with `[HH:MM:SS]`, one emoji, and a short
 [HH:MM:SS] 🤖 Mode: AUTO|INTERACTIVE
 [HH:MM:SS] 🩺 Bootstrap started
 [HH:MM:SS] ✅ Bootstrap ready / ⚠️ Bootstrap restart required / ❌ Bootstrap blocked
-[HH:MM:SS] 📋 Planner started
-[HH:MM:SS] ✅ Planner completed — <classification>, <N> files, visual <pattern>
+[HH:MM:SS] 🧭 Planner mode: FAST|FULL — <reason>
+[HH:MM:SS] 📋 Planner started (fast|full)
+[HH:MM:SS] ✅ Planner completed (fast|full) — <classification>, <N> files, visual <pattern>
 [HH:MM:SS] 📋 Plan ready — <N> tasks
 [HH:MM:SS] ✅ Plan approved (auto|user)
 [HH:MM:SS] 🌿 Branch ready — <branch>

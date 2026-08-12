@@ -214,6 +214,21 @@ Read ADO work item 1234567 and complete it per its description and acceptance cr
 
 Auto mode never waits for requirement clarification or plan approval. The agent records the assumptions it had to make into the run artifacts, so the task description has to point at a definite spec and definite acceptance criteria.
 
+### Automatic planner mode
+
+For each Copilot `/agentow` task, agentOW automatically chooses `FAST` or
+`FULL` planning. `FAST` is limited to bugs whose prompt supplies a complete
+root-cause packet (symptom, code anchor, cause, intended fix, and verification)
+that a bounded source read confirms, with one behavior and at most two product
+files. Features, exploratory bugs, cross-package changes, mandatory context
+audits, and unclear UI ownership use `FULL`.
+
+`FAST` skips only the planner subagent. It still writes a source-cited planner
+report and keeps the normal build, test, evaluator, screenshot, review, and PR
+gates. Contradictory evidence or scope growth automatically escalates the run to
+`FULL`. The decision and reason are visible in `progress.log`, `report.json`,
+and `planning/planner-mode.json`.
+
 ### Batch: many independent tasks
 
 ```text

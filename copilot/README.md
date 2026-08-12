@@ -28,7 +28,9 @@ Copilot runs should keep the same baseline observability as the Claude pipeline:
 ├── plan.md
 ├── progress.log
 ├── report.json
-├── planning/planner-report.md
+├── planning/
+│   ├── planner-mode.json
+│   └── planner-report.md
 ├── implementation/iter<N>.md
 ├── evaluation/iter<N>/evaluator-report.md
 ├── evaluation/iter<N>/before-*.png
@@ -36,6 +38,13 @@ Copilot runs should keep the same baseline observability as the Claude pipeline:
 ├── review.md
 └── final.md
 ```
+
+agentOW automatically chooses a planner mode for each request. `FAST` performs
+bounded source verification in the main session when a bug already has a
+complete, source-confirmed root-cause packet and a one-behavior/two-file scope.
+All other work uses the `FULL` planner agent. Both modes keep the same build,
+evaluation, review, and PR gates, and the decision is recorded in
+`planning/planner-mode.json`, `progress.log`, and `report.json`.
 
 For visible UI changes, BEFORE/AFTER Playwright screenshots are mandatory. AgentOW uses one screenshot engine: the repository Playwright/Heft harness with FIC authentication. It first validates the local `rush start` bundle, then uses the PR CDN bundle as the only fallback. Playwright MCP is not an AgentOW route. If the evaluator cannot capture real screenshots, it must return `FAIL` with the exact reason (FIC auth prompt, missing debug link, selector mismatch, screenshot failure, etc.). The run must not claim visual verification passed without screenshot paths.
 
