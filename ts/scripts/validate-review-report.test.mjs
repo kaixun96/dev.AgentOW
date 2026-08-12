@@ -244,6 +244,8 @@ missingSpClientProfile.preReview.rolloutProtection = {
   gateCheckEvidence: ["sp-client/src/example.ts:2"],
   newPathEvidence: ["sp-client/src/example.ts:3"],
   fallbackEvidence: ["sp-client/src/example.ts:4"],
+  legacyBehaviorEvidence: ["artifact:base-version predicate truth table"],
+  legacyEquivalenceConclusion: "Flight disabled returns the same values and performs the same work as the base version",
   newPathState: "flight-enabled",
   fallbackState: "flight-disabled",
   disabledStateTestEvidence: ["sp-client/src/example.test.ts:1"],
@@ -285,6 +287,11 @@ assert.equal(validate(missingRuntimePathCoverage).status, 1, "every runtime chan
 const missingFallbackEvidence = structuredClone(missingSpClientProfile);
 missingFallbackEvidence.preReview.rolloutProtection.fallbackEvidence = [];
 assert.equal(validate(missingFallbackEvidence).status, 1, "protected rollout evidence requires a fallback trace");
+
+const missingLegacyEquivalence = structuredClone(missingSpClientProfile);
+missingLegacyEquivalence.preReview.rolloutProtection.legacyBehaviorEvidence = [];
+missingLegacyEquivalence.preReview.rolloutProtection.legacyEquivalenceConclusion = "";
+assert.equal(validate(missingLegacyEquivalence).status, 1, "protected rollout evidence requires comparison with base behavior");
 
 const incompleteRollout = structuredClone(missingSpClientProfile);
 incompleteRollout.preReview.rolloutProtection.protectionStatus = "incomplete";

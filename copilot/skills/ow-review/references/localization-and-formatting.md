@@ -69,7 +69,7 @@ Good `.resx` resource:
 {0} - {1}
 ```
 
-Format it with the repository utility, such as `Text.format` or `StringHelper.format`, passing `name` and `description` as the placeholder values.
+Format it with an established repository utility, such as a formatter from `@msinternal/utilities-strings`, `Text.format`, or `StringHelper.format`, passing `name` and `description` as the placeholder values.
 
 ### React elements in localized sentences
 
@@ -171,7 +171,7 @@ Bad:
 resource.replace("{0}", value)
 ```
 
-Reject `.replace("{0}", value)`, local formatting helpers, and manual interpolation when `StringHelper.format`, `Text.format`, or `StringHelper.formatWithLocalizedCountValue` applies. When the localized sentence contains React elements, reject ordinary string formatting and require a ReactNode-aware formatter such as `StringHelper.formatToArray`.
+Reject `.replace("{0}", value)`, local formatting helpers, and manual interpolation when an established formatter from `@msinternal/utilities-strings`, `StringHelper`, or `Text` applies. When the localized sentence contains React elements, reject ordinary string formatting and require a ReactNode-aware formatter such as `StringHelper.formatToArray`.
 
 ### Localized rich text
 

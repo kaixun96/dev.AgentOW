@@ -22,13 +22,14 @@ mechanism and affected behavior.
 
 When applicable, test these first because they have high regression or rollback value:
 
-1. Evaluate a Flight/KS before any gated helper, dependency read, allocation, side effect, or
-   throwing predicate.
+1. Evaluate a Flight/KS before any new-path-only helper, dependency read, allocation, side effect,
+  or throwing predicate. A pure helper may execute in both states when its fallback result is
+  behaviorally equivalent to the pre-change expression.
 2. Evaluate rollout state at call time unless initialization order proves a module/global/static
    snapshot is safe.
 3. With Flight off or KS active, preserve legacy inputs, mutations, fallback, and error behavior.
-4. Gate the actual invocation or consumption boundary so changed values cannot route both states
-   through the new implementation.
+4. Gate the actual new behavior at its invocation, consumption, or pure-helper boundary so the
+  fallback state cannot observe a changed result or side effect.
 5. Define aggregate async failure, fallback, and partial-success behavior explicitly.
 6. Own API QoS at the provider/source boundary and measure the interval named by the event.
 7. Await or observe every promise; use `void` only for intentionally independent work with an
@@ -51,10 +52,15 @@ When applicable, test these first because they have high regression or rollback 
 **Trigger:** changed runtime behavior is staged, rollback-protected, or reached through an
 existing Flight, ECS, experiment, or KS.
 
-- Put the gate first in short-circuit evaluation. No helper call, object construction, property
-  access, request, mutation, allocation, or possible throw from the new path may happen first.
-- Gate execution, not merely value selection. Trace every changed runtime entry to the point
-  where the new implementation is invoked or consumed.
+- Put the gate before new-path-only evaluation. No helper call, object construction, property
+  access, request, mutation, allocation, or possible throw that belongs only to the new behavior
+  may happen first.
+- Trace imports and calls transitively before deciding that a path is unprotected. The gate may
+  live in an imported helper rather than the changed call site.
+- Gate behavior, not syntax. A changed pure helper or abstraction may execute in both states when
+  the KS-active/Flight-off branch returns exactly the pre-change result for the same inputs and
+  performs no new side effects or failure-prone work. Do not require the caller to duplicate the
+  old inline expression merely to avoid reaching the helper.
 - Compare the disabled/activated branch against the previous implementation. Verify inputs,
   state writes, fallback values, telemetry interpretation, and thrown-versus-swallowed errors.
 - Avoid module/global/static snapshots of gate state unless the chunk is guaranteed to execute
@@ -70,9 +76,16 @@ existing Flight, ECS, experiment, or KS.
 - Treat the choice of Flight versus KS and the lifetime of either as current-policy questions;
   do not infer them from an old gate that happens to exist.
 
-**Failure hypotheses:** Flight off still calls a new throwing helper; KS active uses a changed
-wrapper or input; a preloaded module snapshots the default before initialization; one sibling
-entry bypasses the gate; fallback catches an error that legacy code propagated.
+**Failure hypotheses:** Flight off still calls a new throwing helper; KS active changes an input
+or routes through a wrapper with different results, side effects, or failures; a preloaded module
+snapshots the default before initialization; one sibling entry bypasses the gate; fallback catches
+an error that legacy code propagated.
+
+**Behavior-preserving helper example:** suppose the old caller returned `true` for `KindA` and
+`KindB`. It is protected to replace that expression with `isSupportedKind(kind)` when the helper
+returns the same two cases plus `!isNewKindKSActivated() && kind === NewKind`. Follow the import
+into the helper: KS activated produces the exact old result, while KS not activated adds only
+`NewKind`. The helper executing in both states is not itself a rollout defect.
 
 ## React lifecycle, state, and memoization
 

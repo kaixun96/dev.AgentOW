@@ -433,6 +433,7 @@ function validateRolloutProtection(report, expectedFiles, errors) {
     rollout.gateCheckEvidence,
     rollout.newPathEvidence,
     rollout.fallbackEvidence,
+    rollout.legacyBehaviorEvidence,
   ];
   const protectedEvidenceValid =
     Array.isArray(rollout.gateIdentifiers) &&
@@ -449,6 +450,7 @@ function validateRolloutProtection(report, expectedFiles, errors) {
     rollout.disabledStateTestEvidence.length > 0 &&
     rollout.disabledStateTestEvidence.every(testEvidenceReference) &&
     validateRolloutPathCoverage(rollout.pathCoverage, runtimePaths) &&
+    specific(rollout.legacyEquivalenceConclusion) &&
     specific(rollout.conclusion);
   const [expectedNewState, expectedFallbackState] = ROLLOUT_STATES[rollout.gateType];
   if (
@@ -456,7 +458,7 @@ function validateRolloutProtection(report, expectedFiles, errors) {
     rollout.newPathState !== expectedNewState ||
     rollout.fallbackState !== expectedFallbackState
   ) {
-    errors.push("rolloutProtection requires complete gate coverage, correct direction, fallback, and disabled-state tests");
+    errors.push("rolloutProtection requires complete gate coverage, correct direction, legacy-equivalent fallback, and disabled-state tests");
   }
   if (rollout.descriptionStatus === "missing" && !hasBlockingRolloutFinding(report)) {
     errors.push("missing rollout metadata in the PR description requires a blocking finding");

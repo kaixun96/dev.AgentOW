@@ -30,8 +30,10 @@ const sharedUtilityReuseSnippets = [
 ];
 
 const commonReviewIssueSnippets = [
-  "Evaluate a Flight/KS before any gated helper",
-  "Gate execution, not merely value selection",
+  "Evaluate a Flight/KS before any new-path-only helper",
+  "Trace imports and calls transitively",
+  "Gate behavior, not syntax",
+  "The helper executing in both states is not itself a rollout defect",
   "For `Promise.all`, decide whether any failure should fail the feature",
   "Use `useCallback` only when identity reaches a memoized/expensive child",
   "Put API operation QoS at the provider/data-source boundary",
@@ -297,7 +299,8 @@ const checks = [
       "sp-client-review-profile.md",
       "preReview.profileChecks",
       "inspect the PR description before code",
-      "A nearby gate is not coverage.",
+      "a gate inside a called helper is coverage when it guards only the added behavior",
+      "reaching a changed pure abstraction is not a defect by itself",
       "do not equate reading every line with reliable exhaustive review",
       "`preliminary-non-exhaustive` completeness claim",
       "git diff --no-renames",
@@ -335,7 +338,8 @@ const checks = [
       "sp-client-review-profile.md",
       "preReview.profileChecks",
       "inspect the PR description before code",
-      "A nearby gate is not coverage.",
+      "a gate inside a called helper is coverage when it guards only the added behavior",
+      "reaching a changed pure abstraction is not a defect by itself",
       "reading all files does not prove the review is reliable or exhaustive",
       "`preliminary-non-exhaustive`",
       "git diff --no-renames",
