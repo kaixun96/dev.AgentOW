@@ -4,6 +4,10 @@ Use this reference when a change affects a rendered SharePoint surface's theme p
 background, color tokens, primary actions, tabs, links, or other styling that depends on
 whether the experience is SharePoint-owned, customer-content-focused, inline, or overlaid.
 
+Read `${CLAUDE_PLUGIN_ROOT}/skills/detheme/SKILL.md` with this reference. That skill is the
+normative implementation and remediation guide; this reference defines how to review the
+result and what evidence to require.
+
 ## Classify the surface before reviewing colors
 
 Theme rules depend on surface type and ownership. Do not validate a color in isolation or
@@ -33,6 +37,10 @@ assume that every surface inside SharePoint should inherit the customer site the
 6. Record the surface classification, provider/token evidence, and screenshot evidence in
    `spClientThemeDetheme`. If screenshots needed to validate changed visible theme behavior
    are unavailable, report the evidence gap rather than assuming the result is correct.
+7. Check the implementation mechanics from the Detheme skill: correctly scoped
+   `NeutralThemeProvider` hooks, no redundant property-pane wrapper, v8 shim detection and
+   `NeutralV8ThemeProvider` where required, removal of a site-themed nested `FluentProvider`,
+   killswitch protection for existing surfaces, and correctly imported/layered v9 SCSS tokens.
 
 ## Review questions
 
@@ -45,6 +53,9 @@ assume that every surface inside SharePoint should inherit the customer site the
 - For a customer-content full page, does it intentionally follow the customer site theme?
 - Are links bold and underlined where the SharePoint theme treatment requires them?
 - Do screenshots demonstrate the final rendered result rather than only the intended tokens?
+- For existing surfaces, does the killswitch preserve the original provider, wrapper classes,
+  and `$ms-color-*` behavior?
+- Were v8 imports checked against both `enabledForFluentMigration` and the matching shim?
 
 ## Blocking examples
 
@@ -53,3 +64,13 @@ settings, panes, or drawers; SharePoint teal accents appearing in an inline pane
 SharePoint teal accents in a drawer or SharePoint-owned surface; links that violate the
 SharePoint treatment; a local override bypassing the established Detheme flow; or a visible
 theme change that cannot be validated because required screenshots are missing.
+
+## Required fix guidance
+
+Every Detheme finding must tell the author to apply
+`${CLAUDE_PLUGIN_ROOT}/skills/detheme/SKILL.md` and name the exact applicable remediation:
+surface reclassification; `NeutralThemeProvider` plus only the required
+`enabledCustomStyleHooks`; no additional wrapper for a correctly implemented property pane;
+`NeutralV8ThemeProvider` for an unshimmed v8 component; removal of a nested site-themed
+`FluentProvider`; killswitch protection for an existing surface; or layered v9 SCSS tokens with
+the required token import. Do not report only that the colors are wrong.

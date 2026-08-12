@@ -109,6 +109,12 @@ Primary PR screenshots must show the full browser page/viewport, including surro
 
 Routed feature context is a hard execution contract, not background reading. If a context document requires a table, disposition, crop, or measurement, planner/implementation/evaluator/reviewer artifacts must contain that evidence. Missing evidence blocks PASS.
 
+Theme-affecting SharePoint UI must be classified before planning or coding as app-chrome
+invoked, a SharePoint-owned full page, a customer-content full page, an inline pane, or a
+full-overlay drawer. Read `skills/detheme/SKILL.md` and apply its classification-specific
+provider, hook, v8, killswitch, and SCSS guidance; do not infer treatment from the component
+name or apply customer theming to SharePoint-owned chrome.
+
 The linked context library is also maintained from run evidence. Read `docs/context-maintenance.md` before resolving, recording, proposing, or applying context updates. agentOW remains generic: the library manifest owns routes, destinations, domain guards, and commit/push policy. Never hard-code a feature name or personal repository path into agentOW.
 
 Plan-stage context updates describe intent and open decisions only. After implementation and verification, an as-built update must inspect the actual committed diff and may supersede inaccurate plan intent. A read-only library or stale base produces an exported patch/conflict artifact without blocking the product PR.
