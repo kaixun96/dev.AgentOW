@@ -446,9 +446,11 @@ function validateRolloutProtection(report, expectedFiles, errors) {
         evidence.length > 0 &&
         evidence.every(evidenceReference),
     ) &&
-    Array.isArray(rollout.disabledStateTestEvidence) &&
-    rollout.disabledStateTestEvidence.length > 0 &&
-    rollout.disabledStateTestEvidence.every(testEvidenceReference) &&
+    typeof rollout.fallbackBehaviorChanged === "boolean" &&
+    (rollout.fallbackBehaviorChanged === false ||
+      (Array.isArray(rollout.disabledStateTestEvidence) &&
+        rollout.disabledStateTestEvidence.length > 0 &&
+        rollout.disabledStateTestEvidence.every(testEvidenceReference))) &&
     validateRolloutPathCoverage(rollout.pathCoverage, runtimePaths) &&
     specific(rollout.legacyEquivalenceConclusion) &&
     specific(rollout.conclusion);
@@ -458,7 +460,7 @@ function validateRolloutProtection(report, expectedFiles, errors) {
     rollout.newPathState !== expectedNewState ||
     rollout.fallbackState !== expectedFallbackState
   ) {
-    errors.push("rolloutProtection requires complete gate coverage, correct direction, legacy-equivalent fallback, and disabled-state tests");
+    errors.push("rolloutProtection requires complete gate coverage, correct direction, legacy-equivalent fallback, and disabled-state tests when the PR changes fallback behavior");
   }
   if (rollout.descriptionStatus === "missing" && !hasBlockingRolloutFinding(report)) {
     errors.push("missing rollout metadata in the PR description requires a blocking finding");

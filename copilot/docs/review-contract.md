@@ -76,8 +76,10 @@ Apply these concrete standards when relevant:
 - Prefer clear, minimal design; flag unnecessary change, deprecated APIs, unexplained hardcoding, duplicated logic, weak naming, overly broad types, unsafe non-null assertions, and public contracts without adequate documentation.
 - Comments explain why, not what. A `TODO` requires a linked work item; avoid leaving deferred work when it is required for correctness.
 - New or changed behavior needs meaningful unit/regression coverage unless a specific, evidence-backed reason makes a test impractical.
+- For test-only code, review test correctness, determinism, isolation, cleanup, and whether assertions prove the intended product scenario. Production-only dimensions, including privacy/security or telemetry rules for test diagnostics, rollout requirements, UI/accessibility, localization, and runtime performance, are not findings unless the test change affects a production sink or exposes credentials/secrets.
 - Handle API failures and cleanup paths explicitly. Never branch on localized API error-message text.
 - New behavior preserves a safe killswitch/flight-off fallback and browser compatibility where applicable.
+- Verify the fallback against the pre-change behavior. Require new KS-activated or Flight-off test coverage only when the current PR changes fallback/disabled behavior; the absence of a pre-existing state test is not a finding in the current PR.
 - Interactive UI is keyboard focusable and exposes correct role, state, and accessible name. Check light, dark, and high-contrast behavior, including a 4.5:1 text contrast target.
 - Localize eligible UI strings through resources/placeholders and use i18n utilities for date, number, currency, address, and phone formatting. Do not localize brand names, usernames, user input, or telemetry.
 - Do not log personal data, resource names, or tenant-location data where policy forbids it; do not prefill user feedback with user/resource data.
@@ -194,6 +196,7 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
       "legacyEquivalenceConclusion": "<why fallback results, side effects, and failures equal the pre-change behavior>",
       "newPathState": "ks-not-activated|flight-enabled|ks-not-activated-and-flight-enabled",
       "fallbackState": "ks-activated|flight-disabled|ks-activated-or-flight-disabled",
+      "fallbackBehaviorChanged": false,
       "disabledStateTestEvidence": ["sp-client/src/example.test.ts:1"],
       "pathCoverage": [
         {
