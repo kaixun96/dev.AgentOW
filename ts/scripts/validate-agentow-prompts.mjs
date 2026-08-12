@@ -94,6 +94,21 @@ const sharepointDesignSystemSnippets = [
   "`BreadcrumbButton` only for genuine breadcrumb navigation nodes"
 ];
 
+const sharepointThemeDethemeSnippets = [
+  "Classify the surface before reviewing colors",
+  "Surface invoked from app chrome",
+  "SharePoint-owned full page",
+  "Customer-content full page",
+  "Inline pane",
+  "Full-overlay drawer",
+  "primary button and active tab",
+  "links are bold and underlined",
+  "Trace the established SharePoint theme/Detheme provider and token flow",
+  "Inspect screenshots of the changed experience",
+  "`spClientThemeDetheme`",
+  "required screenshots are missing"
+];
+
 const checks = [
   {
     file: "copilot/skills/agentow/SKILL.md",
@@ -305,7 +320,8 @@ const checks = [
       "server-side filtering, transport pagination/continuation, and bounded viewport rendering",
       "typographyStyles",
       "Fluent V9/SPDS primitive",
-      "SharePoint theme/Detheme provider flow",
+      "sharepoint-theme-and-detheme.md",
+      "validate the rendered treatment with screenshots",
       "spClientRolloutTrace",
       "PR description first",
       "preReview.rolloutProtection",
@@ -337,6 +353,7 @@ const checks = [
       "shared-utility-reuse.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
+      "sharepoint-theme-and-detheme.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -378,6 +395,7 @@ const checks = [
       "shared-utility-reuse.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
+      "sharepoint-theme-and-detheme.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -405,6 +423,11 @@ const checks = [
     "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
     "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
     sharepointDesignSystemSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/sharepoint-theme-and-detheme.md",
+    "copilot/skills/ow-review/references/sharepoint-theme-and-detheme.md",
+    sharepointThemeDethemeSnippets,
   ),
   {
     file: "agents/ow-orchestrator.md",

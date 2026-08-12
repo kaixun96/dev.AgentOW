@@ -46,6 +46,8 @@ Use the shared review references as the normative source for cross-cutting quali
   post-freeze string policy.
 - `skills/ow-review/references/sharepoint-design-system-and-ux-components.md` for design-system
   component choice, semantic structure, accessibility, styling APIs, and typography guidance.
+- `skills/ow-review/references/sharepoint-theme-and-detheme.md` for surface classification,
+  SharePoint versus customer theme treatment, Detheme provider flow, and screenshot validation.
 - `skills/ow-review/references/shared-utility-reuse.md` for shared hook/utility reuse checks.
 
 ## TypeScript and maintainability
@@ -66,8 +68,8 @@ trust-boundary checks.
 - Typography checks still apply: when semantic text styling is relevant, verify the chosen
   preset path (for example `typographyStyles`) through
   `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`.
-- When validating local overrides, trace the established SharePoint theme/Detheme provider flow
-  and keep only evidence-backed exceptions.
+- Apply `skills/ow-review/references/sharepoint-theme-and-detheme.md` to theme-affecting UI
+  changes. Classify the surface, trace the established provider/token flow, and validate the rendered treatment with screenshots.
 - Keep one explicit check for reviewer routing: when introducing new UI structure, confirm a
   suitable Fluent V9/SPDS primitive was considered before custom semantic markup.
 

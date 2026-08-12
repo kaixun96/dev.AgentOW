@@ -1,0 +1,55 @@
+# SharePoint theme and Detheme review reference
+
+Use this reference when a change affects a rendered SharePoint surface's theme provider,
+background, color tokens, primary actions, tabs, links, or other styling that depends on
+whether the experience is SharePoint-owned, customer-content-focused, inline, or overlaid.
+
+## Classify the surface before reviewing colors
+
+Theme rules depend on surface type and ownership. Do not validate a color in isolation or
+assume that every surface inside SharePoint should inherit the customer site theme.
+
+| Surface | Required theme treatment | Examples |
+|---|---|---|
+| Surface invoked from app chrome | Use the SharePoint theme. Keep the surface predominantly neutral; SharePoint teal is reserved for the primary button and active tab, and links are bold and underlined. | App bar or suite header settings and flyouts |
+| SharePoint-owned full page | Use the SharePoint theme with the same neutral treatment, teal primary button and active tab, and bold underlined links. | SharePoint settings pages |
+| Customer-content full page | Use customer theming when the experience is focused on a specific site or customer content. | Site- or content-focused experiences |
+| Inline pane | Always use the neutral theme. Primary buttons and active tabs remain neutral rather than SharePoint teal or customer-themed. | Property pane |
+| Full-overlay drawer | Always use SharePoint teal for the primary button and active tab. | Settings, analytics, Site permissions, Change the look |
+
+## Required review method
+
+1. Identify the rendered surface as app-chrome-invoked, a SharePoint-owned full page, a
+   customer-content full page, an inline pane, or a full-overlay drawer.
+2. Trace the established SharePoint theme/Detheme provider and token flow into the changed
+   component. Verify that local providers or overrides do not bypass the surface contract.
+3. Inspect screenshots of the changed experience. Code or token names alone are not enough
+   to prove the final theme treatment.
+4. In the screenshots, verify the background and general chrome, primary button, active tab,
+   and links against the table above. Also check relevant default, selected, hover, focus,
+   disabled, and high-contrast states when the change can affect them.
+5. Confirm that a customer theme is used only for a customer-content full page, not for
+   SharePoint-owned chrome, panes, drawers, or settings pages.
+6. Record the surface classification, provider/token evidence, and screenshot evidence in
+   `spClientThemeDetheme`. If screenshots needed to validate changed visible theme behavior
+   are unavailable, report the evidence gap rather than assuming the result is correct.
+
+## Review questions
+
+- What kind of surface is this, and who owns the experience?
+- Does the provider and token path match that surface classification?
+- Is the surface neutral except for the explicitly allowed SharePoint teal accents?
+- For an inline pane, are primary buttons and active tabs neutral?
+- For a drawer, app-chrome surface, or SharePoint-owned page, are primary buttons and active
+  tabs SharePoint teal?
+- For a customer-content full page, does it intentionally follow the customer site theme?
+- Are links bold and underlined where the SharePoint theme treatment requires them?
+- Do screenshots demonstrate the final rendered result rather than only the intended tokens?
+
+## Blocking examples
+
+Request changes when evidence shows customer theming leaking into SharePoint-owned chrome,
+settings, panes, or drawers; SharePoint teal accents appearing in an inline pane; missing
+SharePoint teal accents in a drawer or SharePoint-owned surface; links that violate the
+SharePoint treatment; a local override bypassing the established Detheme flow; or a visible
+theme change that cannot be validated because required screenshots are missing.
