@@ -98,7 +98,19 @@ const checks = [
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
-      "agentOW is the routing and execution layer; feature-specific rules and execution guards live in those context docs, not in this skill."
+      "agentOW is the routing and execution layer; feature-specific rules and execution guards live in those context docs, not in this skill.",
+      "Automatically select `FAST` or `FULL`",
+      "planning/planner-mode.json",
+      "Missing evidence is `FULL`, not an assumption.",
+      "FAST → FULL escalation",
+      "Do not dispatch the planner agent.",
+      "The change is one behavior in at most two product files.",
+      "Only after source-path routing passes",
+      "do not append a duplicate",
+      "`context-completion pass`",
+      "`context-routing-unstable`",
+      "read every routed document before selecting planner mode",
+      "exhaustive `sourcePaths`"
     ]
   },
   {
@@ -109,9 +121,22 @@ const checks = [
       "`exactFixtureRequired` — defaults to `false`",
       "A test page is a starting candidate, not fixture identity",
       "Capability predicates",
-      "Candidate discovery hints"
+      "Candidate discovery hints",
+      "`plannerMode` — always `full`",
+      "`plannerPass` — 1 for initial research",
+      "\"mode\":\"full\"",
+      "\"pass\":<plannerPass>",
+      "## Source paths consulted",
+      "\"sourcePaths\""
     ]
   },
+  ...mirroredSnippetChecks(
+    "docs/USING-AGENTOW.md",
+    "docs/USING-AGENTOW.zh-CN.md",
+    [
+      "planning/planner-mode.json"
+    ]
+  ),
   {
     file: "copilot/agents/evaluator.agent.md",
     snippets: [

@@ -42,8 +42,9 @@ Use the shared progress event contract from `AGENTS.md`. At minimum, write:
 [HH:MM:SS] 🤖 Mode: AUTO|INTERACTIVE
 [HH:MM:SS] 🩺 Bootstrap started
 [HH:MM:SS] ✅ Bootstrap ready / ⚠️ Bootstrap restart required / ❌ Bootstrap blocked
-[HH:MM:SS] 📋 Planner started
-[HH:MM:SS] ✅ Planner completed — <summary>
+[HH:MM:SS] 🧭 Planner mode: FAST|FULL — <reason>
+[HH:MM:SS] 📋 Planner started (fast|full)
+[HH:MM:SS] ✅ Planner completed (fast|full) — <summary>
 [HH:MM:SS] 📋 Plan ready — <N> tasks
 [HH:MM:SS] ✅ Plan approved (auto|user)
 [HH:MM:SS] 🧠 Context linked — <library id|unlinked>
@@ -101,15 +102,71 @@ The bootstrap marker is per terminal/CLI process, so later agentOW runs in the s
 
 Read `${CLAUDE_PLUGIN_ROOT}/docs/context-maintenance.md`. Create `<sessionDir>/context/{candidates,apply}` plus empty `evidence.ndjson`.
 
-Resolve the linked context library using the documented discovery order. Write an immutable `<sessionDir>/context/link.json` even when the result is `status: "unlinked"`. Snapshot library identity, source/context revisions, manifest digest, and writability. Write request-based routes and document digests to immutable `context/routing.v1.json`. Append `[HH:MM:SS] 🧠 Context linked — <library id|unlinked>`.
+Resolve the linked context library using the documented discovery order. Write an immutable `<sessionDir>/context/link.json` even when the result is `status: "unlinked"`. Snapshot library identity, source/context revisions, manifest digest, and writability. Write request-based routes and document digests to immutable `context/routing.v1.json`, then read every routed document before selecting planner mode. Initial guards, audits, inventories, tables, and measurements participate in FAST eligibility; they are not deferred until after source routing. Append `[HH:MM:SS] 🧠 Context linked — <library id|unlinked>`.
 
-After the planner reports source paths, route them through the same manifest. If they add routes or documents, write `context/routing.v2.json` rather than modifying revision 1, then pass revision 2 downstream. Feature-specific terms, globs, guards, and update targets come only from the library manifest. Existing ad-hoc `contextDocuments` remain a compatible read-only link.
+After source paths are known, route them through the same manifest. FAST must do this before finalizing its report. FULL must route the initial report's paths and run the context-completion loop in Step 2 when new documents appear. Write each next immutable routing revision (normally starting at `context/routing.v2.json`) rather than modifying an earlier revision, read every newly routed document, and pass the latest revision downstream. Feature-specific terms, globs, guards, and update targets come only from the library manifest. Existing ad-hoc `contextDocuments` remain a compatible read-only link.
 
 agentOW is the routing and execution layer; feature-specific rules and execution guards live in those context docs, not in this skill.
 
-## Step 2: Research (dispatch planner)
+## Step 2: Select planner mode + research
 
-Before dispatching, append `[HH:MM:SS] 📋 Planner started`.
+Automatically select `FAST` or `FULL`; the user does not need to choose.
+
+### Planner mode decision
+
+Write `<sessionDir>/planning/planner-mode.json` before research:
+
+```json
+{
+  "mode": "fast|full",
+  "reason": "<concise evidence-based reason>",
+  "checks": {
+    "bugWithExplicitRootCause": true,
+    "codeAnchorProvided": true,
+    "acceptanceCriteriaClear": true,
+    "estimatedFilesAtMostTwo": true,
+    "singleBehaviorChange": true,
+    "crossPackageOrApiChange": false,
+    "architectureOrDataMigration": false,
+    "mandatoryContextAudit": false,
+    "uiOwnershipUnclear": false
+  }
+}
+```
+
+Append `[HH:MM:SS] 🧭 Planner mode: FAST|FULL — <reason>` to `progress.log` and one NDJSON record to `report.json`:
+
+```json
+{"sender":"planner-mode","timestamp":"<ISO>","status":"success","mode":"fast|full","artifactPath":"<sessionDir>/planning/planner-mode.json","reason":"<reason>"}
+```
+
+Select `FAST` only when every statement below is proven by the request plus a quick read of the named source:
+
+- It is a bug with an explicit symptom, root cause, code anchor, intended fix, and pass/fail verification.
+- The named code exists and the source directly supports the claimed root cause.
+- The change is one behavior in at most two product files.
+- It does not cross package/API boundaries, alter architecture, require a data migration, or introduce a dependency.
+- Routed context does not require a planner-produced audit, inventory, table, or measurement.
+- It does not replace a UI root/wrapper, affect repeated-item geometry, or leave surface ownership/open-condition unclear.
+
+Missing evidence is `FULL`, not an assumption. Feature work, broad refactors, exploratory bugs, and requests that only say the root cause is "known" are `FULL`.
+
+### FAST planner
+
+Do not dispatch the planner agent. Append `[HH:MM:SS] 📋 Planner started (fast)`, then perform a bounded source verification in the main session:
+
+1. Read the named code anchor and its direct caller or consumer.
+2. Confirm the root cause and intended edit from source.
+3. Locate existing tests for the affected module.
+4. For visible UI, establish the selector, discriminator, open-condition, and starting route. If any is unclear, escalate to `FULL`.
+5. Route the verified source paths through the context manifest, write the next immutable routing revision, and read every newly routed document.
+6. Re-evaluate file count, ownership, and context guards. Any scope expansion, contradictory evidence, or required audit/table/measurement escalates to `FULL`.
+
+Only after source-path routing passes, write `planning/planner-report.md` using the planner agent's normal output headings, including citations and an exhaustive `Source paths consulted` section. Mark it `Planner mode: FAST` and record only verified findings. Append the normal planner NDJSON line with `"mode":"fast","pass":1,"sourcePaths":[...]` and append `[HH:MM:SS] ✅ Planner completed (fast) — <classification>, <N> files, visual <pattern>`.
+
+### FULL planner
+
+Append `[HH:MM:SS] 📋 Planner started (full)`.
 
 If the request names a feature area with external context docs (for example a dotfiles knowledge-center entry), route and read those docs now. Feature-specific rules and execution guards live in those context docs, not in this skill. Pass every relevant path to all downstream agents.
 
@@ -126,17 +183,31 @@ contextDocuments:
   - <every routed feature/domain context document>
 contextLinkPath: /workspaces/odsp-web/.aero/<session>/context/link.json
 capabilitiesPath: /workspaces/odsp-web/.aero/<session>/capabilities.json
+plannerMode: full
+plannerPass: 1
 ```
 
 Wait for its findings report (classification, root cause, files to change, patterns, tests, visual surface trace, context guards, and any required root/wrapper layout ownership audit). If `planning/planner-report.md` or the planner NDJSON line is missing, treat planner as failed.
+
+The planner NDJSON line must include `"mode":"full"`. The planner agent owns the completion progress line; verify it exists, but do not append a duplicate.
+
+Route the planner NDJSON record's exhaustive `sourcePaths` through the context manifest; do not infer routing inputs from `keyFiles` or prose citations. If this adds context documents the planner did not receive, dispatch the FULL planner again with the latest routing revision and all newly routed documents, marking the request as a `context-completion pass` and incrementing `plannerPass`. Treat the revised `planning/planner-report.md` as canonical. Repeat route → context-completion only until routing is stable, with a maximum of three planner passes total. If a third pass still discovers new routed documents, fail planning with `context-routing-unstable`; never hand an incompletely routed report to implementation.
 
 If routed context requires an audit/table/measurement and the planner report does not contain it, treat planner as failed. "Read the context" is not compliance evidence.
 
 Read the findings. If the planner reports it could not locate the root cause or surface, decide: ask the user for a pointer (interactive), or proceed with its best understanding and record the gap (auto).
 
+### FAST → FULL escalation
+
+If FAST source verification finds contradictory evidence, more than two product files, unclear UI reachability/ownership, a mandatory context audit, or any cross-package/API/architecture/data/dependency impact:
+
+1. Rewrite `planning/planner-mode.json` with `"mode":"full"` and an `escalatedFrom:"fast"` field.
+2. Append a second `planner-mode` NDJSON record and `[HH:MM:SS] 🧭 Planner mode: FULL — escalated from FAST: <reason>`.
+3. Dispatch the full planner. Do not preserve unsupported FAST assumptions in the plan.
+
 ## Step 3: Plan + approval
 
-Using the planner's findings, write a short plan:
+Using the planner report (FAST or FULL), write a short plan:
 - Spec (2-3 sentences)
 - Acceptance criteria (clear pass/fail)
 - Tasks (exact files, what changes)

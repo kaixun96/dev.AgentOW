@@ -213,6 +213,19 @@ CODESPACES=false az login
 
 Auto 模式不会等待需求澄清或计划审批。Agent 会把必要假设记录到运行产物中，因此任务描述必须能够定位到明确的 Spec 和验收标准。
 
+### 自动选择 Planner 模式
+
+每个 Copilot `/agentow` 任务都会自动选择 `FAST` 或 `FULL`。`FAST` 只适用于
+Prompt 已提供完整根因包（现象、代码位置、原因、预期修复和验证方式），且经过
+一次有限的源码读取能够确认、只涉及单一行为和最多两个产品文件的 Bug。Feature、
+探索性 Bug、跨 Package 改动、Context 强制审计以及 UI ownership 不清晰的任务都走
+`FULL`。
+
+`FAST` 只跳过 Planner subagent；它仍会生成带源码引用的标准 planner report，并保留
+构建、测试、Evaluator、截图、Review 和 PR 的全部门槛。一旦源码证据冲突或范围扩大，
+会自动升级到 `FULL`。选择结果和原因会写入 `progress.log`、`report.json` 和
+`planning/planner-mode.json`。
+
 ### Batch：批量处理独立任务
 
 ```text
