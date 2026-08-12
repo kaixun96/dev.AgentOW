@@ -213,6 +213,8 @@ Take fingerprints from the matcher rather than writing them by hand. The orchest
 
 Style preferences and speculative redesign are not findings.
 
+Repository instruction compliance does not automatically imply `Important`. Verify the cited source exactly. A harmless metadata or comment-format mismatch is `Minor`/`Nit:` at most; it is `Important` only when concrete evidence shows a required tool, runtime/rollback operation, contract, or consumer would be affected. Compliant code receives no finding.
+
 - Critical or Important present → `REQUEST_CHANGES`.
 - Minor only → `COMMENT`.
 - Zero findings plus complete coverage → `APPROVE`.
