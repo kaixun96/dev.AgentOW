@@ -214,7 +214,7 @@ Using the planner report (FAST or FULL), write a short plan:
 - Visual surface trace (from the planner, for the evaluator later) — including the surface's **open-condition**: the code that sets its open state and the application state that must hold for it to render. A control name or URL parameter is not an open-condition.
 - Detheme classification for any theme-affecting SharePoint UI: app-chrome-invoked,
   SharePoint-owned full page, customer-content full page, inline pane, or full-overlay drawer.
-  Read `${CLAUDE_PLUGIN_ROOT}/skills/detheme/SKILL.md` and record the required treatment.
+  Read `skills/detheme/SKILL.md` from this Copilot plugin and record the required treatment.
 - Context compliance checklist (each routed guard and its required artifact)
 - Root/wrapper layout ownership table when any JSX root/wrapper is replaced
 - Repeated-item geometry target (selector, axis, metric) when Cards/rows/tiles/items repeat
@@ -251,8 +251,8 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 1. **Branch.** If on `main`, create `user/<alias>/<feature>` from `origin/main` (use `ow-git`). `<alias>` from `whoami`.
 2. **Write the code** yourself, following the planner's "patterns to follow". Surgical changes only — every line traces to the request.
    - Complete every context compliance item before build.
-   - For any theme-affecting SharePoint UI, read
-     `${CLAUDE_PLUGIN_ROOT}/skills/detheme/SKILL.md`, confirm the planned surface
+   - For any theme-affecting SharePoint UI, read `skills/detheme/SKILL.md` from this Copilot
+     plugin, confirm the planned surface
      classification, and implement its provider, hook, v8, nested-provider, killswitch, and
      SCSS-token guidance as applicable. Do not guess the killswitch/flight for an existing
      surface.
