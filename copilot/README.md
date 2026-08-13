@@ -56,7 +56,7 @@ The TypeScript MCP server (`../ts/`) is **reused unchanged** — Copilot CLI has
 
 Prereqs: Copilot CLI ([install](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli)) + `copilot auth`. The MCP bundle is shipped inside this plugin at `ts/dist/`; maintainers refresh it with `cd ../ts && npm install && npm run build` before publishing.
 
-On the first agentOW invocation in a terminal session, bootstrap checks the FIC Playwright/Heft harness and installs trusted ODSP/review plugins plus task-triggered Figma/ADO tooling. Enter `/ow-init` for an explicit one-time comprehensive initialization before the first task. Newly installed plugins require restarting Copilot CLI; OAuth, FIC authentication, and consent remain manual. Results are written to `.aero/<session>/capabilities.json`.
+On the first agentOW invocation in a terminal session, bootstrap checks for a dispatcher-provided personal evaluator and the FIC Playwright/Heft fallback, then installs trusted ODSP/review plugins plus task-triggered Figma/ADO tooling. Enter `/ow-init` for an explicit one-time comprehensive initialization before the first task. Newly installed plugins require restarting Copilot CLI; interactive authentication and consent remain manual when silent renewal cannot complete. Results are written to `.aero/<session>/capabilities.json`.
 
 ```bash
 copilot plugin marketplace add kaixun96/dev.AgentOW

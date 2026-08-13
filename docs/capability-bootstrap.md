@@ -101,7 +101,7 @@ Canonical capability groups:
 
 - `core.source-repo`, `core.rush-node-tmux`
 - `host.claude-agent-teams`, `host.claude-auto-accept`, `host.copilot-auth`
-- `browser.fic-heft`, `fixture.fic-auth`, `fixture.tenant-site`
+- `browser.personal-persistent`, `browser.fic-heft`, `fixture.fic-auth`, `fixture.tenant-site`
 - `design.figma`
 - `odsp.mcp-opt-out`, `odsp.mcp-opt-in`
 - `ado.cli`, `ado.azure-devops-extension`, `ado.auth`
@@ -111,8 +111,9 @@ Canonical capability groups:
 
 Unknown availability is not the same as missing. Optional capabilities and capabilities with a viable fallback never block planning.
 
-AgentOW deliberately has one screenshot engine: FIC Playwright/Heft from the repository harness.
-UI validation first uses that engine with a local `rush start` debug bundle
-(`local-rush-start`), then switches to the PR's SP-Client Validation CDN query
-(`pr-cdn-fic`) only when the local route fails for a route-specific reason. Playwright MCP,
-browser profiles, and `browser_*` tools are not AgentOW visual-validation capabilities.
+When the dispatcher provides a reachable compliant personal-account Playwright profile,
+AgentOW uses it first (`personal-persistent-profile`). A remote Codespace normally cannot
+reach the Devbox profile and falls back without failing. The fallback is repository
+Playwright/Heft with FIC: local `rush start` (`local-rush-start`) first, then PR CDN
+(`pr-cdn-fic`) for a proven route-specific local failure. Playwright MCP and `browser_*`
+tools are not AgentOW visual-validation capabilities.

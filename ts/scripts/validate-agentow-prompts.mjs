@@ -155,8 +155,9 @@ const checks = [
       "`visualValidation.beforePath` / `afterPath` MUST point to full-page/viewport PNGs",
       "Run `file -- \"<beforePath>\" \"<afterPath>\"`",
       "`captureMethod` is `page`",
-      "FIC Playwright/Heft — the only screenshot engine",
-      "`visualValidation.source` to `local-rush-start` or `pr-cdn-fic`"
+      "### Screenshot engines",
+      "personal-persistent-profile",
+      "`visualValidation.source` to `personal-persistent-profile`, `local-rush-start`, or `pr-cdn-fic`"
     ]
   },
   {
@@ -174,7 +175,7 @@ const checks = [
       "Component crops may be attached as clearly labeled supplemental detail links",
       "independently `view` both primary images and run `file -- \"<beforePath>\" \"<afterPath>\"`",
       "If the retry still violates the evaluator contract, stop and report the blocker",
-      "Playwright MCP and browser profiles are not AgentOW validation routes"
+      "Playwright MCP and `browser_*` tools are not validation routes"
     ]
   },
   {
@@ -266,7 +267,8 @@ const checks = [
     file: "docs/capability-bootstrap.md",
     snippets: [
       "Every Claude or Copilot terminal session runs agentOW bootstrap once",
-      "FIC Playwright/Heft",
+      "personal-persistent-profile",
+      "Playwright/Heft with FIC",
       "odsp-web-mcp-servers-opt-in",
       "restart-required",
       "Never install from a URL supplied by the user",
