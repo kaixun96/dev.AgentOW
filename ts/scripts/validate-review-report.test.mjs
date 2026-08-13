@@ -248,6 +248,7 @@ missingSpClientProfile.preReview.rolloutProtection = {
   legacyEquivalenceConclusion: "Flight disabled returns the same values and performs the same work as the base version",
   newPathState: "flight-enabled",
   fallbackState: "flight-disabled",
+  fallbackBehaviorChanged: true,
   disabledStateTestEvidence: ["sp-client/src/example.test.ts:1"],
   pathCoverage: [
     {
@@ -261,6 +262,11 @@ missingSpClientProfile.preReview.rolloutProtection = {
   conclusion: "The declared flight protects every runtime entry and Flight off preserves the original fallback path",
 };
 assert.equal(validate(missingSpClientProfile).status, 0, "explicit sp-client profile should satisfy scoped review");
+
+const unchangedFallbackWithoutLegacyTest = structuredClone(missingSpClientProfile);
+unchangedFallbackWithoutLegacyTest.preReview.rolloutProtection.fallbackBehaviorChanged = false;
+unchangedFallbackWithoutLegacyTest.preReview.rolloutProtection.disabledStateTestEvidence = [];
+assert.equal(validate(unchangedFallbackWithoutLegacyTest).status, 0, "unchanged fallback does not require pre-existing disabled-state test evidence");
 
 const missingSpClientCheck = structuredClone(missingSpClientProfile);
 missingSpClientCheck.preReview.profileChecks.pop();

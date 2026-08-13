@@ -1,6 +1,6 @@
 # SP-Client review profile
 
-Apply this profile when any Git-changed path is under `sp-client/`. It supplements `review-contract.md`; it does not replace repository instructions or feature-specific routed context.
+Apply this profile when any Git-changed path is under `sp-client/`. For changed shared code outside `sp-client/` that implements a Flight or killswitch consumed by SP-Client, apply the rollout and rollback rules below as well. It supplements `review-contract.md`; it does not replace repository instructions or feature-specific routed context.
 
 ## Interpret the checklist with evidence
 
@@ -24,15 +24,16 @@ testing, and graduation cleanup. This profile adds the SP-Client-specific requir
 - Enumerate every changed runtime path, then follow imported helpers and callees transitively from each reachable entry point to the changed behavior. A gate inside a helper counts when it guards the behavior added by the PR and the fallback state remains equivalent to the pre-change implementation; do not stop at the caller or infer protection from an unrelated nearby check.
 - Build a two-state truth table for changed predicates: compare KS activated or Flight disabled with the pre-change predicate across every legacy case, then identify only the cases added when KS is not activated or Flight is enabled. Reaching a changed pure helper in fallback state is valid when its fallback result is identical and it performs no new side effects, throws, or new-path-only dependency reads.
 - Identify the rollback strategy and whether KS, flight/Feature, experiment, or an existing gate is appropriate.
-- For SP-Client KS code, use `_SPKillSwitch`, a lowercase unique GUID, and the comment form `/* 'MM/DD/YYYY', 'alias - Description' */`; apply the reference's call-time evaluation requirement. Read the exact current source before reporting a mismatch; for example, `08/11/2026` already satisfies `MM/DD/YYYY`. A harmless comment-format deviation is at most a `Minor` finding prefixed `Nit:`. Raise `Important` only with concrete evidence that malformed metadata breaks required tooling, makes the KS operationally ambiguous, or otherwise creates a credible merge risk.
+- For any KS that gates SP-Client behavior, including an implementation in `odsp-common`, use `_SPKillSwitch` and a lowercase unique GUID; apply the reference's call-time evaluation requirement. An uppercase or mixed-case KS GUID is an `Important` finding because a KS activation lookup will not match the identifier used by product code, so activating the KS does not activate its fallback behavior. Debug Link may surface this as a debug-mode error, but that is only a symptom of the production rollout-control failure. The KS method comment convention (`/* 'MM/DD/YYYY', 'alias - Description' */`), including its date, alias, and description, is documentation only: `08/11/2026` already satisfies `MM/DD/YYYY`. A harmless comment-format deviation is at most a `Minor` finding prefixed `Nit:` and must not block the PR.
 - For flights, use the established ID/name and attribution comment convention. For performance comparisons, require an experiment and exposure logging; a flight alone is not valid measurement.
 - Flag composite KS logic when one KS over a flight provides a clearer emergency control.
 - Check whether an old KS should graduate. A graduation change needs evidence that the KS is inactive in all rings (for example Merlin `Test-GridKillSwitch` output), and must remove obsolete fallback complexity safely.
 
 ## Tests and review evidence
 
-- Unit tests cover changed behavior, edge/error paths, null/undefined inputs, and both gate states when gated.
+- Unit tests cover changed behavior, edge/error paths, and null/undefined inputs. Require KS-activated or Flight-off coverage only when this PR changes fallback/disabled behavior; do not report an absent pre-existing state test as a defect in the current PR.
 - Tests assert product behavior rather than mock implementation details.
+- For test-only changes, assess test correctness, determinism, isolation, cleanup, and assertion quality. Do not apply production privacy/security, telemetry, rollout, accessibility, localization, or performance checks to test diagnostics such as test labels or tenant URLs, unless the test code affects a production sink or exposes credentials/secrets.
 - Complex features add or update durable Markdown documentation when it materially helps future maintenance and AI-assisted follow-ups.
 
 ## Delegation to shared references
@@ -86,7 +87,7 @@ For every `sp-client/` review, record these IDs in `preReview.profileChecks`. Ea
 - `spClientLargeCollections`
 - `spClientAutomatedTests`
 
-`spClientRolloutTrace` is additionally represented by the structured `preReview.rolloutProtection` object. For runtime changes it must contain the exact runtime path set, PR-description/plan evidence, gate identifiers and type, entry-point and gate-check citations, new/fallback path citations, direction, disabled-state test evidence, and one path-specific coverage record per runtime changed file. Missing description, unprotected paths, incorrect direction, or absent fallback tests require a finding and cannot be approved.
+`spClientRolloutTrace` is additionally represented by the structured `preReview.rolloutProtection` object. For runtime changes it must contain the exact runtime path set, PR-description/plan evidence, gate identifiers and type, entry-point and gate-check citations, new/fallback path citations, direction, a `fallbackBehaviorChanged` declaration, and one path-specific coverage record per runtime changed file. Require `disabledStateTestEvidence` only when `fallbackBehaviorChanged` is true; a missing pre-existing state test otherwise requires no finding.
 
 ## Blocking examples
 
