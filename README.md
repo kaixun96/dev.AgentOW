@@ -241,6 +241,7 @@ Three-layer harness:
 Operational notes:
 - MCP tool timeout is not automatically a Rush failure. Long `rush build -t @msinternal/sp-pages` / `rush start` runs can outlive the MCP request; agents should track the underlying process and read Rush summaries before deciding.
 - Local `rush start` debug links are the preferred fast path for evaluator screenshots. PR SP-Client Validation CDN query is the fallback when localhost validation fails or the user explicitly asks for PR CDN screenshots.
+- For a Windows-hosted owner/Twinbot, see [Personal-account evaluator browser](docs/personal-evaluator-browser.md) to configure a compliant persistent Playwright profile. Twin-mediated runs prefer this route when reachable; standalone Codespaces use FIC.
 - agentOW is a routing/execution layer. Feature-specific rules and execution guards should live in the routed context docs (for example dotfiles knowledge centers), not in agentOW prompts.
 - Each run resolves at most one external context library using `docs/context-maintenance.md`. The library manifest owns routes, update targets, and `auto-commit` / `patch-only` / `disabled` policy.
 - Context maintenance never adds a user gate. Plan intent is recorded during the run; the committed diff and evaluator/reviewer results produce an as-built revision before shipping. Read-only or stale libraries leave a patch/conflict artifact without blocking the product PR.
