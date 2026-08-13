@@ -117,6 +117,11 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    - Use the same FIC Playwright spec with PR CDN when `finalValidationMode == "pr-cdn-fic"` is explicitly requested, or when local debug validation already failed for a proven route-specific reason such as localhost cert/assembly-load failure or a missing local dev server.
    - Prefer and repair the local route before switching. A transient FIC-auth, tenant, fixture, selector, or test-spec failure is shared with the CDN route and does not justify a source switch. Diagnose the failed rung and retry with one variable changed. Switch only when evidence proves the local bundle route itself cannot work; record that evidence in `reasonForSkipOrFail`.
    - If the surface needs a real tenant with pre-existing content (Viva Amplify campaigns, published news posts, analytics telemetry), prefer the PR CDN query on a dogfood tenant from the start. A per-run pool tenant has no such content, and building it inside the capture spec adds several minutes of setup that can fail before a single pixel is captured.
+   - Keep authentication and changed-code injection separate. FIC or a personal profile authenticates the browser; it does not select the changed build. Choose the injection route from the changed app:
+     - **SP-Client:** local or PR `loader` + `debugManifestsFile`. Never use `srr`.
+     - **ODSP-Next:** PR `srr` cookie.
+     - **OnePlayer:** `OnePlayerPRBuild=odsp-web-pr_<id>.<build>`.
+   - Record the selected app and injection route in the evaluator artifact. A route mismatch is `failureKind: "evaluator-spec"` with blocker `changed-app-injection-route-mismatch`.
 2. Get the debug link/query:
    - If `ow-debuglink` is unavailable, returns no `fullTestUrl`, or the dev server is not ready, return `FAIL` with blocker `visual-validation-debug-link-missing`.
    - **Re-verify the bundle is being served immediately before every capture attempt, not just once at the start.** A dev server can die mid-session — killed with a stray process cleanup, evicted, or crashed — and every subsequent attempt then loads a page with no product code on it. Fetch the loader or manifests URL and require a 200. If it fails, restart the server and say so; do not proceed.
@@ -166,11 +171,15 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `before-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 BEFORE captured — <path>`.
 7. Run the same selected screenshot engine against the changed build → AFTER. Keep the exact same flags, setup, trigger, viewport, and fixture. Verify discriminator again.
+   - Prove the affected bundle loaded, not merely that some URL contains the PR build number. For SP-Client, require debug consent, `prBuildCount > 0`, and a resource entry for the affected assembly/chunk. For ODSP-Next and OnePlayer, require a resource entry for the affected app bundle from the selected PR route. Record the matched resource URL with hashes/query secrets removed.
+   - If the expected rendered component changes (for example Link → stable Button), assert a branch-specific DOM/computed-style discriminator. If it remains on the BEFORE component, return `FAIL` even when the screenshots are pixel-identical.
 8. Capture the primary AFTER screenshot with the same full-page/viewport method and dimensions → save to `<sessionDir>/evaluation/iter<N>/after-<component>-full.png`.
    - An optional `<sessionDir>/evaluation/iter<N>/after-<component>-crop.png` may accompany it, but must not replace it.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
    - Append progress: `[HH:MM:SS] 📸 AFTER captured — <path>`.
 9. Run `file -- "<beforePath>" "<afterPath>"` with the shell tool and quote its PNG dimension output in `evaluator-report.md`. Verify both primary PNG dimensions equal the configured viewport dimensions and visually inspect both images for surrounding page context. If either primary image is component-width, clipped, missing page context, or otherwise not the full viewport, return `failureKind: "evaluator-spec"` with blocker `primary-screenshot-not-full-viewport`.
+
+   If BEFORE and AFTER are pixel-identical or all recorded component geometry is identical for a visible component migration, stop and re-prove the source and branch discriminator before judging appearance. Exact equality is a source-verification alarm, not a PASS condition. If affected-resource and changed-branch proof is absent, return `failureKind: "evaluator-spec"` with blocker `after-build-not-proven`.
 
    **Then look at the changed component itself and judge whether it rendered.** Correct dimensions and page context do not mean the surface is usable evidence: a component whose styles have not applied still fills the viewport and still sits in its page. Signs it did not render: no bounded surface or chrome of its own, text overflowing its container or overlapping page content behind it, no background where the design has one, controls stacked in raw document order. If the changed component looks unstyled or half-painted, return `failureKind: "evaluator-spec"` with blocker `component-rendered-unstyled` — never attach it. Passing an assertion on the component's `data-automation-id` proves the element exists in the DOM; it says nothing about whether it was painted.
 

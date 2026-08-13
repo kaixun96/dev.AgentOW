@@ -105,7 +105,19 @@ For any visible UI change, Playwright screenshots are mandatory. The evaluator m
 
 For Twin-mediated runs, the preferred screenshot engine is the owner's compliant personal-account Playwright persistent profile when the dispatcher provides a reachable personal-evaluator script or validated evidence. It compares target/current with the changed build under identical flights. If that route is not reachable from the current host (the normal Codespace case), unavailable, or requires owner interaction, fall back immediately to the repository FIC Playwright/Heft harness: local `rush start` first, then PR CDN for a proven route-specific local failure. Host-local route unavailability is not a product failure. Playwright MCP/browser tools remain unsupported. Do not claim visual verification passed without evaluator-produced screenshot paths.
 
+Authentication and changed-code injection are separate dimensions. FIC or a personal profile proves identity only; it does not prove the PR code loaded. Select and prove the injection route for the changed app:
+
+| Changed app | Required AFTER injection | Required proof |
+|---|---|---|
+| SP-Client | local or PR `loader` + `debugManifestsFile` | accept debug consent; `prBuildCount > 0`; affected PR bundle resource loaded |
+| ODSP-Next | PR `srr` cookie | affected ODSP-Next PR resource loaded |
+| OnePlayer | `OnePlayerPRBuild=odsp-web-pr_<id>.<build>` | affected OnePlayer PR resource loaded |
+
+Never use `srr` to validate an SP-Client surface. Loading unrelated PR resources is not enough: the proof must name a bundle that owns or imports the changed surface. A manual or external screenshot run may add evidence, but it cannot turn an evaluator `FAIL` into `PASS` unless it satisfies the same artifact schema and hard gates and the evaluator is rerun against that evidence.
+
 Primary PR screenshots must show the full browser page/viewport, including surrounding page context. Drawer/Dialog/component crops are supplemental only and must not be stored in `visualValidation.beforePath` / `afterPath` or embedded as the primary BEFORE/AFTER table. Before accepting evaluator PASS, the main session must independently view both primary images and compare their actual PNG dimensions with the recorded viewport.
+
+Pixel-identical or geometry-identical BEFORE/AFTER is never proof that a UI migration is safe. Treat exact equality as a source-verification alarm: re-check the affected resource, changed-branch DOM discriminator, and expected component semantics. If the PR should change the rendered component but the discriminator is unchanged, return `FAIL` even when both images look acceptable.
 
 Routed feature context is a hard execution contract, not background reading. If a context document requires a table, disposition, crop, or measurement, planner/implementation/evaluator/reviewer artifacts must contain that evidence. Missing evidence blocks PASS.
 
