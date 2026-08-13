@@ -28,7 +28,8 @@ A `must-split` review still performs a preliminary risk scan so known defects ar
 1. add an Important `reviewability` finding;
 2. state that findings are preliminary and non-exhaustive;
 3. propose at least two distinct, evidenced, independently reviewable split boundaries;
-4. never APPROVE or imply that no additional defects remain.
+4. continue reviewing the available change and report any independent Critical or Important defects;
+5. treat `reviewability` as advisory for verdict purposes: size, file count, or independent-unit count alone must not produce `REQUEST_CHANGES` or stop the review.
 
 ## Required two-pass method
 
@@ -153,10 +154,14 @@ If a concern is found on lines outside the current PR diff hunk (for example, un
 
 Non-diff concerns must not by themselves drive a `REQUEST_CHANGES` verdict for the current PR.
 
+An Important `reviewability` finding asks the author to split an oversized or multi-surface PR, but is advisory for verdict purposes. It does not by itself produce `REQUEST_CHANGES`; only independent Critical or Important findings outside the `reviewability` category do.
+
+The default remains: `REQUEST_CHANGES`: one or more Critical or Important findings. The advisory `reviewability` exception above applies only to PR size, file count, behavior-unit count, and high-risk-domain count.
+
 Verdicts are deterministic:
 
-- `REQUEST_CHANGES`: one or more Critical or Important findings.
-- `COMMENT`: Minor findings only.
+- `REQUEST_CHANGES`: one or more Critical findings, or one or more Important findings outside `reviewability`.
+- `COMMENT`: Minor findings only, or advisory Important `reviewability` findings.
 - `APPROVE`: zero findings and complete, current-diff coverage.
 
 Draft PR status, AUTO mode, and retry limits do not turn unresolved blocking findings into approval.
@@ -314,6 +319,8 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
 ```
 
 Every behavior unit path must be Git-changed, and their union must cover every changed file. Every non-zero `generatedOrMechanicalLines` claim requires `mechanicalBreakdown` entries with a changed path, exact line count, specific rationale, and cited generation/mechanical evidence. Entry lines must sum exactly to the claim, and the aggregate claimed for each path cannot exceed that path's Git numstat churn. A structural large-change exception requires mechanical evidence for every changed path. A `must-split` report requires at least two distinct `splitBoundaries`, each with a specific name, changed paths, rationale, and evidence. Their union must cover every changed file; multi-file changes cannot assign a path to multiple splits. Its summary must explicitly say the scan is preliminary or non-exhaustive.
+
+`must-split` is a scope warning, not a review rejection. It applies equally to churn thresholds, file-count thresholds, independent behavior-unit count, and high-risk-domain count. The reviewer continues the available risk scan and leaves the Important split recommendation; only separate product defects can block the PR.
 
 The complete set of dimension keys is enforced by `tools/validate-review-report.mjs`.
 

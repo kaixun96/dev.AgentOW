@@ -24,7 +24,9 @@ When applicable, test these first because they have high regression or rollback 
 
 1. Evaluate a Flight/KS before any new-path-only helper, dependency read, allocation, side effect,
   or throwing predicate. A pure helper may execute in both states when its fallback result is
-  behaviorally equivalent to the pre-change expression.
+  behaviorally equivalent to the pre-change expression. As a narrow exception, a pure Fluent V9
+  factory that must be declared at module scope, such as `bundleIcon` or `makeStyles`, may execute
+  before the gate when its generated component or hook is first used only behind the Flight/KS.
 2. Evaluate rollout state at call time unless initialization order proves a module/global/static
    snapshot is safe.
 3. With Flight off or KS active, preserve legacy inputs, mutations, fallback, and error behavior.
@@ -61,6 +63,11 @@ existing Flight, ECS, experiment, or KS.
   the KS-active/Flight-off branch returns exactly the pre-change result for the same inputs and
   performs no new side effects or failure-prone work. Do not require the caller to duplicate the
   old inline expression merely to avoid reaching the helper.
+- Do not report module-scope `bundleIcon`, `makeStyles`, or a comparable pure Fluent V9 factory as
+  unprotected new-path execution solely because it runs before the gate. Verify that the generated
+  component, hook, class, or other result is first consumed only in the Flight-enabled/KS-inactive
+  path. If the fallback path consumes that new result, or the factory performs observable work,
+  the result is unprotected and remains a rollout defect.
 - Compare the disabled/activated branch against the previous implementation. Verify inputs,
   state writes, fallback values, telemetry interpretation, and thrown-versus-swallowed errors.
 - Avoid module/global/static snapshots of gate state unless the chunk is guaranteed to execute
