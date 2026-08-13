@@ -401,8 +401,8 @@ hardOversizeBlocked.findings.push({
   evidence: ["artifact:git-numstat"],
 });
 hardOversizeBlocked.counts.important = 1;
-hardOversizeBlocked.verdict = "REQUEST_CHANGES";
-assert.equal(validate(hardOversizeBlocked).status, 0, "oversized preliminary scan should pass only with a split blocker");
+hardOversizeBlocked.verdict = "COMMENT";
+assert.equal(validate(hardOversizeBlocked).status, 0, "oversized preliminary scan should report an advisory split recommendation without rejecting the PR");
 fs.writeFileSync(diffNumstatPath, "10\t2\tsrc/example.ts\n");
 
 const mechanicalHardCeilingBypass = makeReport();

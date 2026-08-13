@@ -895,7 +895,7 @@ function validate(report, options) {
             (finding.severity === "Critical" || finding.severity === "Important"),
         ))
     ) {
-      errors.push("must-split reviews require a blocking reviewability finding and non-exhaustive claim");
+      errors.push("must-split reviews require an Important reviewability finding and non-exhaustive claim");
     }
     if (reviewability.status === "reviewable" && reviewability.completenessClaim !== "exhaustive") {
       errors.push("reviewable changes require an exhaustive completeness claim");
@@ -1002,10 +1002,22 @@ function validate(report, options) {
     errors.push("counts do not match findings");
   }
 
+  const hasBlockingImportantFinding = (report.findings ?? []).some(
+    (finding) =>
+      isObject(finding) &&
+      finding.severity === "Important" &&
+      finding.category !== "reviewability",
+  );
+  const hasAdvisoryReviewabilityFinding = (report.findings ?? []).some(
+    (finding) =>
+      isObject(finding) &&
+      finding.severity === "Important" &&
+      finding.category === "reviewability",
+  );
   const expectedVerdict =
-    actualCounts.critical > 0 || actualCounts.important > 0
+    actualCounts.critical > 0 || hasBlockingImportantFinding
       ? "REQUEST_CHANGES"
-      : actualCounts.minor > 0
+      : actualCounts.minor > 0 || hasAdvisoryReviewabilityFinding
         ? "COMMENT"
         : "APPROVE";
   if (report.verdict !== expectedVerdict) errors.push(`verdict must be ${expectedVerdict} for the reported findings`);

@@ -23,6 +23,7 @@ testing, and graduation cleanup. This profile adds the SP-Client-specific requir
 - Read the PR description first. It must identify the flight/KS, state whether it is a Flight, KS, or KS+Flight, explain the enabled/disabled direction, and name the fallback. If reviewing before PR creation, require this information in the plan and ensure the generated PR description puts it on the first line.
 - Enumerate every changed runtime path, then follow imported helpers and callees transitively from each reachable entry point to the changed behavior. A gate inside a helper counts when it guards the behavior added by the PR and the fallback state remains equivalent to the pre-change implementation; do not stop at the caller or infer protection from an unrelated nearby check.
 - Build a two-state truth table for changed predicates: compare KS activated or Flight disabled with the pre-change predicate across every legacy case, then identify only the cases added when KS is not activated or Flight is enabled. Reaching a changed pure helper in fallback state is valid when its fallback result is identical and it performs no new side effects, throws, or new-path-only dependency reads.
+- A pure Fluent V9 factory that must live at module scope, such as `bundleIcon` or `makeStyles`, may run before the gate. Its generated component, hook, class, or other result must first be used only in the Flight-enabled/KS-inactive path; fallback use of that new result is unprotected and is a rollout defect.
 - Identify the rollback strategy and whether KS, flight/Feature, experiment, or an existing gate is appropriate.
 - For any KS that gates SP-Client behavior, including an implementation in `odsp-common`, use `_SPKillSwitch` and a lowercase unique GUID; apply the reference's call-time evaluation requirement. An uppercase or mixed-case KS GUID is an `Important` finding because a KS activation lookup will not match the identifier used by product code, so activating the KS does not activate its fallback behavior. Debug Link may surface this as a debug-mode error, but that is only a symptom of the production rollout-control failure. The KS method comment convention (`/* 'MM/DD/YYYY', 'alias - Description' */`), including its date, alias, and description, is documentation only: `08/11/2026` already satisfies `MM/DD/YYYY`. A harmless comment-format deviation is at most a `Minor` finding prefixed `Nit:` and must not block the PR.
 - For flights, use the established ID/name and attribution comment convention. For performance comparisons, require an experiment and exposure logging; a flight alone is not valid measurement.
@@ -47,6 +48,9 @@ Use the shared review references as the normative source for cross-cutting quali
   post-freeze string policy.
 - `skills/ow-review/references/sharepoint-design-system-and-ux-components.md` for design-system
   component choice, semantic structure, accessibility, styling APIs, and typography guidance.
+- `skills/ow-review/references/sharepoint-theme-and-detheme.md` for surface classification,
+  SharePoint versus customer theme treatment, Detheme provider flow, screenshot validation,
+  and exact remediation through `skills/detheme/SKILL.md`.
 - `skills/ow-review/references/shared-utility-reuse.md` for shared hook/utility reuse checks.
 
 ## TypeScript and maintainability
@@ -67,8 +71,10 @@ trust-boundary checks.
 - Typography checks still apply: when semantic text styling is relevant, verify the chosen
   preset path (for example `typographyStyles`) through
   `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`.
-- When validating local overrides, trace the established SharePoint theme/Detheme provider flow
-  and keep only evidence-backed exceptions.
+- Apply `skills/ow-review/references/sharepoint-theme-and-detheme.md` to theme-affecting UI
+  changes. Classify the surface, trace the established provider/token flow, validate the
+  rendered treatment with screenshots, preserve the SharePoint theme/Detheme provider flow, and direct violations to the applicable fix in
+  `skills/detheme/SKILL.md`.
 - Keep one explicit check for reviewer routing: when introducing new UI structure, confirm a
   suitable Fluent V9/SPDS primitive was considered before custom semantic markup.
 
