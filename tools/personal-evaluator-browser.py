@@ -390,6 +390,18 @@ def wait_for_drawer(page: Page) -> Locator:
     return drawer
 
 
+def dismiss_onboarding_if_visible(page: Page) -> bool:
+    dismiss = page.get_by_role("button", name="Dismiss").first
+    try:
+        if dismiss.is_visible(timeout=1_000):
+            dismiss.click()
+            dismiss.wait_for(state="hidden", timeout=10_000)
+            return True
+    except PlaywrightTimeoutError:
+        pass
+    return False
+
+
 def collect_geometry(drawer: Locator) -> dict[str, Any]:
     return drawer.evaluate(
         """
@@ -462,13 +474,11 @@ def capture_state(
         if "net::ERR_ABORTED" not in str(error):
             raise
     page.wait_for_selector(AUTHENTICATED_SELECTOR, timeout=60_000)
-    onboarding_dismiss = page.get_by_role("button", name="Dismiss").first
-    try:
-        if onboarding_dismiss.is_visible(timeout=2_000):
-            onboarding_dismiss.click()
-    except PlaywrightTimeoutError:
-        pass
+    dismiss_onboarding_if_visible(page)
     drawer = wait_for_drawer(page)
+    if dismiss_onboarding_if_visible(page):
+        drawer.wait_for(state="visible", timeout=30_000)
+        page.wait_for_timeout(500)
     page.screenshot(path=output_dir / f"{label}-full.png", full_page=False)
     drawer.screenshot(path=output_dir / f"{label}-drawer.png")
     geometry = collect_geometry(drawer)

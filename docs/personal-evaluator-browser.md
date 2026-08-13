@@ -196,6 +196,7 @@ python $Evaluator bootstrap
 | Works while RDP connected, screenshots fail after disconnect | OS-level screenshot path was used | Use Playwright `page.screenshot()`, not Snipping Tool/ShareX |
 | `profile is already in use` | Another evaluator/bootstrap owns the profile | Wait or close only the dedicated evaluator browser |
 | `ERR_ABORTED` after setting `srr` | ODSP-Next replaced the navigation | Treat as expected and wait for the app-shell discriminator |
+| BEFORE/AFTER captures show different Explore SharePoint modal stacking | Onboarding appeared after the app shell/target | Recheck and dismiss onboarding after the target settles before screenshotting |
 | Codespace cannot find profile | Expected host boundary | Fall back to FIC; do not copy the profile |
 
 ## Proven reference
