@@ -31,6 +31,7 @@ The dispatcher gives you:
 - `cycle` — iteration number
 - `sessionDir` — `.aero/<session>` folder
 - `reportFile` — shared NDJSON report file
+- `reportWriterCommand` — locked durable append command. Never append `reportFile` directly.
 - `progressLog` — user-visible progress log
 - `artifactPath` — `evaluation/iter<N>/evaluator-report.md`
 - `debugUrl` — debug URL/query from the implementer, if already known
@@ -283,7 +284,10 @@ A criterion is PASS only with concrete evidence. "Looks right" is not evidence. 
 
 ## Required artifact + NDJSON
 
-Write `artifactPath` with the full report. Append exactly one JSON line to `reportFile`:
+Write `artifactPath` with the full report. Write exactly one JSON object to
+`<artifactPath>.record.json`, then invoke
+`reportWriterCommand --record-file "<artifactPath>.record.json"`. Never append `reportFile`
+directly:
 
 ```json
 {"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","contextGuardStatus":"complete|not-applicable|failure","layoutGeometry":{"required":true,"selector":"<repeated item selector>","axis":"vertical|horizontal","beforeRects":[{"top":0,"right":0,"bottom":0,"left":0}],"afterRects":[{"top":0,"right":0,"bottom":0,"left":0}],"beforeGap":0,"afterGap":0,"verdict":"PASS|FAIL"},"visualValidation":{"status":"captured|skipped|failed","source":"personal-persistent-profile|pr-cdn-fic|local-rush-start","captureMethod":"page","viewport":{"width":1440,"height":1000},"beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<required for repeated/dense UI; otherwise optional>","afterCropPath":"<required for repeated/dense UI; otherwise optional>","dimensionEvidence":"<verbatim file output>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}

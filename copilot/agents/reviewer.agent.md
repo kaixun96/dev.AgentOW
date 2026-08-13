@@ -41,10 +41,12 @@ Treat review as collaborative defect prevention, not fault-finding. Be direct an
 ## Input
 
 The dispatcher gives you:
-- `branch`, `sessionDir`, `reportFile`, and `progressLog`;
+- `branch`, `sessionDir`, `reportFile`, `reportWriterCommand`, and `progressLog`;
 - `artifactPath` (`review.md`) and `artifactJsonPath` (`review.json`);
 - `contextDocuments`;
-- the actual `planPath`, `implementationEvidencePath`, and `evaluationArtifactPaths` extracted from the latest planner/evaluator NDJSON records; never infer conventional artifact paths;
+- the actual `planPath`, `implementationEvidencePaths` (the deduplicated main + recovery journal
+  union), and `evaluationArtifactPaths` extracted from the latest planner/evaluator records; never
+  infer conventional artifact paths;
 - `reviewLedgerPath`, the branch's record of previously accepted findings; it may not exist yet;
 - `changedFiles` as a hint only; Git is authoritative.
 
@@ -254,7 +256,9 @@ Before returning:
    - `APPROVE`: `[HH:MM:SS] ✅ Review APPROVE`
    - `COMMENT`: `[HH:MM:SS] ✅ Review COMMENT — <summary>`
    - `REQUEST_CHANGES`: `[HH:MM:SS] ⚠️ Review REQUEST_CHANGES — <criticalCount> critical, <importantCount> important`
-3. Append exactly one JSON line to `reportFile`:
+3. Write exactly one JSON object to `<artifactJsonPath>.record.json`, then invoke
+   `reportWriterCommand --record-file "<artifactJsonPath>.record.json"`. Never append
+   `reportFile` directly:
 
 ```json
 {"sender":"reviewer","timestamp":"<ISO>","status":"success|failure","verdict":"APPROVE|REQUEST_CHANGES|COMMENT","artifactPath":"<artifactPath>","artifactJsonPath":"<artifactJsonPath>","reviewedHead":"<SHA>","diffDigest":"<SHA256>","criticalCount":0,"importantCount":0,"minorCount":0,"carriedCount":0,"blockers":[{"description":"<Critical or Important issue>","suggestedFix":"<file:line + change>"}]}

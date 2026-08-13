@@ -1,193 +1,165 @@
 #!/usr/bin/env node
-// progress-watcher.mjs
-//
-// Tail-watch a session's evaluation/ + report.json and append human-readable
-// log lines to progress.log whenever new files appear or new NDJSON lines are
-// written. This is the BACKSTOP for orchestrator forgetting to echo progress.
-//
-// Usage:
-//   node tools/progress-watcher.mjs <sessionDir>
-//
-// Example:
-//   node tools/progress-watcher.mjs /workspaces/odsp-web/.aero/redo10-bookmark-panel
-//
-// Designed to run as a background process for the lifetime of a session.
-// Idempotent: safe to restart; remembers last-seen NDJSON line + last-seen file mtimes
-// via a sidecar state file (.progress-watcher.state.json).
 
-import * as fs from 'fs';
-import { watch } from 'fs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { reconcileSession, updateRunState } from './run-state.mjs';
 
-const sessionDir = process.argv[2];
+const sessionDir = process.argv[2] ? path.resolve(process.argv[2]) : undefined;
 if (!sessionDir || !fs.existsSync(sessionDir)) {
   console.error('usage: node progress-watcher.mjs <sessionDir>');
   process.exit(2);
 }
 
-const progressLog = `${sessionDir}/progress.log`;
-const reportJson = `${sessionDir}/report.json`;
-const evaluationDir = `${sessionDir}/evaluation`;
-const stateFile = `${sessionDir}/.progress-watcher.state.json`;
-
-const state = fs.existsSync(stateFile)
-  ? JSON.parse(fs.readFileSync(stateFile, 'utf8'))
-  : { ndjsonOffset: 0, seenFiles: {} };
-
-// --- Stall / heartbeat detection -------------------------------------------
-// Surfaces pipeline deadlocks (e.g. a teammate dropping its build_done so the
-// orchestrator waits forever). Heartbeat keeps the log ticking during long
-// no-output stretches so a frozen log is distinguishable from a real build;
-// past STALL_MS it escalates to a loud warning naming the likely cause.
+const progressLog = path.join(sessionDir, 'progress.log');
+const reportJson = path.join(sessionDir, 'report.json');
+const recoveryJson = path.join(sessionDir, 'report-recovery.ndjson');
+const stateFile = path.join(sessionDir, '.progress-watcher.state.json');
+const state = readState();
 const HEARTBEAT_MS = Number(process.env.OW_WATCHER_HEARTBEAT_MS) || 8 * 60 * 1000;
 const STALL_MS = Number(process.env.OW_WATCHER_STALL_MS) || 24 * 60 * 1000;
-let lastProgressMs = Date.now(); // last time an agent wrote real output (report grew / new eval file)
+let lastProgressMs = Date.now();
 let lastHeartbeatMs = 0;
 
+function readState() {
+  try {
+    const value = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    return {
+      ...value,
+      ndjsonOffsets: value.ndjsonOffsets ?? { report: value.ndjsonOffset ?? 0, recovery: 0 },
+      pendingNdjson: {
+        report:
+          typeof value.pendingNdjson === 'string'
+            ? value.pendingNdjson
+            : value.pendingNdjson?.report ?? '',
+        recovery: value.pendingNdjson?.recovery ?? ''
+      }
+    };
+  } catch {
+    return { ndjsonOffsets: { report: 0, recovery: 0 }, pendingNdjson: { report: '', recovery: '' } };
+  }
+}
+
 function saveState() {
-  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+  const tempPath = `${stateFile}.${process.pid}.tmp`;
+  fs.writeFileSync(tempPath, `${JSON.stringify(state, null, 2)}\n`);
+  fs.renameSync(tempPath, stateFile);
 }
 
-function ts() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+function clock() {
+  return new Date().toTimeString().slice(0, 8);
 }
 
-function log(msg) {
-  const line = `[${ts()}] ${msg}\n`;
+function log(message) {
+  const line = `[${clock()}] ${message}\n`;
   fs.appendFileSync(progressLog, line);
-  process.stderr.write(line); // also stderr for debugging
+  process.stderr.write(line);
 }
 
-// --- 1. NDJSON tail: read new lines from report.json, translate to human log ---
+function translate(record) {
+  if (record.sender === 'planner' || record.sender === 'ow-planner') {
+    log(`📋 Planner result (${record.mode ?? 'full'}): ${record.status}`);
+  } else if (record.sender === 'evaluator') {
+    log(`🔍 Evaluator cycle ${record.cycle ?? '?'}: ${record.verdict ?? record.status ?? '?'}`);
+  } else if (record.sender === 'reviewer') {
+    log(`📝 Review: ${record.verdict ?? record.status ?? '?'}`);
+  } else if (record.phase === 'code_done') {
+    log(`🔨 code_done cycle ${record.cycle}: ${record.commits?.[0]?.slice(0, 12) ?? '?'} on ${record.branch ?? '?'}`);
+  } else if (record.phase === 'build_done') {
+    const icon = record.buildStatus === 'success' ? '✅' : '❌';
+    log(`${icon} build_done cycle ${record.cycle}: ${record.buildStatus ?? '?'}`);
+  } else if (record.agent === 'ow-evaluator' && record.mode === 'code_inspection') {
+    log(`🔍 code_inspection cycle ${record.cycle}: ${record.verdict ?? '?'}`);
+  } else if (record.agent === 'ow-review-agent') {
+    log(`📝 Review: ${record.verdict ?? '?'} (${record.criticalCount ?? 0} critical)`);
+  }
+}
 
-function tailReportJson() {
-  if (!fs.existsSync(reportJson)) return;
-  const stat = fs.statSync(reportJson);
-  if (stat.size <= state.ndjsonOffset) return;
-  lastProgressMs = Date.now(); // report.json grew → an agent made progress
+function tailReportFile(filePath, key) {
+  if (!fs.existsSync(filePath)) return;
+  const stat = fs.statSync(filePath);
+  if (stat.size < state.ndjsonOffsets[key]) {
+    state.ndjsonOffsets[key] = 0;
+    state.pendingNdjson[key] = '';
+  }
+  if (stat.size === state.ndjsonOffsets[key]) return;
 
-  const fd = fs.openSync(reportJson, 'r');
-  const buf = Buffer.alloc(stat.size - state.ndjsonOffset);
-  fs.readSync(fd, buf, 0, buf.length, state.ndjsonOffset);
-  fs.closeSync(fd);
-  state.ndjsonOffset = stat.size;
+  const descriptor = fs.openSync(filePath, 'r');
+  const buffer = Buffer.alloc(stat.size - state.ndjsonOffsets[key]);
+  fs.readSync(descriptor, buffer, 0, buffer.length, state.ndjsonOffsets[key]);
+  fs.closeSync(descriptor);
+  state.ndjsonOffsets[key] = stat.size;
 
-  const text = buf.toString('utf8');
-  for (const line of text.split('\n')) {
+  const combined = `${state.pendingNdjson[key] ?? ''}${buffer.toString('utf8')}`;
+  const lines = combined.split('\n');
+  state.pendingNdjson[key] = lines.pop() ?? '';
+  for (const line of lines) {
     if (!line.trim()) continue;
     try {
-      const obj = JSON.parse(line);
-      translateNdjson(obj);
+      translate(JSON.parse(line));
     } catch {
-      // ignore non-JSON
+      log('⚠️ Invalid completed NDJSON line preserved in report.json');
     }
   }
+  lastProgressMs = Date.now();
   saveState();
 }
 
-function translateNdjson(obj) {
-  // planner result
-  if (obj.sender === 'ow-planner') {
-    if (obj.status === 'success') log(`📋 Planner result: success — plan=${obj.planPath?.split('/').pop()}`);
-    else log(`📋 Planner result: ${obj.status}`);
-    return;
-  }
-  // generator code_done
-  if (obj.phase === 'code_done') {
-    log(`🔨 code_done cycle ${obj.cycle}: ${obj.commits?.[0]?.slice(0,12) ?? '?'} on ${obj.branch}`);
-    return;
-  }
-  // generator build_done
-  if (obj.phase === 'build_done') {
-    const status = obj.buildStatus === 'success' ? '✅' : '❌';
-    log(`${status} build_done cycle ${obj.cycle}: ${obj.buildStatus}${obj.port ? ` — server :${obj.port}` : ''}`);
-    return;
-  }
-  // evaluator code_inspection
-  if (obj.agent === 'ow-evaluator' && obj.mode === 'code_inspection') {
-    log(`🔍 code_inspection cycle ${obj.cycle}: ${obj.verdict}`);
-    return;
-  }
-  // review
-  if (obj.agent === 'ow-review-agent') {
-    log(`📝 Review: ${obj.verdict ?? '?'} (${obj.criticalCount ?? 0} critical)`);
-    return;
+function tailReports() {
+  tailReportFile(reportJson, 'report');
+  tailReportFile(recoveryJson, 'recovery');
+}
+
+function reconcile() {
+  const result = reconcileSession(sessionDir);
+  if (result.newReportRecords > 0 || result.newProgressRecords > 0) lastProgressMs = Date.now();
+  if (result.state.status === 'completed') {
+    log('🤖 progress-watcher finished after durable completion');
+    process.exit(0);
   }
 }
 
-// --- 2. evaluation/ file watch: new PNG / JSON triggers a log line ---
-
-const interesting = /(before|after|composite|diff).*\.png$|^(rule|vision)-findings\.json$|^reflection\.md$/;
-
-function scanEvaluation() {
-  if (!fs.existsSync(evaluationDir)) return;
-  for (const iter of fs.readdirSync(evaluationDir)) {
-    const iterDir = `${evaluationDir}/${iter}`;
-    if (!fs.statSync(iterDir).isDirectory()) continue;
-    for (const f of fs.readdirSync(iterDir)) {
-      if (!interesting.test(f)) continue;
-      const full = `${iterDir}/${f}`;
-      const m = fs.statSync(full).mtimeMs;
-      const key = `${iter}/${f}`;
-      if (state.seenFiles[key] === m) continue;
-      state.seenFiles[key] = m;
-      lastProgressMs = Date.now(); // new evaluation artifact → progress
-      if (f.endsWith('.png')) log(`📸 ${iter}: ${f}`);
-      else if (f === 'rule-findings.json') {
-        try {
-          const r = JSON.parse(fs.readFileSync(full, 'utf8'));
-          log(`🔍 ${iter} rule-findings: verdict=${r.verdict ?? '?'} blockers=${r.blockers?.length ?? '?'}`);
-        } catch { log(`🔍 ${iter} rule-findings.json written`); }
-      } else if (f === 'vision-findings.json') {
-        try {
-          const v = JSON.parse(fs.readFileSync(full, 'utf8'));
-          log(`👁  ${iter} vision-findings: verdict=${v.verdict ?? '?'} issues=${v.totalIssueCount ?? '?'}`);
-        } catch { log(`👁  ${iter} vision-findings.json written`); }
-      } else if (f === 'reflection.md') {
-        log(`📝 ${iter} reflection.md written`);
-      }
-    }
+function readRunState() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(sessionDir, 'run-state.json'), 'utf8'));
+  } catch {
+    return undefined;
   }
-  saveState();
 }
-
-// --- 2b. Stall watchdog: no agent output for too long → heartbeat, then warn ---
 
 function checkStall() {
   const gap = Date.now() - lastProgressMs;
-  if (gap < HEARTBEAT_MS) return;
-  // Emit at most once per HEARTBEAT_MS window so we don't spam every 2s.
-  if (Date.now() - lastHeartbeatMs < HEARTBEAT_MS) return;
+  if (gap < HEARTBEAT_MS || Date.now() - lastHeartbeatMs < HEARTBEAT_MS) return;
   lastHeartbeatMs = Date.now();
-  const mins = Math.round(gap / 60000);
+  const minutes = Math.round(gap / 60000);
   if (gap >= STALL_MS) {
-    log(
-      `⚠️ POSSIBLE STALL — no agent output (report.json / evaluation) for ~${mins}m. ` +
-        `A teammate may have dropped a response and deadlocked the orchestrator (classic case: the ` +
-        `generator's dev server reaches [WATCHING] but build_done is never sent). ` +
-        `Check the last line of report.json + re-prompt the awaited teammate via the orchestrator — ` +
-        `do NOT keep waiting indefinitely.`
-    );
+    log(`⚠️ POSSIBLE STALL — no durable artifact or report output for ~${minutes}m; reconcile and resume from run-state.json`);
   } else {
-    log(
-      `🕐 watcher heartbeat — no new agent output for ~${mins}m ` +
-        `(a cold build / dev-server start legitimately takes 20-40m; watcher alive).`
-    );
+    log(`🕐 watcher heartbeat — no new durable output for ~${minutes}m`);
   }
 }
 
-// --- 3. Wire up: poll every 2s (fs.watch is unreliable on some filesystems) ---
+function shutdown(signal) {
+  try {
+    reconcileSession(sessionDir);
+    updateRunState(sessionDir, 'interruption', { reason: `progress-watcher received ${signal}` });
+  } finally {
+    process.exit(0);
+  }
+}
 
-log(`🤖 progress-watcher started (pid ${process.pid}) — backstop for orchestrator log writes`);
-
-scanEvaluation();
-tailReportJson();
+log(`🤖 progress-watcher started (pid ${process.pid}) — disk-backed artifact reconciliation active`);
+tailReports();
+reconcile();
 
 setInterval(() => {
-  tailReportJson();
-  scanEvaluation();
-  checkStall();
+  try {
+    tailReports();
+    reconcile();
+    checkStall();
+  } catch (error) {
+    log(`⚠️ watcher recovery needed — ${error instanceof Error ? error.message : String(error)}`);
+  }
 }, 2000);
 
-process.on('SIGINT', () => { log('🤖 progress-watcher stopped'); process.exit(0); });
-process.on('SIGTERM', () => { log('🤖 progress-watcher stopped'); process.exit(0); });
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

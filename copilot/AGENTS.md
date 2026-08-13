@@ -27,6 +27,12 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 ├── plan.md
 ├── progress.log
 ├── report.json
+├── report-recovery.ndjson
+├── run-state.json
+├── request-history.ndjson
+├── lifecycle.ndjson
+├── artifact-index.json
+├── checkpoints/
 ├── planning/
 │   ├── planner-mode.json
 │   └── planner-report.md
@@ -50,7 +56,19 @@ Keep the Copilot run artifact-compatible with the Claude pipeline wherever pract
 ```
 
 - `progress.log` is mandatory and user-visible. Append a timestamped line before every state transition. Treat it as a first-class product surface, not debug noise.
+- `run-state.json` is the continuity authority. User interruptions and post-completion requirement
+  changes must be recorded before answering; same-task follow-ups reuse the run and increment its
+  revision rather than creating a new `.aero` directory.
+- `artifact-index.json` is content-hashed and reconciled from disk. A screenshot or evaluator
+  artifact that exists on disk must be represented in `report.json` and `progress.log` even if the
+  main conversation was interrupted before the evaluator returned.
+- `report-recovery.ndjson` is the append-only supplement when `report.json` ends in an in-flight
+  partial record. Consumers read the union and deduplicate artifact IDs; reconciliation may
+  backfill artifact records once the report is healthy and never truncates another writer's data.
 - `report.json` is NDJSON. Append one JSON object for planner mode, each planner pass, each implementation cycle, evaluator, reviewer, and final status.
+- All report writers use `run-state.mjs report` with a one-object JSON file. Direct append to
+  `report.json` is forbidden. Readers consume the deduplicated union of the main and recovery
+  journals.
 - `planning/planner-mode.json`, `planning/planner-report.md`, `implementation/iter<N>.md`, `evaluation/iter<N>/evaluator-report.md`, `review.md`, `review.json`, and `final.md` are mandatory unless the run stops before that phase.
 - `context/link.json` is mandatory and records either a resolved context library or `status: "unlinked"`.
 - Context evidence is append-only. Plan intent, actual code, evaluation, review, and later feedback must remain distinguishable.
@@ -68,6 +86,9 @@ Use this exact style. Each line starts with `[HH:MM:SS]`, one emoji, and a short
 [HH:MM:SS] 🤖 Mode: AUTO|INTERACTIVE
 [HH:MM:SS] 🩺 Bootstrap started
 [HH:MM:SS] ✅ Bootstrap ready / ⚠️ Bootstrap restart required / ❌ Bootstrap blocked
+[HH:MM:SS] ⏸️ Run interrupted — <reason>
+[HH:MM:SS] ▶️ Run resumed — revision <N>, phase <phase>
+[HH:MM:SS] 🔁 Requirement revision <N> — checkpoint <path>
 [HH:MM:SS] 🧭 Planner mode: FAST|FULL — <reason>
 [HH:MM:SS] 📋 Planner started (fast|full)
 [HH:MM:SS] ✅ Planner completed (fast|full) — <classification>, <N> files, visual <pattern>

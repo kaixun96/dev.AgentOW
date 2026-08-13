@@ -99,6 +99,13 @@ const checks = [
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
       "agentOW is the routing and execution layer; feature-specific rules and execution guards live in those context docs, not in this skill.",
+      "## Durable conversation and follow-up protocol",
+      "run-state.mjs",
+      "progress-watcher.mjs",
+      "never append `report.json` directly",
+      "reportWriterCommand",
+      "Immediately after the evaluator returns",
+      "A later same-task requirement change reopens this same run",
       "Automatically select `FAST` or `FULL`",
       "planning/planner-mode.json",
       "Missing evidence is `FULL`, not an assumption.",
