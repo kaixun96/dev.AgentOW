@@ -26,7 +26,10 @@ When applicable, test these first because they have high regression or rollback 
   or throwing predicate. A pure helper may execute in both states when its fallback result is
   behaviorally equivalent to the pre-change expression. As a narrow exception, a pure Fluent V9
   factory that must be declared at module scope, such as `bundleIcon` or `makeStyles`, may execute
-  before the gate when its generated component or hook is first used only behind the Flight/KS.
+  before the gate when its generated component or hook is first used only behind the Flight/KS. Do
+  not require reordering of commutative predicates (`A && B` versus `B && A`) when both sides are
+  pure and equivalent; prefer putting Flight/KS first, especially when the other side can throw,
+  allocate, or cause side effects.
 2. Evaluate rollout state at call time unless initialization order proves a module/global/static
    snapshot is safe.
 3. With Flight off or KS active, preserve legacy inputs, mutations, fallback, and error behavior.
@@ -68,11 +71,18 @@ existing Flight, ECS, experiment, or KS.
   component, hook, class, or other result is first consumed only in the Flight-enabled/KS-inactive
   path. If the fallback path consumes that new result, or the factory performs observable work,
   the result is unprotected and remains a rollout defect.
+- React hooks are a structural exception. Do not require wrapping `useEffect`, `useMemo`,
+  `useCallback`, or other hooks inside a Flight/KS conditional, because conditional hook calls
+  violate React rules. Gate checks inside hook callbacks or effect bodies are acceptable when the
+  resulting behavior is correct.
 - Compare the disabled/activated branch against the previous implementation. Verify inputs,
   state writes, fallback values, telemetry interpretation, and thrown-versus-swallowed errors.
 - Avoid module/global/static snapshots of gate state unless the chunk is guaranteed to execute
   after rollout initialization. Preloaded, view-mode, and early page-app code require call-time
   evaluation.
+- Treat a given Flight/KS value as stable within one session unless the code explicitly reloads
+  rollout configuration. Do not raise speculative page-switch drift findings across multiple call
+  sites in the same session.
 - Prefer a consumer/invocation gate when only some callers need protection. Put rollout policy
   inside a shared utility only when that policy is part of the utility's explicit contract.
 - Prove whether an upstream gate protects every changed path and whether another configuration
@@ -80,6 +90,12 @@ existing Flight, ECS, experiment, or KS.
 - Verify both states while rollout is active. The PR evidence should name the gate, direction,
   stage, rollback behavior, and cleanup plan. Remove retired branches and tests only after
   graduation is established.
+- For Flight/KS-graduation-only PRs, prioritize fallback equivalence and cleanup completeness.
+  Verify removed-branch strings, styles, helpers/functions, and constants are also removed when
+  no longer referenced.
+- For KS graduation, require evidence that the KS is inactive in all rings. If the PR description
+  does not include Merlin verification output, leave an explicit reminder for the author to attach
+  it.
 - Treat the choice of Flight versus KS and the lifetime of either as current-policy questions;
   do not infer them from an old gate that happens to exist.
 

@@ -6,20 +6,22 @@ Use this reference when a change adds or modifies a user-facing component, inter
 
 1. Build UI with the highest supported ODSP-Web design-system layer that meets the UX requirement. Do not skip a higher layer merely to obtain a small styling or API preference.
 2. Prefer SPDS from the path-appropriate stable package: use `@msinternal/sharepoint-ui-react-stable-bundle` under `sp-client/`, and use `@msinternal/sharepoint-ui-react-stable` under `odsp-common/`.
-3. If SPDS does not provide the required component, behavior, slot, token, or accessibility capability, the author may use either `@msinternal/sharepoint-ui-react` or Fluent UI React V9.
-4. Choose between `@msinternal/sharepoint-ui-react` and Fluent UI React V9 based on which supported component best meets the UX, semantic, accessibility, and theming requirement.
-5. Build a custom HTML/CSS component only when all three layers cannot meet the requirement.
-6. Prefer the provided component and its documented props, slots, appearance options, typography presets, and design tokens over recreating the control or its styles.
-7. Avoid overriding SPDS component styles as much as possible. When a change adds many style overrides on top of SPDS, ask why they are needed and whether they are explicitly intended by design.
-8. Preserve the intended semantic interaction: use links for navigation, buttons for actions, navigation or list components for navigation or list behavior, and standard message or error components for user feedback.
-9. Use supported styling APIs only. Do not target generated or private Fluent implementation selectors such as `.fui-*`.
-10. Reuse an existing ODSP-Web shared wrapper, helper, or component when it already provides the required behavior; do not create a parallel implementation.
-11. Treat SPDS and Fluent components as semantic, compound APIs, not as styled DOM containers. Use only their documented child components, slots, and wrapper hierarchy. Every child must belong to that component's domain and semantic structure. If content is an adjacent action, status indicator, or page-level control rather than a valid component child, place it outside the compound component and lay it out with a sibling wrapper. Do not insert raw structural HTML such as `li`, `tr`, or `option` inside a Fluent or SPDS component merely because the current implementation happens to render a compatible parent element. For genuine component items, require the corresponding SPDS or Fluent item component instead.
-12. Keep accessibility intact: semantic structure, keyboard behavior, focus handling, high-contrast and theme support, labels, and screen-reader announcements must remain correct.
-13. When custom HTML/CSS is necessary, require a documented gap showing why SPDS, `@msinternal/sharepoint-ui-react`, and Fluent V9 cannot meet the UX requirement.
-14. For custom HTML/CSS, require semantic HTML and explicit keyboard, focus, accessibility, theme, high-contrast, localization, and responsive behavior.
-15. Keep custom components focused and reusable. Do not reproduce a standard design-system control solely for visual customization.
-16. Verify the chosen implementation preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience.
+3. In `sp-client/`, route components to `@msinternal/sharepoint-ui-react-stable-bundle` when they are exported there. Route portal/heavy families such as `Dialog` and `Checkbox` and their documented subcomponents through `@msinternal/sharepoint-ui-react-stable/lib/LazyComponents` when that is the supported stable entry. In `odsp-common/`, use the corresponding non-bundle stable packages and verify the exact export path.
+4. Do not import a component from `@fluentui/react-components` when the required SPDS stable or `LazyComponents` entry provides it. This is an Important design-system finding: the PR bypasses the required production component package. The finding may be waived only with a cited capability gap in both SPDS entries.
+5. If SPDS does not provide the required component, behavior, slot, token, or accessibility capability, the author may use either `@msinternal/sharepoint-ui-react` or Fluent UI React V9, but must record the specific gap and why the chosen fallback is compatible.
+6. Choose between `@msinternal/sharepoint-ui-react` and Fluent UI React V9 based on which supported component best meets the UX, semantic, accessibility, and theming requirement.
+7. Build a custom HTML/CSS component only when all three layers cannot meet the requirement.
+8. Prefer the provided component and its documented props, slots, appearance options, typography presets, and design tokens over recreating the control or its styles.
+9. Avoid overriding SPDS component styles as much as possible. When a change adds many style overrides on top of SPDS, ask why they are needed and whether they are explicitly intended by design.
+10. Preserve the intended semantic interaction: use links for navigation, buttons for actions, navigation or list components for navigation or list behavior, and standard message or error components for user feedback.
+11. Use supported styling APIs only. Do not target generated or private Fluent implementation selectors such as `.fui-*`.
+12. Reuse an existing ODSP-Web shared wrapper, helper, or component when it already provides the required behavior; do not create a parallel implementation.
+13. Treat SPDS and Fluent components as semantic, compound APIs, not as styled DOM containers. Use only their documented child components, slots, and wrapper hierarchy. Every child must belong to that component's domain and semantic structure. If content is an adjacent action, status indicator, or page-level control rather than a valid component child, place it outside the compound component and lay it out with a sibling wrapper. Do not insert raw structural HTML such as `li`, `tr`, or `option` inside a Fluent or SPDS component merely because the current implementation happens to render a compatible parent element. For genuine component items, require the corresponding SPDS or Fluent item component instead.
+14. Keep accessibility intact: semantic structure, keyboard behavior, focus handling, high-contrast and theme support, labels, and screen-reader announcements must remain correct.
+15. When custom HTML/CSS is necessary, require a documented gap showing why SPDS, `@msinternal/sharepoint-ui-react`, and Fluent V9 cannot meet the UX requirement.
+16. For custom HTML/CSS, require semantic HTML and explicit keyboard, focus, accessibility, theme, high-contrast, localization, and responsive behavior.
+17. Keep custom components focused and reusable. Do not reproduce a standard design-system control solely for visual customization.
+18. Verify the chosen implementation preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience.
 
 ## Review questions
 
