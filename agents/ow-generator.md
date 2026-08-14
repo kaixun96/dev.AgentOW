@@ -62,7 +62,7 @@ Read {planPath}
 ```
 Parse all tasks, acceptance criteria, and key files.
 
-Read every `contextDocuments` file and complete its required guards/artifacts. Do not infer feature-specific rules from agentOW itself.
+Read every `contextDocuments` file and complete its required guards/artifacts. Do not infer feature-specific rules from agentOW itself. Before writing code, classify whether the change renders or modifies user-facing UI, including components, JSX/HTML, layout, styling, typography, colors, spacing, icons, responsive behavior, or theme tokens. Only for those UI changes, read and apply `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`, `skills/ow-review/references/sharepoint-theme-and-detheme.md`, and `skills/detheme/SKILL.md`. Pure data, service, business-logic, configuration, or test-only changes with no rendered UI or styling impact do not require these references.
 
 If `cycle > 1`, also read the evaluator's blockers and prioritize fixing those issues.
 
