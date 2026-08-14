@@ -7,7 +7,7 @@ description: "Run the agentOW review gate on its own in Copilot CLI, outside the
 
 Review an existing change with the same evidence gate the pipeline uses, without planning, implementing, or shipping anything.
 
-This command inspects and reports only. Never edit product code, never create or publish a PR, never post PR comments, and never mark unreviewed code as approved.
+This command inspects and reports only. Never edit product code, never create or publish a PR, and never mark unreviewed code as approved. PR-comment policy: do not post comments when reviewing your own PR; when reviewing another author's PR, post actionable comments on that PR.
 
 Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before dispatching. It is normative.
 
