@@ -2,6 +2,25 @@
 
 Use this reference when a change adds or modifies a user-facing component, interactive UX pattern, layout, styling, or imports from SharePoint design-system or Fluent UI component packages.
 
+## Component-fit analysis before implementation
+
+Do not select a component from the request's nouns alone. A request for a "list", for example, may require a semantic list, `Table`, `DataGrid`, tree, grouped collection, or another purpose-built control. Before planning imports or JSX:
+
+1. Convert the UX request into interaction and data requirements: data shape, selection mode, sorting/filtering/grouping, keyboard model, editing, virtualization/paging, drag and drop, responsive behavior, and accessibility semantics.
+2. Identify the plausible SPDS components and compare at least the strongest two candidates when more than one can represent the data. Do not stop at the first exported component.
+3. Read each candidate's current Fluent UI React V9 documentation in `https://storybooks.fluentui.dev/react/` and inspect the version-pinned component API/source used by ODSP-Web. Search by component name rather than relying on remembered APIs.
+4. Verify the component is exported from the path-appropriate SPDS stable entry and inspect nearby ODSP-Web production usage for controlled-state, localization, responsive, and accessibility conventions.
+5. Write a requirement-to-capability matrix. Record the selected component, why it owns the required interaction model, why each serious alternative is less suitable, the SPDS import route, documentation/source consulted, and nearby prior art. Missing evidence is a planning gap, not an implementation assumption.
+
+Treat a rendered UI change that lacks this analysis, contradicts its own evidence, or manually rebuilds behavior owned by a better-supported component as an Important finding. The fix is to complete the comparison and use the best-fit supported component, not merely to document the existing choice after implementation.
+
+### `Table` versus `DataGrid`
+
+- Prefer SPDS `DataGrid` for a conventional interactive tabular experience with sortable columns, row selection, stable row identity, and standard grid keyboard/focus semantics. Use its documented column definitions, controlled sort/selection state, and selection cells instead of rebuilding those behaviors with header buttons, standalone checkboxes, `role="grid"`, or custom arrow-key navigation.
+- Prefer SPDS `Table` for primarily presentational tabular data or when the UX requires substantial nonstandard row structure, keyboard behavior, selection semantics, or composition that `DataGrid` cannot support. Document that capability gap before accepting the additional implementation and ARIA responsibility.
+- Server-side sorting, paging controls, upload commands, drag-and-drop zones, status UI, and dialogs do not by themselves require a low-level `Table`; keep sibling workflows outside the grid and drive API requests from controlled `DataGrid` state when that is the better fit.
+- For either choice, verify high-zoom/narrow-width behavior from the component guidance. A minimum grid width inside a horizontally scrollable container is often preferable to collapsing columns or breaking header/cell relationships.
+
 ## Review checklist
 
 1. Build UI with the highest supported ODSP-Web design-system layer that meets the UX requirement. Do not skip a higher layer merely to obtain a small styling or API preference.

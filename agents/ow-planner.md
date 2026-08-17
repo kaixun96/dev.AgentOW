@@ -115,6 +115,8 @@ Use Grep, Glob, and Read to find:
 
 Be thorough — read the actual source files, not just file names.
 
+For rendered UI, read `skills/ow-review/references/sharepoint-design-system-and-ux-components.md` before choosing components. Translate the request into interaction requirements and compare at least the strongest two plausible SPDS controls when more than one could fit. Search the current Fluent V9 Storybook documentation by component name, inspect the version-pinned SPDS export/API, and cite nearby ODSP-Web production usage. For sortable/selectable tabular UX, explicitly compare `DataGrid` and `Table`; never choose `Table` merely because the request calls the UX a list. Missing component-fit evidence is a planning failure.
+
 ### Phase 6: Draft Grounded Plan
 
 Write a plan file to `{planDir}/plan.md` with this structure:
@@ -131,6 +133,19 @@ Write a plan file to `{planDir}/plan.md` with this structure:
 ## Acceptance Criteria
 1. <criterion with clear pass/fail condition>
 2. ...
+
+## Component-Fit Analysis
+- **Interaction requirements**: <data, selection, sorting/filtering/grouping, keyboard, paging/virtualization, responsive, accessibility needs; or not applicable>
+- **Candidates compared**: <strongest supported candidates>
+- **Requirement-to-capability matrix**:
+
+| Requirement | Candidate support | Evidence |
+| --- | --- | --- |
+| <requirement> | <candidate-by-candidate result> | <Fluent docs/SPDS source/ODSP usage citation> |
+
+- **Selected component/import route**: <component + SPDS package>
+- **Alternatives rejected**: <candidate + evidence-based reason>
+- **Sources consulted**: <current Fluent V9 docs, version-pinned API/source, nearby production usage>
 
 ## Tasks
 

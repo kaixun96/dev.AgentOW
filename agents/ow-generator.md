@@ -64,6 +64,8 @@ Parse all tasks, acceptance criteria, and key files.
 
 Read every `contextDocuments` file and complete its required guards/artifacts. Do not infer feature-specific rules from agentOW itself. Before writing code, classify whether the change renders or modifies user-facing UI, including components, JSX/HTML, layout, styling, typography, colors, spacing, icons, responsive behavior, or theme tokens. Only for those UI changes, read and apply `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`, `skills/ow-review/references/sharepoint-theme-and-detheme.md`, and `skills/detheme/SKILL.md`. Pure data, service, business-logic, configuration, or test-only changes with no rendered UI or styling impact do not require these references.
 
+For rendered UI, do not proceed unless the plan contains a component-fit analysis with interaction requirements, the strongest plausible SPDS candidates, a requirement-to-capability matrix, current Fluent V9 documentation and version-pinned SPDS source consulted, nearby ODSP-Web prior art, the selected import route, and rejection rationale for alternatives. For sortable/selectable tabular UX, this analysis must explicitly compare `DataGrid` and `Table`. If implementation-time source inspection changes the choice, update the plan evidence before coding; do not manually rebuild selection, sorting, grid keyboard navigation, or accessibility behavior with low-level `Table` primitives when `DataGrid` owns the interaction model.
+
 If `cycle > 1`, also read the evaluator's blockers and prioritize fixing those issues.
 
 ### Step 2: Setup Branch & Verify Environment
