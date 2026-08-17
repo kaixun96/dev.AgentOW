@@ -33,7 +33,7 @@ testing, and graduation cleanup. This profile adds the SP-Client-specific requir
 
 ## Tests and review evidence
 
-- Unit tests cover changed behavior, edge/error paths, and null/undefined inputs. Require KS-activated or Flight-off coverage only when this PR changes fallback/disabled behavior; do not report an absent pre-existing state test as a defect in the current PR.
+- Unit tests cover meaningful changed behavior, edge/error paths, and relevant null/undefined inputs at the behavior-owning boundary. Do not require a dedicated test for a `Flights.ts`, `KillSwitches.ts`, or similar module that only stores an ID/GUID or forwards to the rollout SDK. Test that wrapper directly only when it owns independent branching, composition, transformation, caching, fallback policy, side effects, or another contract that can regress separately. Require KS-activated or Flight-off consumer coverage only when this PR changes fallback/disabled behavior; do not report an absent pre-existing state test as a defect in the current PR.
 - Tests assert product behavior rather than mock implementation details.
 - For test-only changes, assess test correctness, determinism, isolation, cleanup, and assertion quality. Do not apply production privacy/security, telemetry, rollout, accessibility, localization, or performance checks to test diagnostics such as test labels or tenant URLs, unless the test code affects a production sink or exposes credentials/secrets.
 - Complex features add or update durable Markdown documentation when it materially helps future maintenance and AI-assisted follow-ups.

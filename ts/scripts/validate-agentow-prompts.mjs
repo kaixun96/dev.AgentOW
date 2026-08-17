@@ -39,6 +39,9 @@ const commonReviewIssueSnippets = [
   "Put API operation QoS at the provider/data-source boundary",
   "Consume `ServiceScope`/`PageContext` only after readiness",
   "Use one shared, normalized, same-origin, fail-closed navigation resolver",
+  "behavior-owning consumer boundary",
+  "Do not require tests that merely mock",
+  "one-line wrapper returns the mock value",
   "Do not turn this reference into mechanical policy"
 ];
 
@@ -92,6 +95,19 @@ const sharepointDesignSystemSnippets = [
   "Breadcrumb overflow action versus navigation",
   "`BreadcrumbItem > Menu > MenuTrigger > Button`",
   "`BreadcrumbButton` only for genuine breadcrumb navigation nodes"
+];
+
+const uxArchitectureBundleSnippets = [
+  "it is not SharePoint- or SPDS-specific",
+  "Source/component decomposition and runtime bundle splitting are separate decisions",
+  "responsibility-to-module map",
+  "nearest common owner",
+  "File length alone is not a finding",
+  "Do not introduce `React.lazy`, dynamic `import()`, `Suspense`, or a new chunk solely because source code moved",
+  "`eager`, `lazy`, or `unchanged`",
+  "Reject extraction that only moves lines or hides coupling",
+  "Do not raise a finding from file length alone",
+  "This reference owns rendered-feature decomposition"
 ];
 
 const checks = [
@@ -291,7 +307,10 @@ const checks = [
       "At 2,000 or more substantive changed lines, the change is always `must-split`.",
       "splitBoundaries",
       "--diff-numstat",
-      "validate-review-report.mjs"
+      "validate-review-report.mjs",
+      "Test observable contracts and regression risk, not every changed file or function",
+      "A trivial Flight/KS constant or pass-through wrapper does not need its own unit test",
+      "nearest stable consumer rather than testing a trivial gate wrapper"
     ]
   },
   {
@@ -310,6 +329,9 @@ const checks = [
       "SharePoint theme/Detheme provider flow",
       "spClientRolloutTrace",
       "PR description first",
+      "Unit tests cover meaningful changed behavior",
+      "Do not require a dedicated test for a `Flights.ts`, `KillSwitches.ts`, or similar module",
+      "KS-activated or Flight-off consumer coverage only when this PR changes fallback/disabled behavior",
       "preReview.rolloutProtection",
       "Use `Nit:` only for optional education."
     ]
@@ -339,6 +361,7 @@ const checks = [
       "shared-utility-reuse.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
+      "ux-architecture-and-bundle-boundaries.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -380,6 +403,7 @@ const checks = [
       "shared-utility-reuse.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
+      "ux-architecture-and-bundle-boundaries.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -407,6 +431,11 @@ const checks = [
     "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
     "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
     sharepointDesignSystemSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/ux-architecture-and-bundle-boundaries.md",
+    "copilot/skills/ow-review/references/ux-architecture-and-bundle-boundaries.md",
+    uxArchitectureBundleSnippets,
   ),
   {
     file: "agents/ow-orchestrator.md",
@@ -740,6 +769,7 @@ const mirroredChecks = [
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
   ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
   ["skills/ow-review/references/shared-utility-reuse.md", "copilot/skills/ow-review/references/shared-utility-reuse.md"],
+  ["skills/ow-review/references/ux-architecture-and-bundle-boundaries.md", "copilot/skills/ow-review/references/ux-architecture-and-bundle-boundaries.md"],
   ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"]
 ];
 

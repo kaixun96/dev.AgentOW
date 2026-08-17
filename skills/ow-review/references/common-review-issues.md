@@ -49,7 +49,9 @@ When applicable, test these first because they have high regression or rollback 
    rendering.
 13. Consume `ServiceScope`/`PageContext` only after readiness and account for preloaded chunks.
 14. Add behavioral regression tests for changed states, errors, and enabled/disabled rollout
-   paths; screenshots protect behavior only when meaningful regressions fail the test.
+  paths at the behavior-owning consumer boundary. Do not add a unit test solely because a
+  `Flights.ts`, `KillSwitches.ts`, or similar module gained a trivial constant/pass-through
+  wrapper; screenshots protect behavior only when meaningful regressions fail the test.
 15. Use one shared, normalized, same-origin, fail-closed navigation resolver.
 
 ## Rollout isolation: Flight, ECS, and KillSwitch
@@ -90,6 +92,14 @@ existing Flight, ECS, experiment, or KS.
 - Verify both states while rollout is active. The PR evidence should name the gate, direction,
   stage, rollback behavior, and cleanup plan. Remove retired branches and tests only after
   graduation is established.
+- Test the observable behavior controlled by the Flight/KS, not the rollout SDK or a trivial gate
+  wrapper. A direct wrapper test is meaningful only when the wrapper contains independent
+  branching, composition, transformation, caching, fallback policy, side effects, or another
+  contract that can regress separately from its consumer. Do not require tests that merely mock
+  `_SPFlight.isEnabled`/`_SPKillSwitch.isActivated`, assert the hard-coded ID/GUID, or prove that a
+  one-line wrapper returns the mock value. When rollout changes behavior, cover enabled and
+  fallback states through the nearest stable consumer whose output, rendering, request, mutation,
+  or error behavior differs.
 - For Flight/KS-graduation-only PRs, prioritize fallback equivalence and cleanup completeness.
   Verify removed-branch strings, styles, helpers/functions, and constants are also removed when
   no longer referenced.

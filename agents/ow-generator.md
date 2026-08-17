@@ -66,6 +66,10 @@ Read every `contextDocuments` file and complete its required guards/artifacts. D
 
 For rendered UI, do not proceed unless the plan contains a component-fit analysis with interaction requirements, the strongest plausible SPDS candidates, a requirement-to-capability matrix, current Fluent V9 documentation and version-pinned SPDS source consulted, nearby ODSP-Web prior art, the selected import route, and rejection rationale for alternatives. For sortable/selectable tabular UX, this analysis must explicitly compare `DataGrid` and `Table`. If implementation-time source inspection changes the choice, update the plan evidence before coding; do not manually rebuild selection, sorting, grid keyboard navigation, or accessibility behavior with low-level `Table` primitives when `DataGrid` owns the interaction model.
 
+For a substantial UX, read `skills/ow-review/references/ux-architecture-and-bundle-boundaries.md` and do not proceed unless the plan contains a responsibility-to-module map for page composition, child regions, workflow hooks, API/data contracts, domain models/helpers, state ownership, public contracts, extraction rationale, reuse evidence, and each module's `eager|lazy|unchanged` loading decision. Implement those cohesive boundaries and keep the root focused on composition and shared coordination. If source evidence changes a boundary, revise the map before coding. Do not collapse independent UI, workflow, and data responsibilities into one component, but also do not create trivial wrappers, one-state hooks, circular imports, or generic utility files merely to increase file count. Treat source decomposition and runtime chunks separately; use established package loader and design-system lazy-entry patterns only for evidenced user-journey and dependency-weight boundaries, preserve async fallback/error/focus/telemetry/rollout behavior, avoid tiny chunk waterfalls, and inspect build output for claimed material bundle changes.
+
+Include the realized component/hook/service/model boundaries, state ownership, deviations from the approved responsibility map, and actual eager/lazy behavior with bundle/build evidence in the generator report. Do not claim bundle improvement merely because source moved into additional files.
+
 If `cycle > 1`, also read the evaluator's blockers and prioritize fixing those issues.
 
 ### Step 2: Setup Branch & Verify Environment
@@ -234,15 +238,15 @@ Failing without notifying the orchestrator deadlocks the entire pipeline.
 
 ### Step 8: Test
 
-**Always scope tests to the changed modules.** Do NOT run the full package test suite.
+**Always scope tests to the changed observable behavior.** Do NOT run the full package test suite or mechanically target every changed module.
 
-1. **Find relevant tests**: Use `Grep` or `Glob` to check if tests exist for the modules you changed (e.g. `Glob("**/ViewEditMotion*.test.ts")`).
+1. **Find relevant tests**: Use `Grep` or `Glob` to locate tests for the component/service/helper that owns the changed behavior (e.g. `Glob("**/ViewEditMotion*.test.ts")`). For Flight/KS changes, prefer the nearest stable consumer where enabled/fallback state changes an output, rendering, request, mutation, or error path. Do not add a dedicated test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent branching, composition, transformation, caching, fallback policy, side effects, or another separately regressible contract.
 2. **If tests exist**: Run scoped:
    ```
    ow-test: project="<package-name>", testPattern="<ModuleName>"
    ```
-   The `testPattern` should match the changed module name(s). If multiple modules changed, run each pattern separately or combine with `|` (e.g. `"ModuleA|ModuleB"`).
-3. **If NO tests exist** for the changed modules: Skip testing and note `"testStatus": "skipped-no-relevant-tests"` in the report. Do NOT run the full package test suite as a substitute — running 600+ unrelated tests wastes time and proves nothing about your changes.
+   The `testPattern` should match the behavior-owning test target(s). If multiple meaningful targets changed, run each pattern separately or combine with `|` (e.g. `"ModuleA|ModuleB"`).
+3. **If NO meaningful tests exist** for the changed behavior: Skip testing and note `"testStatus": "skipped-no-relevant-tests"` with the reason in the report. Do NOT create a low-value wrapper test or run the full package test suite as a substitute — either wastes time and proves nothing about the product change.
 
 If scoped tests fail:
 - Read failure details
