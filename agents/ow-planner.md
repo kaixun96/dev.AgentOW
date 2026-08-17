@@ -68,6 +68,8 @@ Create a preliminary task list with categories:
 
 (No GATING/ULS/DEPLOY categories — those don't apply to odsp-web agent workflow.)
 
+TEST tasks follow observable behavior and regression risk, not changed filenames. For Flight/KS work, plan enabled/fallback tests at the nearest consuming component/service/helper whose behavior changes. Do not add a dedicated test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it contains independent branching, composition, transformation, caching, fallback policy, side effects, or another contract that can regress separately.
+
 ### Phase 3: Read Project Conventions
 
 ```bash

@@ -39,6 +39,9 @@ const commonReviewIssueSnippets = [
   "Put API operation QoS at the provider/data-source boundary",
   "Consume `ServiceScope`/`PageContext` only after readiness",
   "Use one shared, normalized, same-origin, fail-closed navigation resolver",
+  "behavior-owning consumer boundary",
+  "Do not require tests that merely mock",
+  "one-line wrapper returns the mock value",
   "Do not turn this reference into mechanical policy"
 ];
 
@@ -304,7 +307,10 @@ const checks = [
       "At 2,000 or more substantive changed lines, the change is always `must-split`.",
       "splitBoundaries",
       "--diff-numstat",
-      "validate-review-report.mjs"
+      "validate-review-report.mjs",
+      "Test observable contracts and regression risk, not every changed file or function",
+      "A trivial Flight/KS constant or pass-through wrapper does not need its own unit test",
+      "nearest stable consumer rather than testing a trivial gate wrapper"
     ]
   },
   {
@@ -323,6 +329,9 @@ const checks = [
       "SharePoint theme/Detheme provider flow",
       "spClientRolloutTrace",
       "PR description first",
+      "Unit tests cover meaningful changed behavior",
+      "Do not require a dedicated test for a `Flights.ts`, `KillSwitches.ts`, or similar module",
+      "KS-activated or Flight-off consumer coverage only when this PR changes fallback/disabled behavior",
       "preReview.rolloutProtection",
       "Use `Nit:` only for optional education."
     ]

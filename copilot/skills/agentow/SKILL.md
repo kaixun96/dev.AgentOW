@@ -298,7 +298,7 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 4. **Build:** `ow-build` on the affected project. If it fails:
    - Classify: rush infra error (`shrinkwrap-deps.json` missing, `inputsSnapshot not found`) → run `ow-rush install` once, retry. Auth/network error → stop and report. Code error → fix and rebuild (max 3 attempts).
    - If the MCP request times out but a `rush build -t <project>` process is still running, do **not** treat it as build failure. Log `⚠️ Build tool timeout — tracking underlying Rush process`, wait for the real Rush process to exit, then read `common/temp/markdown-summary/build-summary.md` and the raw log. Record this in `agent-metrics.md` as `tool-timeout / self-recovered-by-process-tracking`.
-5. **Test:** `ow-test` scoped to the changed modules (not the full suite). If no tests exist for the modules, note it; don't run 600 unrelated tests.
+5. **Test:** `ow-test` scoped to tests that own the changed observable behavior (not every changed file and not the full suite). For Flight/KS changes, exercise enabled/fallback behavior through the nearest stable consumer. Do not add or run a dedicated unit test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent logic that can regress separately. If no meaningful test target exists, record the evidence-backed reason; don't run 600 unrelated tests.
 6. **Dev server / debug link:** follow the feature context docs for the surface's verification contract. For UI-visible changes, prefer `ow-start` + `ow-debuglink` before PR validation builds finish; if the context docs require additional guards, execute those guards and record the result.
 7. **Commit** (don't push yet).
 

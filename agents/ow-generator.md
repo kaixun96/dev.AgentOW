@@ -238,15 +238,15 @@ Failing without notifying the orchestrator deadlocks the entire pipeline.
 
 ### Step 8: Test
 
-**Always scope tests to the changed modules.** Do NOT run the full package test suite.
+**Always scope tests to the changed observable behavior.** Do NOT run the full package test suite or mechanically target every changed module.
 
-1. **Find relevant tests**: Use `Grep` or `Glob` to check if tests exist for the modules you changed (e.g. `Glob("**/ViewEditMotion*.test.ts")`).
+1. **Find relevant tests**: Use `Grep` or `Glob` to locate tests for the component/service/helper that owns the changed behavior (e.g. `Glob("**/ViewEditMotion*.test.ts")`). For Flight/KS changes, prefer the nearest stable consumer where enabled/fallback state changes an output, rendering, request, mutation, or error path. Do not add a dedicated test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent branching, composition, transformation, caching, fallback policy, side effects, or another separately regressible contract.
 2. **If tests exist**: Run scoped:
    ```
    ow-test: project="<package-name>", testPattern="<ModuleName>"
    ```
-   The `testPattern` should match the changed module name(s). If multiple modules changed, run each pattern separately or combine with `|` (e.g. `"ModuleA|ModuleB"`).
-3. **If NO tests exist** for the changed modules: Skip testing and note `"testStatus": "skipped-no-relevant-tests"` in the report. Do NOT run the full package test suite as a substitute — running 600+ unrelated tests wastes time and proves nothing about your changes.
+   The `testPattern` should match the behavior-owning test target(s). If multiple meaningful targets changed, run each pattern separately or combine with `|` (e.g. `"ModuleA|ModuleB"`).
+3. **If NO meaningful tests exist** for the changed behavior: Skip testing and note `"testStatus": "skipped-no-relevant-tests"` with the reason in the report. Do NOT create a low-value wrapper test or run the full package test suite as a substitute — either wastes time and proves nothing about the product change.
 
 If scoped tests fail:
 - Read failure details
