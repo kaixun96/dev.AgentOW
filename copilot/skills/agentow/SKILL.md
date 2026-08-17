@@ -223,7 +223,13 @@ Using the planner report (FAST or FULL), write a short plan:
   current Fluent V9 documentation and version-pinned SPDS source consulted, nearby ODSP-Web
   usage, selected component/import route, and rejection rationale for alternatives. For
   sortable/selectable tabular UX, the plan must explicitly compare SPDS `DataGrid` and `Table`.
-  Record the Detheme treatment as well. Pure data, service,
+  For a substantial UX, also include a responsibility-to-module map covering page composition,
+  child regions, hooks/workflows, API/data contracts, models/helpers, state ownership, public
+  contracts, extraction rationale, nearby architecture/reuse, and an `eager|lazy|unchanged`
+  loading decision with evidence for every planned module. Read and apply
+  `skills/ow-review/references/ux-architecture-and-bundle-boundaries.md` for this analysis; it is
+  independent of SPDS or SharePoint surface treatment. Record the Detheme treatment as well.
+  Pure data, service,
   business-logic, configuration, or test-only changes with no rendered UI or styling impact do
   not need these references.
 - Context compliance checklist (each routed guard and its required artifact)
@@ -275,6 +281,17 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
      rationale before coding. Do not recreate selection, sorting, grid keyboard navigation, or
      accessibility behavior with low-level `Table` primitives when `DataGrid` owns the required
      interaction model.
+   - For a substantial UX, do not begin implementation without the responsibility-to-module map.
+     Read and follow `skills/ow-review/references/ux-architecture-and-bundle-boundaries.md`.
+     Keep the root focused on composition and shared coordination; implement cohesive child
+     regions, workflow hooks, API/data modules, domain models, and pure helpers at the planned
+     boundaries. If source evidence changes a boundary, revise the map first. Do not collapse the
+     plan into one monolithic component, and do not manufacture trivial wrappers or generic
+     utility files merely to increase file count.
+   - Treat source decomposition and runtime chunking separately. Use the package's established
+     loader and SPDS `LazyComponents` conventions only for evidenced action/navigation and heavy
+     dependency boundaries. Preserve loading/error/retry/focus/telemetry and rollout behavior,
+     avoid tiny chunk waterfalls, and inspect build output for claimed material bundle changes.
    - For every removed/replaced root class/style, preserve or move consumer-owned external layout while leaving replacement-component internal chrome to the component defaults.
    - Do not proceed if any layout declaration in the planner's ownership table has no disposition.
 3. **rush update** (via `ow-rush`) if you changed any `package.json`.
@@ -298,6 +315,9 @@ Write `/workspaces/odsp-web/.aero/<session>/implementation/iter<N>.md` after eac
 - commit SHA
 - remaining blockers, if any
 - context compliance evidence, including the completed root/wrapper layout ownership table and post-change disposition
+- UX architecture evidence for substantial surfaces: implemented component/hook/service/model
+  boundaries, state ownership, any deviations from the approved responsibility map, and actual
+  eager/lazy behavior plus bundle/build-output evidence for claimed loading changes
 
 Append a generator/implementation NDJSON line to `report.json`.
 

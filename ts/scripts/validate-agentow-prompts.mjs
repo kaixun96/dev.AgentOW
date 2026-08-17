@@ -94,6 +94,19 @@ const sharepointDesignSystemSnippets = [
   "`BreadcrumbButton` only for genuine breadcrumb navigation nodes"
 ];
 
+const uxArchitectureBundleSnippets = [
+  "it is not SharePoint- or SPDS-specific",
+  "Source/component decomposition and runtime bundle splitting are separate decisions",
+  "responsibility-to-module map",
+  "nearest common owner",
+  "File length alone is not a finding",
+  "Do not introduce `React.lazy`, dynamic `import()`, `Suspense`, or a new chunk solely because source code moved",
+  "`eager`, `lazy`, or `unchanged`",
+  "Reject extraction that only moves lines or hides coupling",
+  "Do not raise a finding from file length alone",
+  "This reference owns rendered-feature decomposition"
+];
+
 const checks = [
   {
     file: "copilot/skills/agentow/SKILL.md",
@@ -339,6 +352,7 @@ const checks = [
       "shared-utility-reuse.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
+      "ux-architecture-and-bundle-boundaries.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -380,6 +394,7 @@ const checks = [
       "shared-utility-reuse.md",
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
+      "ux-architecture-and-bundle-boundaries.md",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -407,6 +422,11 @@ const checks = [
     "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
     "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
     sharepointDesignSystemSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/ux-architecture-and-bundle-boundaries.md",
+    "copilot/skills/ow-review/references/ux-architecture-and-bundle-boundaries.md",
+    uxArchitectureBundleSnippets,
   ),
   {
     file: "agents/ow-orchestrator.md",
@@ -740,6 +760,7 @@ const mirroredChecks = [
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
   ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
   ["skills/ow-review/references/shared-utility-reuse.md", "copilot/skills/ow-review/references/shared-utility-reuse.md"],
+  ["skills/ow-review/references/ux-architecture-and-bundle-boundaries.md", "copilot/skills/ow-review/references/ux-architecture-and-bundle-boundaries.md"],
   ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"]
 ];
 

@@ -117,6 +117,8 @@ Be thorough — read the actual source files, not just file names.
 
 For rendered UI, read `skills/ow-review/references/sharepoint-design-system-and-ux-components.md` before choosing components. Translate the request into interaction requirements and compare at least the strongest two plausible SPDS controls when more than one could fit. Search the current Fluent V9 Storybook documentation by component name, inspect the version-pinned SPDS export/API, and cite nearby ODSP-Web production usage. For sortable/selectable tabular UX, explicitly compare `DataGrid` and `Table`; never choose `Table` merely because the request calls the UX a list. Missing component-fit evidence is a planning failure.
 
+For a substantial rendered UX, including a net-new page or a component combining multiple independent regions, workflows, or data contracts, read `skills/ow-review/references/ux-architecture-and-bundle-boundaries.md`. Inventory page composition, child interaction regions, shared state, stateful workflows, API/data contracts, domain mapping, and pure helpers. Search nearby architecture and reusable hooks/providers/utilities. Produce a responsibility-to-module map naming each component/hook/service/model, its public contract and state owner, why it remains inline or is extracted, and its `eager|lazy|unchanged` loading decision. Base async boundaries on real user journeys, dependency weight, package conventions, and build evidence; moving code to another file does not create a bundle split. Do not use line count as the decomposition rule or create trivial wrappers and one-state hooks.
+
 ### Phase 6: Draft Grounded Plan
 
 Write a plan file to `{planDir}/plan.md` with this structure:
@@ -146,6 +148,17 @@ Write a plan file to `{planDir}/plan.md` with this structure:
 - **Selected component/import route**: <component + SPDS package>
 - **Alternatives rejected**: <candidate + evidence-based reason>
 - **Sources consulted**: <current Fluent V9 docs, version-pinned API/source, nearby production usage>
+
+## UX Architecture and Loading Boundaries
+- **Substantial UX**: <true|false + reason>
+- **Responsibility-to-module map**:
+
+| Responsibility | Owner component/hook/service/model | Contract and state owner | Inline/extract rationale | Loading: eager/lazy/unchanged + evidence |
+| --- | --- | --- | --- | --- |
+| <responsibility> | <module> | <props/return/data contract + state owner> | <cohesion rationale> | <decision, user boundary, dependency/build evidence, fallback> |
+
+- **Existing architecture/reuse consulted**: <nearby source citations>
+- **Bundle validation**: <existing loader/chunk convention and measurement/build-output plan, or not applicable>
 
 ## Tasks
 

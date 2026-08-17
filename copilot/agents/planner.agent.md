@@ -36,7 +36,8 @@ The dispatcher gives you:
 4. **Existing patterns** — how does the surrounding code already solve similar problems? The implementer must follow these, not invent new ones. Cite examples.
 5. **Tests** — which test files exist for the affected modules (`<project>/src/**/*.test.ts`)? Note if none exist.
 6. **Component fit** (for rendered UI) — read `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`. Translate the request into interaction requirements, identify plausible SPDS controls, and compare at least the strongest two when more than one could fit. Search the current Fluent V9 Storybook documentation by component name, verify the version-pinned SPDS export/API, and cite nearby ODSP-Web production usage. Produce a requirement-to-capability matrix plus the selected component, import route, and rejection rationale for serious alternatives. For sortable/selectable tabular data, explicitly compare `DataGrid` with `Table`; do not choose `Table` merely because the user called the UX a list.
-7. **UI surface trace** (if the change has a visible UI surface) — the implementer will need BEFORE/AFTER screenshots. Provide:
+7. **UX architecture and loading boundaries** (for a substantial rendered UX, including a net-new page or a component combining multiple independent regions, workflows, or data contracts) — read `skills/ow-review/references/ux-architecture-and-bundle-boundaries.md`. Inventory page composition, child interaction regions, shared state, stateful workflows, data/API contracts, domain mapping, and pure helpers. Search nearby architecture and reusable hooks/providers/utilities. Produce a responsibility-to-module map naming each component/hook/service/model, its contract, state owner, extraction rationale, and `eager|lazy|unchanged` loading decision. Base async boundaries on a real user action/navigation boundary, dependency weight, package conventions, and build evidence; source-file extraction alone does not create a bundle split. Do not use line count as the decision rule and do not create trivial wrappers or one-state hooks.
+8. **UI surface trace** (if the change has a visible UI surface) — the implementer will need BEFORE/AFTER screenshots. Provide:
    - Changed component + where it renders (`file:line`)
    - The DOM selector / `data-automation-id` that triggers the surface, with the `file:line` that defines it
    - **The open-condition**, with `file:line`: the call site that sets the surface's open state, and the application state required for that branch to be taken. Read the code around the setter — a surface may render only for certain statuses, only after an operation *fails*, or never, because the product mounts a sibling component instead. Name the state to arrange, not just the control to click; a capture driving the happy path will otherwise time out against a surface that could not appear. If the component has no reachable call site, say so — that is a finding about the change, not a gap in the trace.
@@ -48,14 +49,14 @@ The dispatcher gives you:
    - Candidate discovery hints — available SharePoint search, API, tenant inventory, or repo fixture paths the evaluator can use to find alternatives
    - A test page is a starting candidate, not fixture identity, unless `exactFixtureRequired` is `true`
    - If you cannot trace a reliable trigger from source, mark `skip` with the reason. Do NOT fabricate a selector.
-8. **Context guards** — if `contextDocuments` were provided, read them and summarize the exact guard/checklist items that apply. Cite the doc path and section; do not duplicate or reinterpret domain rules from memory.
-9. **Root/wrapper layout ownership** — for any UI component migration or JSX root/wrapper replacement:
+9. **Context guards** — if `contextDocuments` were provided, read them and summarize the exact guard/checklist items that apply. Cite the doc path and section; do not duplicate or reinterpret domain rules from memory.
+10. **Root/wrapper layout ownership** — for any UI component migration or JSX root/wrapper replacement:
    - Open every class/style attached to the old root and cite its definition.
    - Classify layout declarations as component-internal chrome, external layout relative to parent/siblings, or parent collection layout.
    - State the required disposition for each external-layout declaration (`margin`, parent `gap`, wrapping, alignment, parent-facing width/positioning).
    - If the surface renders repeated Cards/rows/tiles/items, provide a repeated-item selector and specify the adjacent-item geometry that the evaluator must measure in BEFORE and AFTER.
    - If routed context docs define a layout audit, reproduce its required evidence fields exactly. Missing this audit is a planner failure, not an implementer assumption.
-10. **Capability fit** — read `capabilitiesPath`. Use available fallbacks, do not block on irrelevant optional tools, and keep tenant/site/fixture suitability deferred until source-cited predicates exist.
+11. **Capability fit** — read `capabilitiesPath`. Use available fallbacks, do not block on irrelevant optional tools, and keep tenant/site/fixture suitability deferred until source-cited predicates exist.
 
 ## How to research
 
@@ -90,6 +91,15 @@ Write `artifactPath` and return the same structured report:
 - Selected component and SPDS import route: <component + package>
 - Alternatives rejected: <candidate + evidence-based reason>
 - Sources consulted: <Fluent V9 documentation, version-pinned API/source, nearby production usage>
+
+## UX architecture and loading boundaries
+- Substantial UX: <true|false + reason>
+- Responsibility-to-module map:
+  | Responsibility | Owner component/hook/service/model | Contract and state owner | Inline/extract rationale | Loading: eager/lazy/unchanged + evidence |
+  | --- | --- | --- | --- | --- |
+  | <responsibility> | <module> | <props/return/data contract + state owner> | <cohesion rationale> | <decision, user boundary, dependency/build evidence, fallback> |
+- Existing architecture/reuse consulted: <nearby source citations>
+- Bundle validation: <existing loader/chunk convention and measurement/build-output plan, or not applicable>
 
 ## Source paths consulted
 - <every source file read during this planner pass; exhaustive and deduplicated>
