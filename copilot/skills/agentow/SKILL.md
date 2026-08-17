@@ -218,8 +218,12 @@ Using the planner report (FAST or FULL), write a short plan:
   layout, styling, typography, colors, spacing, icons, responsive behavior, or theme tokens,
   read both `skills/ow-review/references/sharepoint-design-system-and-ux-components.md` and
   `skills/ow-review/references/sharepoint-theme-and-detheme.md`, plus
-  `skills/detheme/SKILL.md`. Record the applicable SPDS package/import route and Detheme
-  treatment in the plan. Pure data, service,
+  `skills/detheme/SKILL.md`. Include the planner's component-fit analysis in the plan: the
+  interaction requirements, strongest supported candidates, requirement-to-capability matrix,
+  current Fluent V9 documentation and version-pinned SPDS source consulted, nearby ODSP-Web
+  usage, selected component/import route, and rejection rationale for alternatives. For
+  sortable/selectable tabular UX, the plan must explicitly compare SPDS `DataGrid` and `Table`.
+  Record the Detheme treatment as well. Pure data, service,
   business-logic, configuration, or test-only changes with no rendered UI or styling impact do
   not need these references.
 - Context compliance checklist (each routed guard and its required artifact)
@@ -265,6 +269,12 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
      classification, and implement its provider, hook, v8, nested-provider, killswitch, and
      SCSS-token guidance as applicable. Do not guess the killswitch/flight for an existing
      surface.
+   - Do not implement rendered UI until the plan contains a grounded component-fit analysis.
+     Confirm the selected component still satisfies every mapped requirement using its documented
+     API and stable SPDS export. If source inspection changes the choice, update the matrix and
+     rationale before coding. Do not recreate selection, sorting, grid keyboard navigation, or
+     accessibility behavior with low-level `Table` primitives when `DataGrid` owns the required
+     interaction model.
    - For every removed/replaced root class/style, preserve or move consumer-owned external layout while leaving replacement-component internal chrome to the component defaults.
    - Do not proceed if any layout declaration in the planner's ownership table has no disposition.
 3. **rush update** (via `ow-rush`) if you changed any `package.json`.

@@ -35,7 +35,8 @@ The dispatcher gives you:
 3. **Files to change** — exact paths, with the specific function/component in each. Cite `file:line`.
 4. **Existing patterns** — how does the surrounding code already solve similar problems? The implementer must follow these, not invent new ones. Cite examples.
 5. **Tests** — which test files exist for the affected modules (`<project>/src/**/*.test.ts`)? Note if none exist.
-6. **UI surface trace** (if the change has a visible UI surface) — the implementer will need BEFORE/AFTER screenshots. Provide:
+6. **Component fit** (for rendered UI) — read `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`. Translate the request into interaction requirements, identify plausible SPDS controls, and compare at least the strongest two when more than one could fit. Search the current Fluent V9 Storybook documentation by component name, verify the version-pinned SPDS export/API, and cite nearby ODSP-Web production usage. Produce a requirement-to-capability matrix plus the selected component, import route, and rejection rationale for serious alternatives. For sortable/selectable tabular data, explicitly compare `DataGrid` with `Table`; do not choose `Table` merely because the user called the UX a list.
+7. **UI surface trace** (if the change has a visible UI surface) — the implementer will need BEFORE/AFTER screenshots. Provide:
    - Changed component + where it renders (`file:line`)
    - The DOM selector / `data-automation-id` that triggers the surface, with the `file:line` that defines it
    - **The open-condition**, with `file:line`: the call site that sets the surface's open state, and the application state required for that branch to be taken. Read the code around the setter — a surface may render only for certain statuses, only after an operation *fails*, or never, because the product mounts a sibling component instead. Name the state to arrange, not just the control to click; a capture driving the happy path will otherwise time out against a surface that could not appear. If the component has no reachable call site, say so — that is a finding about the change, not a gap in the trace.
@@ -47,14 +48,14 @@ The dispatcher gives you:
    - Candidate discovery hints — available SharePoint search, API, tenant inventory, or repo fixture paths the evaluator can use to find alternatives
    - A test page is a starting candidate, not fixture identity, unless `exactFixtureRequired` is `true`
    - If you cannot trace a reliable trigger from source, mark `skip` with the reason. Do NOT fabricate a selector.
-7. **Context guards** — if `contextDocuments` were provided, read them and summarize the exact guard/checklist items that apply. Cite the doc path and section; do not duplicate or reinterpret domain rules from memory.
-8. **Root/wrapper layout ownership** — for any UI component migration or JSX root/wrapper replacement:
+8. **Context guards** — if `contextDocuments` were provided, read them and summarize the exact guard/checklist items that apply. Cite the doc path and section; do not duplicate or reinterpret domain rules from memory.
+9. **Root/wrapper layout ownership** — for any UI component migration or JSX root/wrapper replacement:
    - Open every class/style attached to the old root and cite its definition.
    - Classify layout declarations as component-internal chrome, external layout relative to parent/siblings, or parent collection layout.
    - State the required disposition for each external-layout declaration (`margin`, parent `gap`, wrapping, alignment, parent-facing width/positioning).
    - If the surface renders repeated Cards/rows/tiles/items, provide a repeated-item selector and specify the adjacent-item geometry that the evaluator must measure in BEFORE and AFTER.
    - If routed context docs define a layout audit, reproduce its required evidence fields exactly. Missing this audit is a planner failure, not an implementer assumption.
-9. **Capability fit** — read `capabilitiesPath`. Use available fallbacks, do not block on irrelevant optional tools, and keep tenant/site/fixture suitability deferred until source-cited predicates exist.
+10. **Capability fit** — read `capabilitiesPath`. Use available fallbacks, do not block on irrelevant optional tools, and keep tenant/site/fixture suitability deferred until source-cited predicates exist.
 
 ## How to research
 
@@ -78,6 +79,17 @@ Write `artifactPath` and return the same structured report:
 
 ## Patterns to follow
 - <existing example at file:line> — <what to mirror>
+
+## Component-fit analysis
+- Requirements: <interaction/data/accessibility/responsive capabilities, or "not applicable">
+- Candidates: <strongest supported candidates compared>
+- Requirement-to-capability matrix:
+  | Requirement | Candidate support | Evidence |
+  | --- | --- | --- |
+  | <requirement> | <candidate-by-candidate result> | <Fluent docs/SPDS source/ODSP usage citation> |
+- Selected component and SPDS import route: <component + package>
+- Alternatives rejected: <candidate + evidence-based reason>
+- Sources consulted: <Fluent V9 documentation, version-pinned API/source, nearby production usage>
 
 ## Source paths consulted
 - <every source file read during this planner pass; exhaustive and deduplicated>
