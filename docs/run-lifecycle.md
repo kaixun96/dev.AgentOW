@@ -5,7 +5,8 @@ compacted, or continued after completion without being the only copy of run stat
 
 ## Files
 
-- `run-state.json`: status, phase, revision, timestamps, artifact counts, and live timing summary.
+- `run-state.json`: status, phase, revision, execution profile (`standard` or `poc`), timestamps,
+  artifact counts, and live timing summary.
 - `request-history.ndjson`: exact initial request and later follow-ups.
 - `lifecycle.ndjson`: initialized, interrupted, resumed, requirement-change, and completed events.
 - `report-recovery.ndjson`: append-only supplement when the main report has an incomplete trailing

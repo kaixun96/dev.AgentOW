@@ -20,6 +20,19 @@ export interface PrCreateResult {
   draft: boolean;
 }
 
+export interface PrUpdateInput {
+  prId: number;
+  title: string;
+  description: string;
+  draft?: boolean;
+}
+
+export interface PrUpdateResult {
+  prId: number;
+  prUrl: string;
+  draft: boolean;
+}
+
 const BRANCH_PATTERN = /^user\/[^/]+\/[^/]+$/;
 const ODSP_WEB_REPO_ID = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
 const ADO_ORG = "https://dev.azure.com/onedrive";
@@ -30,6 +43,24 @@ function execCmd(cmd: string, cwd: string, signal?: AbortSignal): Promise<{ exit
     const proc = cp.exec(cmd, { cwd, signal }, (err, stdout, stderr) => {
       if (err && err.killed) { reject(new Error("Aborted")); return; }
       resolve({ exitCode: err?.code ?? 0, stdout: stdout.trim(), stderr: stderr.trim() });
+    });
+  });
+}
+
+function execFileCmd(
+  file: string,
+  args: string[],
+  cwd: string,
+  signal?: AbortSignal,
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    cp.execFile(file, args, { cwd, signal }, (err, stdout, stderr) => {
+      if (err && err.killed) { reject(new Error("Aborted")); return; }
+      resolve({
+        exitCode: typeof err?.code === "number" ? err.code : err ? 1 : 0,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+      });
     });
   });
 }
@@ -123,5 +154,34 @@ export class PrClient {
     this.logger?.info("pr-create", `PR #${prId} created: ${prUrl}`);
 
     return { prId, prUrl, branch, draft };
+  }
+
+  async updatePr(input: PrUpdateInput, signal?: AbortSignal): Promise<PrUpdateResult> {
+    const draft = input.draft ?? true;
+    const descFile = path.join(os.tmpdir(), `ow-pr-desc-${Date.now()}.md`);
+    fs.writeFileSync(descFile, input.description, "utf8");
+    const azArgs = [
+      "repos", "pr", "update",
+      "--id", String(input.prId),
+      "--title", input.title,
+      "--description", `@${descFile}`,
+      "--draft", String(draft),
+      "--org", ADO_ORG,
+      "--output", "json",
+    ];
+
+    let result: Awaited<ReturnType<typeof execCmd>>;
+    try {
+      result = await execFileCmd("az", azArgs, this.cwd, signal);
+    } finally {
+      try { fs.unlinkSync(descFile); } catch { /* ignore */ }
+    }
+    if (result.exitCode !== 0) {
+      throw new Error(`az repos pr update failed (exit ${result.exitCode}):\n${result.stderr}`);
+    }
+
+    const prUrl = `${ADO_ORG}/${ADO_PROJECT}/_git/odsp-web/pullrequest/${input.prId}`;
+    this.logger?.info("pr-update", `PR #${input.prId} updated: ${prUrl}`);
+    return { prId: input.prId, prUrl, draft };
   }
 }

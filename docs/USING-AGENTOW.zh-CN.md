@@ -191,6 +191,7 @@ CODESPACES=false az login
 |---|---|---|---|
 | 单任务、需要确认需求和计划 | `/ow-team` | `/agentow` | 有 |
 | 单任务、Context 已充分 | `/ow-team --auto` | `/agentow --auto` | 零交互 |
+| 快速生成可运行 POC、暂缓质量门槛 | 不适用 | `/agentow --poc` | 可选 |
 | 多个独立任务 | `/ow-batch` | `/ow-batch` | 启动后零交互 |
 
 ### Interactive：用于补齐 Context
@@ -212,6 +213,32 @@ CODESPACES=false az login
 ```
 
 Auto 模式不会等待需求澄清或计划审批。Agent 会把必要假设记录到运行产物中，因此任务描述必须能够定位到明确的 Spec 和验收标准。
+
+### POC：最快看到可运行结果
+
+```text
+/agentow --poc --auto
+做一个新版 PhotoGrid 交互的可运行原型，我只需要先看最终效果。
+```
+
+POC 是执行 Profile，`--auto` 控制是否交互，因此既可以使用 `/agentow --poc`，也可以使用
+`/agentow --poc --auto`。POC 仍然要求 Build/typecheck 和最终结果验证，但只做有限的主
+Agent 规划，默认跳过 Test，只截 requested/default 场景的 AFTER 图；Reviewer 只在发现
+Critical 安全问题时阻塞，其余问题记录为后续完善项。
+
+输出始终是带 `[POC]` 标题和 **NOT PRODUCTION READY** 警告的 Draft PR，并明确列出跳过的
+门槛；agentOW 绝不会自动 Merge。涉及认证/授权、安全或隐私边界、破坏性数据操作、Schema
+或数据迁移、生产配置、Secret 的任务不能使用 POC 模式。
+
+需要升级为正式实现时，在同一个 Run 中回复：
+
+```text
+promote this POC
+```
+
+agentOW 会复用同一个 `.aero` Session、Branch 和 PR，然后补齐 FULL Planner、Test、完整
+场景 BEFORE/AFTER、严格 Review 和 Context 维护。只有所有正式门槛通过后才移除 POC
+警告。
 
 ### 自动选择 Planner 模式
 

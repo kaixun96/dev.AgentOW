@@ -31273,6 +31273,21 @@ function execCmd(cmd, cwd, signal) {
     });
   });
 }
+function execFileCmd(file2, args2, cwd, signal) {
+  return new Promise((resolve, reject) => {
+    cp4.execFile(file2, args2, { cwd, signal }, (err, stdout, stderr) => {
+      if (err && err.killed) {
+        reject(new Error("Aborted"));
+        return;
+      }
+      resolve({
+        exitCode: typeof err?.code === "number" ? err.code : err ? 1 : 0,
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+      });
+    });
+  });
+}
 var PrClient = class {
   constructor(cwd = OW.odspWebRoot, logger2) {
     this.cwd = cwd;
@@ -31362,11 +31377,121 @@ ${prResult.stdout}`);
     this.logger?.info("pr-create", `PR #${prId} created: ${prUrl}`);
     return { prId, prUrl, branch, draft };
   }
+  async updatePr(input, signal) {
+    const draft = input.draft ?? true;
+    const descFile = path2.join(os.tmpdir(), `ow-pr-desc-${Date.now()}.md`);
+    fs2.writeFileSync(descFile, input.description, "utf8");
+    const azArgs = [
+      "repos",
+      "pr",
+      "update",
+      "--id",
+      String(input.prId),
+      "--title",
+      input.title,
+      "--description",
+      `@${descFile}`,
+      "--draft",
+      String(draft),
+      "--org",
+      ADO_ORG,
+      "--output",
+      "json"
+    ];
+    let result;
+    try {
+      result = await execFileCmd("az", azArgs, this.cwd, signal);
+    } finally {
+      try {
+        fs2.unlinkSync(descFile);
+      } catch {
+      }
+    }
+    if (result.exitCode !== 0) {
+      throw new Error(`az repos pr update failed (exit ${result.exitCode}):
+${result.stderr}`);
+    }
+    const prUrl = `${ADO_ORG}/${ADO_PROJECT}/_git/odsp-web/pullrequest/${input.prId}`;
+    this.logger?.info("pr-update", `PR #${input.prId} updated: ${prUrl}`);
+    return { prId: input.prId, prUrl, draft };
+  }
 };
 
 // src/ow/tools/prAttach.ts
 import * as cp5 from "child_process";
 import * as fs3 from "fs/promises";
+
+// src/ow/tools/prDescriptionBudget.js
+var ADO_PR_DESCRIPTION_MAX_LENGTH = 4e3;
+var VISUAL_SECTION_START = "<!-- agentow:visual-validation:start -->";
+var VISUAL_SECTION_END = "<!-- agentow:visual-validation:end -->";
+var DISPOSABLE_SECTION_PATTERN = /<!-- agentow:disposable:start(?:\s+([^>]+?))?\s*-->[\s\S]*?<!-- agentow:disposable:end -->\s*/gi;
+function compactMarkdown(markdown) {
+  return markdown.split("\n").map((line) => line.trimEnd()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function removeLegacyVisualSections(markdown) {
+  const lines = markdown.split("\n");
+  const result = [];
+  let skipping = false;
+  for (const line of lines) {
+    if (/^## Visual Validation(?: Attachments)?\s*$/i.test(line)) {
+      skipping = true;
+      continue;
+    }
+    if (skipping && /^##\s/.test(line)) skipping = false;
+    if (!skipping) result.push(line);
+  }
+  return result.join("\n").trim();
+}
+function replaceVisualSection(existing, visualBlock) {
+  const start = existing.indexOf(VISUAL_SECTION_START);
+  const end = existing.indexOf(VISUAL_SECTION_END);
+  if (start >= 0 && end >= start) {
+    const suffixStart = end + VISUAL_SECTION_END.length;
+    return {
+      markdown: `${existing.slice(0, start)}${visualBlock}${existing.slice(suffixStart)}`,
+      replaced: true
+    };
+  }
+  const withoutLegacyVisual = removeLegacyVisualSections(existing);
+  return {
+    markdown: withoutLegacyVisual ? `${withoutLegacyVisual}
+
+${visualBlock}` : visualBlock,
+    replaced: withoutLegacyVisual !== existing.trim()
+  };
+}
+function preparePrDescriptionUpdate(existing, visualMarkdown, maxLength = ADO_PR_DESCRIPTION_MAX_LENGTH) {
+  if (!visualMarkdown.trim()) {
+    return { description: compactMarkdown(existing), replacedVisualSection: false, prunedSections: [] };
+  }
+  const visualBlock = `${VISUAL_SECTION_START}
+${visualMarkdown.trim()}
+${VISUAL_SECTION_END}`;
+  const replacement = replaceVisualSection(existing.trim(), visualBlock);
+  let description = compactMarkdown(replacement.markdown);
+  const prunedSections = [];
+  if (description.length > maxLength) {
+    description = compactMarkdown(
+      description.replace(DISPOSABLE_SECTION_PATTERN, (_match, label) => {
+        prunedSections.push(label?.trim() || "generated details");
+        return "";
+      })
+    );
+  }
+  if (description.length > maxLength) {
+    throw new Error(
+      `PR description would be ${description.length} characters after replacing visual evidence; Azure DevOps allows ${maxLength}. Mark low-value generated content with <!-- agentow:disposable:start label --> ... <!-- agentow:disposable:end --> or shorten it. Human-authored content and required visual evidence were preserved.`
+    );
+  }
+  return {
+    description,
+    replacedVisualSection: replacement.replaced,
+    prunedSections
+  };
+}
+
+// src/ow/tools/prAttach.ts
 var ODSP_WEB_REPO_ID2 = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
 var ADO_ORG2 = "https://dev.azure.com/onedrive";
 var ADO_PROJECT2 = "ODSP-Web";
@@ -31463,6 +31588,8 @@ var PrAttach = class {
     }
     let commentPosted = false;
     let descriptionUpdated = false;
+    let descriptionPruned = false;
+    let prunedDescriptionSections = [];
     const descriptionAppend = buildDescriptionAppend(input, uploaded);
     if (descriptionAppend) {
       const getUrl = `${baseUrl}?api-version=${API_VERSION}`;
@@ -31477,9 +31604,10 @@ var PrAttach = class {
       const pr = await getResp.json();
       const existing = pr.description ?? "";
       const append = replacePlaceholders(descriptionAppend, uploaded);
-      const newDescription = existing.trim() ? `${existing.trim()}
-
-${append}` : append;
+      const descriptionUpdate = preparePrDescriptionUpdate(existing, append);
+      const newDescription = descriptionUpdate.description;
+      descriptionPruned = descriptionUpdate.prunedSections.length > 0;
+      prunedDescriptionSections = descriptionUpdate.prunedSections;
       const patchResp = await fetch(getUrl, {
         method: "PATCH",
         headers: {
@@ -31500,7 +31628,9 @@ ${append}` : append;
       prId: input.prId,
       uploaded,
       commentPosted,
-      descriptionUpdated
+      descriptionUpdated,
+      descriptionPruned,
+      prunedDescriptionSections
     };
   }
 };
@@ -32055,15 +32185,32 @@ function registerOwTools(server2, logger2, logDir) {
     }, extras.signal);
     return successResultWithDebug(logger2, "ow-pr-create", result);
   });
+  registerMcpTool(server2, "ow-pr-update", {
+    description: "Update an existing Azure DevOps PR title, description, and draft state. Use this when promoting a POC so the same PR is retained.",
+    inputSchema: {
+      prId: external_exports.number().describe("Pull request ID to update"),
+      title: external_exports.string().describe("Replacement PR title"),
+      description: external_exports.string().describe("Replacement PR body in markdown"),
+      draft: external_exports.boolean().optional().describe("Keep as draft (default: true)")
+    }
+  }, async (input, extras) => {
+    const result = await pr.updatePr({
+      prId: input.prId,
+      title: input.title,
+      description: input.description,
+      draft: input.draft
+    }, extras.signal);
+    return successResultWithDebug(logger2, "ow-pr-update", result);
+  });
   registerMcpTool(server2, "ow-pr-attach", {
-    description: "Upload files (typically PNG screenshots) as attachments to an existing PR on Azure DevOps, then append them to the PR description. Never posts PR comments. Use {{name}} placeholders in appendToDescription to reference uploaded attachment URLs.",
+    description: "Upload files (typically PNG screenshots) to an Azure DevOps PR, then replace its generated visual-validation description block. Keeps the 4000-character limit by removing only explicitly disposable generated sections; never drops human-authored content or posts comments. Use {{name}} placeholders in appendToDescription.",
     inputSchema: {
       prId: external_exports.number().describe("Pull request ID to attach files to"),
       attachments: external_exports.array(external_exports.object({
         name: external_exports.string().describe("Filename used on ADO, e.g. 'before-pr2219557.png'"),
         localPath: external_exports.string().describe("Absolute path to the local file to upload")
       })).describe("Files to upload as PR attachments"),
-      appendToDescription: external_exports.string().optional().describe("Markdown to append to the PR's existing description. Use {{name}} placeholders for attachment URLs. If omitted, a simple attachment section is appended.")
+      appendToDescription: external_exports.string().optional().describe("Markdown for the generated visual-validation block. Replaces the prior block. Use {{name}} placeholders for attachment URLs. If omitted, a simple attachment section is generated.")
     }
   }, async (input, extras) => {
     const result = await prAttach.attach({
@@ -32116,6 +32263,7 @@ You are connected to the ow MCP server \u2014 a dev toolkit for odsp-web develop
 
 ### PR Creation
 - ow-pr-create       \u2014 Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
+- ow-pr-update       \u2014 Update an existing draft PR title and description, including POC promotion.
 - ow-pr-attach       \u2014 Upload screenshots/files as attachments to an existing PR and append them to the PR description. It never posts PR comments.
 - ow-pr-debug-query  \u2014 Fetch the PR SP-Client Validation CDN debug query from PR threads, with ADO auth fallback and CDN status probes.
 
@@ -32130,7 +32278,7 @@ Since Claude Code runs directly inside the Codespace, all commands execute local
 5. ow-start \u2014 rush start in tmux for dev server.
 6. ow-session-capture on 'agentow:rush' \u2014 poll until [WATCHING] or FAILURE:.
 7. ow-debuglink \u2014 extract debug URL from rush output.
-8. ow-pr-create \u2014 push and create draft PR when ready.
+8. ow-pr-create \u2014 push and create draft PR when ready; use ow-pr-update instead when promoting an existing POC PR.
 
 ## Rules
 
