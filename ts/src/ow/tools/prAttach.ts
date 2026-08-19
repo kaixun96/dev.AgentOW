@@ -2,6 +2,7 @@ import * as cp from "node:child_process";
 import * as fs from "node:fs/promises";
 import { OW } from "../../shared/constants.js";
 import type { FileLogger } from "../../shared/logger.js";
+import { preparePrDescriptionUpdate } from "./prDescriptionBudget.js";
 
 export interface PrAttachInput {
   prId: number;
@@ -18,6 +19,8 @@ export interface PrAttachResult {
   uploaded: Array<{ name: string; url: string }>;
   commentPosted: boolean;
   descriptionUpdated: boolean;
+  descriptionPruned: boolean;
+  prunedDescriptionSections: string[];
 }
 
 const ODSP_WEB_REPO_ID = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
@@ -129,6 +132,8 @@ export class PrAttach {
 
     // 3. Always update the description for screenshots/attachments.
     let descriptionUpdated = false;
+    let descriptionPruned = false;
+    let prunedDescriptionSections: string[] = [];
     const descriptionAppend = buildDescriptionAppend(input, uploaded);
     if (descriptionAppend) {
       // Fetch current PR to get existing description
@@ -145,7 +150,10 @@ export class PrAttach {
       const existing = pr.description ?? "";
 
       const append = replacePlaceholders(descriptionAppend, uploaded);
-      const newDescription = existing.trim() ? `${existing.trim()}\n\n${append}` : append;
+      const descriptionUpdate = preparePrDescriptionUpdate(existing, append);
+      const newDescription = descriptionUpdate.description;
+      descriptionPruned = descriptionUpdate.prunedSections.length > 0;
+      prunedDescriptionSections = descriptionUpdate.prunedSections;
 
       const patchResp = await fetch(getUrl, {
         method: "PATCH",
@@ -169,6 +177,8 @@ export class PrAttach {
       uploaded,
       commentPosted,
       descriptionUpdated,
+      descriptionPruned,
+      prunedDescriptionSections,
     };
   }
 }

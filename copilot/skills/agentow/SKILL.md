@@ -212,6 +212,10 @@ Using the planner report (FAST or FULL), write a short plan:
 - Acceptance criteria (clear pass/fail)
 - Tasks (exact files, what changes)
 - Visual surface trace (from the planner, for the evaluator later) — including the surface's **open-condition**: the code that sets its open state and the application state that must hold for it to render. A control name or URL parameter is not an open-condition.
+- Scenario matrix (from the planner) — every source-proven, acceptance-relevant user-visible
+  option/state touched by the change, capped at five without Cartesian expansion. Each row needs
+  source evidence, precondition, setup, trigger, discriminator, and expected result. A visible UI
+  plan with no matrix is incomplete.
 - Detheme classification for any theme-affecting SharePoint UI: app-chrome-invoked,
   SharePoint-owned full page, customer-content full page, inline pane, or full-overlay drawer.
 - For any change that renders or modifies user-facing UI, including components, JSX/HTML,
@@ -325,11 +329,18 @@ Append a generator/implementation NDJSON line to `report.json`.
 
 Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
 
-Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, changed files, cycle number, debug link, routed `contextDocuments`, `planPath`, `implementationArtifactPath`, `sessionDir`, `reportFile`, `progressLog`, and `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for PASS/FAIL + blockers.
+Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, scenario
+matrix, changed files, cycle number, debug link, routed `contextDocuments`, `planPath`,
+`implementationArtifactPath`, `sessionDir`, `reportFile`, `progressLog`, and
+`artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for
+PASS/FAIL + blockers.
 
 **Never end the turn while a dispatched subagent is still running.** Wait for its verdict. A run that reports "the browser capture is still running, I'm waiting for its result" and then terminates has abandoned the work mid-flight: the subagent's findings are lost, nothing is written to the artifact, and the next run repeats the whole discovery. If the wait is genuinely unbounded, record what was dispatched and why you stopped, then return a `FAIL` naming that — an explicit abandonment is recoverable, a silent one is not.
 
 For UI-visible changes, visual validation is mandatory and the evaluator owns it:
+- Every required scenario matrix row must have its own evaluator-produced full-viewport BEFORE and
+  AFTER pair. `scenarioCoverage` must be `complete`, with captured count equal to required count.
+  One default screenshot pair never substitutes for additional source-proven options or states.
 - BEFORE and AFTER screenshot paths must be present in the evaluator result.
 - Primary `beforePath` / `afterPath` must be full browser-page/viewport screenshots that include the surrounding page context, not Drawer/Dialog/component-only crops. Their dimensions must match the evaluator's recorded viewport.
 - Optional close-up crops belong only in `beforeCropPath` / `afterCropPath`; they are supplemental evidence.
@@ -483,7 +494,20 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
 
    The block is human-readable and carries a machine-readable comment, so a later reviewer on any machine recovers the same decisions with `review-ledger.mjs parse` instead of re-raising them.
 2. **Visual validation for UI changes:** prefer a dispatcher-provided, reachable compliant personal-account Playwright profile. It must compare target/current with the changed build under identical flights and set `visualValidation.source=personal-persistent-profile`. A Codespace that cannot reach the Devbox profile falls back immediately to the evaluator's FIC Playwright/Heft spec: local `rush start` first, then `ow-pr-debug-query` / `finalValidationMode=pr-cdn-fic` for a proven route-specific local failure. Playwright MCP and `browser_*` tools are not validation routes.
-3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. The primary BEFORE/AFTER table in the PR description MUST embed the full-page/viewport `beforePath` and `afterPath`. Component crops may be attached as clearly labeled supplemental detail links, but must never replace the primary images. Include `visualValidation.source` in the PR description (`personal-persistent-profile`, `local-rush-start`, or `pr-cdn-fic`) so reviewers know which path produced the images. Missing or invalid full-page/viewport BEFORE/AFTER screenshots block PR creation unless Step 6 proved a complete external fixture gap; only that case may ship as `success-with-blockers` with the complete coverage manifest.
+3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. Render a
+   compact PR table with one row per required scenario and BEFORE/AFTER links from
+   `visualValidation.scenarios`. Component crops may be supplemental links, but never replace the
+   primary images. Include `visualValidation.source`.
+   Component crops may be attached as clearly labeled supplemental detail links.
+   - Pass the table to `ow-pr-attach`; it replaces the prior
+     `<!-- agentow:visual-validation:start -->` block instead of appending duplicates.
+   - Azure DevOps limits descriptions to 4000 characters. Keep Summary, Changes, required
+     verification disclosures, accepted-review ledger, and scenario evidence. Low-value generated
+     diagnostics may be wrapped in
+     `<!-- agentow:disposable:start label --> ... <!-- agentow:disposable:end -->`; the attachment
+     tool removes those only when needed. Never silently delete human-authored or required content.
+   - Missing/incomplete scenario evidence blocks PR creation unless Step 6 proved a complete
+     external fixture gap; only that case may ship as `success-with-blockers`.
    - If visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.
 4. **Report** the PR URL to the user.
 

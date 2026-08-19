@@ -138,6 +138,9 @@ const checks = [
       "A test page is a starting candidate, not fixture identity",
       "Capability predicates",
       "Candidate discovery hints",
+      "scenario matrix",
+      "Do not create a Cartesian product",
+      "\"scenarioCount\":1",
       "`plannerMode` — always `full`",
       "`plannerPass` — 1 for initial research",
       "\"mode\":\"full\"",
@@ -173,7 +176,10 @@ const checks = [
       "`captureMethod` is `page`",
       "### Screenshot engines",
       "personal-persistent-profile",
-      "`visualValidation.source` to `personal-persistent-profile`, `local-rush-start`, or `pr-cdn-fic`"
+      "`visualValidation.source` to `personal-persistent-profile`, `local-rush-start`, or `pr-cdn-fic`",
+      "`scenarioMatrix` is a hard coverage contract",
+      "`scenarioCoverage` is `complete`",
+      "scenario-matrix-incomplete"
     ]
   },
   {
@@ -191,7 +197,10 @@ const checks = [
       "Component crops may be attached as clearly labeled supplemental detail links",
       "independently `view` both primary images and run `file -- \"<beforePath>\" \"<afterPath>\"`",
       "If the retry still violates the evaluator contract, stop and report the blocker",
-      "Playwright MCP and `browser_*` tools are not validation routes"
+      "Playwright MCP and `browser_*` tools are not validation routes",
+      "Every required scenario matrix row",
+      "agentow:visual-validation:start",
+      "agentow:disposable:start label"
     ]
   },
   {
@@ -200,7 +209,9 @@ const checks = [
       "one failed URL, credential, tenant, or site is resource-local evidence",
       "Missing or incomplete coverage triggers evaluator-only environment discovery",
       "Primary PR screenshots must show the full browser page/viewport",
-      "the main session must independently view both primary images"
+      "the main session must independently view both primary images",
+      "bounded scenario matrix",
+      "one-row-per-scenario table"
     ]
   },
   {

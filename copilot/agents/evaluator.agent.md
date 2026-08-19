@@ -27,6 +27,8 @@ The dispatcher gives you:
 - `request` — the original feature/bug description
 - `acceptanceCriteria` — what "done" means
 - `surfaceTrace` — from the planner: selector, discriminator, pattern, test page (may be `skip`)
+- `scenarioMatrix` — planner-derived required UI scenarios (maximum five), each with source
+  evidence, precondition, setup, trigger, discriminator, and expected visible result
 - `changedFiles` — what the implementer changed
 - `cycle` — iteration number
 - `sessionDir` — `.aero/<session>` folder
@@ -50,6 +52,14 @@ Use `view` / `grep` to confirm the changed code matches the intent and the accep
 ### UI criteria (mandatory screenshots for Pattern A/B/C)
 
 If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You may skip screenshots only when `surfaceTrace` is explicitly `Pattern: skip` with a non-UI/server-side reason, or `Pattern: D` has been probed and confirmed unreachable. If unsure whether the change is visible, treat it as visible and attempt screenshots.
+
+For visible UI, `scenarioMatrix` is a hard coverage contract. It must contain one to five required
+scenarios. Execute every required row without waiting for the work item to name each option. Reuse
+authentication, environment discovery, and fixture setup where safe, but independently establish
+each row's precondition, drive its trigger, assert its discriminator/expected result, and capture
+matching BEFORE and AFTER evidence. One passing row cannot stand in for another. Missing, duplicate,
+or unexecuted rows are `failureKind: "evaluator-spec"` with blocker
+`scenario-matrix-incomplete`.
 
 If `contextDocuments` are provided, read them before UI verification and apply the documented domain-specific guards. Cite the doc path/section in the report.
 
@@ -110,6 +120,11 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
 
    Write the precondition into the artifact before capturing. If it cannot be established from the source, say so and return `FAIL` rather than guessing — a guessed precondition costs a full timeout per attempt.
 
+   Apply steps 0 through 10 to each `scenarioMatrix` row. The singular `selector`,
+   `discriminator`, precondition, setup, and expected result below mean the current scenario's
+   values. Preserve successful rows if a later row fails; retries resume only incomplete/failed
+   rows against the same source revisions.
+
 1. Determine screenshot source:
    - **Default / preferred when reachable:** use `personalEvaluatorScript` or validated `personalEvaluatorEvidence`. Run its authentication check first. BEFORE must use target/current; AFTER must use the changed build; keep flights, killswitches, fixture, route, trigger, viewport, and state identical. Set `visualValidation.source="personal-persistent-profile"`.
    - A Codespace normally cannot access a Devbox profile. Record `personal-route: not-reachable-from-host` and continue directly to FIC; do not classify that as an auth, environment, or product failure.
@@ -166,17 +181,17 @@ When `verificationMode == "environment_discovery"`, start with this hard gate an
      **Let that wait fail the test — never `.catch()` it and shoot anyway.** A swallowed paint wait is worse than no wait: it still costs the full timeout, and then produces exactly the unstyled image it was meant to prevent, with nothing in the log to say the guard fired. Observed: a spec whose wait required a non-transparent background caught the timeout, waited a further 3s, and screenshotted a transparent surface — the image was only stopped later, by hand. If the wait times out, that is the finding; report it as `component-rendered-unstyled` and read the paragraph on `mountNode` in step 9 before assuming it was a timing problem.
    - Set and record one viewport size for both phases.
    - Use `page.screenshot({ path, fullPage: false })` after setting the viewport; `fullPage: false` captures the entire current viewport rather than one DOM element.
-   - Save it to `<sessionDir>/evaluation/iter<N>/before-<component>-full.png`.
+   - Save it to `<sessionDir>/evaluation/iter<N>/scenario-<id>-before-<component>-full.png`.
    - You may additionally save `<sessionDir>/evaluation/iter<N>/before-<component>-crop.png` for close-up inspection, but a crop is supplemental only.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `before-screenshot-missing`.
-   - Append progress: `[HH:MM:SS] 📸 BEFORE captured — <path>`.
+   - Append progress: `[HH:MM:SS] 📸 BEFORE captured (<scenario id>) — <path>`.
 7. Run the same selected screenshot engine against the changed build → AFTER. Keep the exact same flags, setup, trigger, viewport, and fixture. Verify discriminator again.
    - Prove the affected bundle loaded, not merely that some URL contains the PR build number. For SP-Client, require debug consent, `prBuildCount > 0`, and a resource entry for the affected assembly/chunk. For ODSP-Next and OnePlayer, require a resource entry for the affected app bundle from the selected PR route. Record the matched resource URL with hashes/query secrets removed.
    - If the expected rendered component changes (for example Link → stable Button), assert a branch-specific DOM/computed-style discriminator. If it remains on the BEFORE component, return `FAIL` even when the screenshots are pixel-identical.
-8. Capture the primary AFTER screenshot with the same full-page/viewport method and dimensions → save to `<sessionDir>/evaluation/iter<N>/after-<component>-full.png`.
+8. Capture the primary AFTER screenshot with the same full-page/viewport method and dimensions → save to `<sessionDir>/evaluation/iter<N>/scenario-<id>-after-<component>-full.png`.
    - An optional `<sessionDir>/evaluation/iter<N>/after-<component>-crop.png` may accompany it, but must not replace it.
    - If screenshot capture fails or no path is produced, return `FAIL` with blocker `after-screenshot-missing`.
-   - Append progress: `[HH:MM:SS] 📸 AFTER captured — <path>`.
+   - Append progress: `[HH:MM:SS] 📸 AFTER captured (<scenario id>) — <path>`.
 9. Run `file -- "<beforePath>" "<afterPath>"` with the shell tool and quote its PNG dimension output in `evaluator-report.md`. Verify both primary PNG dimensions equal the configured viewport dimensions and visually inspect both images for surrounding page context. If either primary image is component-width, clipped, missing page context, or otherwise not the full viewport, return `failureKind: "evaluator-spec"` with blocker `primary-screenshot-not-full-viewport`.
 
    If BEFORE and AFTER are pixel-identical or all recorded component geometry is identical for a visible component migration, stop and re-prove the source and branch discriminator before judging appearance. Exact equality is a source-verification alarm, not a PASS condition. If affected-resource and changed-branch proof is absent, return `failureKind: "evaluator-spec"` with blocker `after-build-not-proven`.
@@ -267,7 +282,8 @@ If pattern is `D`, do not skip immediately. First probe reachability (app entry 
 - <criterion>: PASS/FAIL — <evidence: file:line, or DOM snippet, or screenshot path>
 
 ## Visual validation
-- <captured / skipped / failed> — <before/after paths or reason>
+- Scenario coverage: <complete|incomplete> — <executed>/<required>
+- <scenario id + label>: <captured / failed> — <before/after paths or reason>
 
 ## Layout geometry
 - Required: <true|false>
@@ -286,10 +302,15 @@ A criterion is PASS only with concrete evidence. "Looks right" is not evidence. 
 Write `artifactPath` with the full report. Append exactly one JSON line to `reportFile`:
 
 ```json
-{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","contextGuardStatus":"complete|not-applicable|failure","layoutGeometry":{"required":true,"selector":"<repeated item selector>","axis":"vertical|horizontal","beforeRects":[{"top":0,"right":0,"bottom":0,"left":0}],"afterRects":[{"top":0,"right":0,"bottom":0,"left":0}],"beforeGap":0,"afterGap":0,"verdict":"PASS|FAIL"},"visualValidation":{"status":"captured|skipped|failed","source":"personal-persistent-profile|pr-cdn-fic|local-rush-start","captureMethod":"page","viewport":{"width":1440,"height":1000},"beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<required for repeated/dense UI; otherwise optional>","afterCropPath":"<required for repeated/dense UI; otherwise optional>","dimensionEvidence":"<verbatim file output>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
+{"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","contextGuardStatus":"complete|not-applicable|failure","layoutGeometry":{"required":true,"selector":"<repeated item selector>","axis":"vertical|horizontal","beforeRects":[{"top":0,"right":0,"bottom":0,"left":0}],"afterRects":[{"top":0,"right":0,"bottom":0,"left":0}],"beforeGap":0,"afterGap":0,"verdict":"PASS|FAIL"},"visualValidation":{"status":"captured|skipped|failed","source":"personal-persistent-profile|pr-cdn-fic|local-rush-start","captureMethod":"page","viewport":{"width":1440,"height":1000},"scenarioCoverage":"complete|incomplete","requiredScenarioCount":1,"capturedScenarioCount":1,"scenarios":[{"id":"<stable id>","label":"<label>","status":"captured|failed","beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<optional/required crop>","afterCropPath":"<optional/required crop>","dimensionEvidence":"<verbatim file output>","reasonForFail":"<required if failed>"}],"beforePath":"<backward-compatible first scenario full-viewport path>","afterPath":"<backward-compatible first scenario full-viewport path>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
 ```
 
-For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured`, `captureMethod` is `page`, both primary paths are populated, both PNG dimensions match `visualValidation.viewport`, and visual inspection confirms surrounding page context. Component-only crops are never valid primary paths.
+For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured`,
+`scenarioCoverage` is `complete`, every required scenario has one entry with status `captured`,
+`captureMethod` is `page`, every scenario's primary paths are populated, all PNG dimensions match
+`visualValidation.viewport`, and visual inspection confirms surrounding page context. Component-only
+crops are never valid primary paths. Top-level `beforePath` / `afterPath` mirror the first scenario
+only for backward compatibility and never prove matrix completeness.
 When `layoutGeometry.required` is true, `verdict` must also be `FAIL` unless both crop paths are populated, at least two BEFORE and AFTER rectangles are recorded, and `layoutGeometry.verdict` is `PASS`.
 Omit `coverageManifest` only when the verdict makes no claim about auth, FIC, tenants, sites, fixtures, or environment availability.
 
