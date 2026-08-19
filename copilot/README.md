@@ -46,6 +46,11 @@ All other work uses the `FULL` planner agent. Both modes keep the same build,
 evaluation, review, and PR gates, and the decision is recorded in
 `planning/planner-mode.json`, `progress.log`, and `report.json`.
 
+Runs are also interruption-safe. `run-state.json` and append-only request/lifecycle histories keep
+the active phase and requirement revisions on disk, while a detached watcher reconciles every
+artifact and screenshot into `artifact-index.json`, `report.json`, and `progress.log`. Same-task
+follow-ups after completion checkpoint the prior revision and resume the existing run.
+
 For visible UI changes, BEFORE/AFTER Playwright screenshots are mandatory. AgentOW uses one screenshot engine: the repository Playwright/Heft harness with FIC authentication. It first validates the local `rush start` bundle, then uses the PR CDN bundle as the only fallback. Playwright MCP is not an AgentOW route. If the evaluator cannot capture real screenshots, it must return `FAIL` with the exact reason (FIC auth prompt, missing debug link, selector mismatch, screenshot failure, etc.). The run must not claim visual verification passed without screenshot paths.
 
 ## Shared MCP server

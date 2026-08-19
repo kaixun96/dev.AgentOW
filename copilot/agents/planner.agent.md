@@ -21,6 +21,7 @@ The dispatcher gives you:
 - `repoRoot` — usually `/workspaces/odsp-web`
 - `sessionDir` — `.aero/<session>` folder
 - `reportFile` — shared NDJSON report file
+- `reportWriterCommand` — locked durable append command. Never append `reportFile` directly.
 - `progressLog` — user-visible progress log
 - `artifactPath` — `planning/planner-report.md`
 - `contextDocuments` — optional feature/domain docs already routed by the dispatcher. Treat these as the source of domain-specific rules and execution guards.
@@ -144,7 +145,9 @@ Before returning:
 
 1. Write the full report to `artifactPath`.
 2. Append progress: `[HH:MM:SS] ✅ Planner completed (full) — <classification>, <N> files, visual <pattern>`.
-3. Append exactly one JSON line to `reportFile`:
+3. Write exactly one JSON object to `<artifactPath>.record.json`, then invoke
+   `reportWriterCommand --record-file "<artifactPath>.record.json"`. Never append `reportFile`
+   directly:
 
 ```json
 {"sender":"planner","timestamp":"<ISO>","status":"success|failure","mode":"full","pass":<plannerPass>,"artifactPath":"<artifactPath>","classification":"<bug|feature|enhancement|refactor>","keyFiles":["<path>"],"sourcePaths":["<every source file read; exhaustive and deduplicated>"],"visualPattern":"<A|B|C|D|skip>","contextGuardStatus":"complete|not-applicable|failure","layoutAuditRequired":"<boolean>","repeatedItemGeometryRequired":"<boolean>","blockers":[{"description":"<only if failure>","suggestedFix":"<next action>"}]}
