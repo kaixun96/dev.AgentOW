@@ -389,7 +389,26 @@ export function registerOwTools(
     return successResultWithDebug(logger, "ow-pr-create", result);
   });
 
-  // ── 16. ow-pr-attach ─────────────────────────────────────────────────────
+  // ── 16. ow-pr-update ─────────────────────────────────────────────────────
+  registerMcpTool(server, "ow-pr-update", {
+    description: "Update an existing Azure DevOps PR title, description, and draft state. Use this when promoting a POC so the same PR is retained.",
+    inputSchema: {
+      prId: z.number().describe("Pull request ID to update"),
+      title: z.string().describe("Replacement PR title"),
+      description: z.string().describe("Replacement PR body in markdown"),
+      draft: z.boolean().optional().describe("Keep as draft (default: true)"),
+    },
+  }, async (input, extras) => {
+    const result = await pr.updatePr({
+      prId: input.prId,
+      title: input.title,
+      description: input.description,
+      draft: input.draft,
+    }, extras.signal);
+    return successResultWithDebug(logger, "ow-pr-update", result);
+  });
+
+  // ── 17. ow-pr-attach ─────────────────────────────────────────────────────
   registerMcpTool(server, "ow-pr-attach", {
     description: "Upload files (typically PNG screenshots) to an Azure DevOps PR, then replace its generated visual-validation description block. Keeps the 4000-character limit by removing only explicitly disposable generated sections; never drops human-authored content or posts comments. Use {{name}} placeholders in appendToDescription.",
     inputSchema: {
@@ -409,7 +428,7 @@ export function registerOwTools(
     return successResultWithDebug(logger, "ow-pr-attach", result);
   });
 
-  // ── 17. ow-pr-debug-query ────────────────────────────────────────────────
+  // ── 18. ow-pr-debug-query ────────────────────────────────────────────────
   registerMcpTool(server, "ow-pr-debug-query", {
     description: "Fetch the SP-Client Validation CDN debug query from an Azure DevOps PR thread. Uses az token first, then git credential fallback. Also probes loader/manifests HTTP status.",
     inputSchema: {

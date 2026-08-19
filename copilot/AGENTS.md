@@ -173,7 +173,7 @@ Environment claims have a second hard gate: one failed URL, credential, tenant, 
 6. Fix loop     → classify FAIL: environment discovery stays evaluator-only; product defects return to YOU. Max 5 product cycles.
 7. Review       → dispatch @reviewer → surface findings
 8. Maintain     → update linked context from as-built evidence without a user gate
-9. Ship         → ow-pr-create (draft PR), then ow-pr-attach for screenshots if captured
+9. Ship         → ow-pr-create for a new draft PR, ow-pr-update for POC promotion, then ow-pr-attach
 ```
 
 The `agentow` skill walks you through this in detail. It auto-loads when the user asks to implement a feature or fix a bug in odsp-web.
@@ -184,7 +184,18 @@ The `agentow` skill walks you through this in detail. It auto-loads when the use
 
 - **Interactive** (default) — clarify intent and approve the plan. Validated review remains mandatory; Critical and Important findings must be fixed.
 - **Auto** (`--auto` in the prompt) — skip intent and plan-approval questions, but never skip validated review or ship unresolved Critical/Important findings.
+- **POC** (`--poc`, optionally with `--auto`) — optimize for a runnable demo: bounded
+  main-session planning, mandatory build/typecheck, tests skipped by default, AFTER-only validation
+  of the requested/default UI state, and an advisory reviewer that blocks only Critical safety
+  defects. Creates a `[POC]` draft PR with explicit skipped-gate disclosure and never auto-merges.
+  Authentication/security, destructive data operations, migrations, production configuration, and
+  secrets are not eligible for POC mode.
 - **Batch** (`/ow-batch`) — serial unattended loop over multiple main-session agentOW AUTO runs. Each task gets fresh bounded planner/evaluator/reviewer subagents, a checkpoint, and one summary row.
+
+`--poc` is an execution profile; `--auto` controls interaction, so they can be combined. A later
+`promote this POC` reuses the same `.aero` run, branch, and draft PR, checkpoints the POC revision,
+and runs the complete STANDARD planner/test/BEFORE-AFTER/reviewer/context pipeline before removing
+the POC warning.
 
 ## Core principles
 

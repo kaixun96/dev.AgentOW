@@ -9,9 +9,26 @@ You (the main session) drive this end to end. You are the orchestrator AND the i
 
 ## Mode
 
-If the prompt contains `--auto` (or the user says "no questions" / "just do it"), this is **AUTO mode**: skip every user gate. Otherwise **INTERACTIVE mode**.
+Execution profile and interaction mode are separate:
 
-Announce the mode in one line before starting, so the user knows what to expect.
+- `--poc` selects **POC profile**: optimize for a runnable result and fast visual feedback, not
+  production readiness. It uses bounded main-session planning, skips tests by default, performs an
+  advisory safety review, and captures AFTER-only UI evidence for the requested/default scenario.
+- Without `--poc`, use the **STANDARD profile** and every normal quality gate in this document.
+- `--auto` (or "no questions" / "just do it") selects **AUTO interaction** and skips user gates.
+  Otherwise interaction is **INTERACTIVE**. `--poc --auto` is valid.
+
+Announce both dimensions in one line, for example `POC + AUTO` or `STANDARD + INTERACTIVE`.
+
+POC is forbidden for authentication/authorization, security/privacy boundaries, destructive data
+operations, schema/data migrations, production configuration, or secrets. Switch to STANDARD for
+those tasks. POC never means permission to ignore compiler errors, obvious runtime failure, data
+loss, or security defects.
+
+If the user says **"promote this POC"**, reuse the same `.aero` run, branch, and draft PR. Record a
+`requirement-change --profile standard`, checkpoint the POC revision, switch the profile to STANDARD, and restart at
+Understand/Planning. Run FULL planning, tests, full scenario BEFORE/AFTER evaluation, and strict
+review. Remove POC labeling only after all STANDARD gates pass. Never create a second run or PR.
 
 ## Durable conversation and follow-up protocol
 
@@ -51,6 +68,7 @@ Commands:
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" event "<sessionDir>" \
   --type note|interruption|resume|requirement-change \
+  --profile standard|poc \
   --message-file "<messageFile>" --event-id "<unique inbound message id>" \
   --reason "<concise reason>"
 
@@ -100,7 +118,8 @@ durable state and launch its detached reconciliation watcher before any research
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" init "<sessionDir>" \
-  --request-file "<sessionDir>/request.txt" --run-id "<session>"
+  --request-file "<sessionDir>/request.txt" --run-id "<session>" \
+  --profile "<poc when --poc is present; otherwise standard>"
 
 nohup node "${CLAUDE_PLUGIN_ROOT}/tools/progress-watcher.mjs" "<sessionDir>" \
   > "<sessionDir>/.progress-watcher.out" 2>&1 &
@@ -187,9 +206,34 @@ After source paths are known, route them through the same manifest. FAST must do
 
 agentOW is the routing and execution layer; feature-specific rules and execution guards live in those context docs, not in this skill.
 
+**POC profile:** resolve and read directly named context plus repository instructions, but do not run
+context-completion passes or write plan/as-built updates to the linked library. Record
+`contextMaintenance: "deferred-for-poc"` in run artifacts. Promotion performs the full routing and
+maintenance contract.
+
 ## Step 2: Select planner mode + research
 
 Automatically select `FAST` or `FULL`; the user does not need to choose.
+
+### POC planner
+
+In POC profile, do not dispatch the planner agent and do not apply FAST eligibility/escalation.
+Perform one bounded main-session source pass:
+
+1. Locate the target surface/behavior, its nearest existing pattern, and the smallest runnable edit.
+2. Read direct callers/consumers and repository instructions; do not perform exhaustive architecture,
+   reuse, context-completion, or scenario discovery.
+3. Write `planning/planner-mode.json` with `"mode":"poc"` and the explicit shortcuts.
+4. Write a short source-cited `planning/planner-report.md`: target files, chosen pattern, runnable
+   acceptance check, requested/default visual scenario, assumptions, and risks deferred to promotion.
+5. Submit a planner record with `"mode":"poc"` and append
+   `[HH:MM:SS] ✅ Planner completed (poc) — <N> files, <scenario>`.
+
+Do not use uncertain scope as a reason to launch FULL planning in POC profile. Ask one blocking
+question only when no plausible runnable interpretation exists. The POC planner must still stop or
+switch to STANDARD for the forbidden risk classes in the Mode section.
+
+The FAST/FULL rules below apply only to STANDARD profile.
 
 Record durable phase `planning` before selecting or dispatching a planner. Reconcile immediately
 after every planner pass before reading its report.
@@ -291,7 +335,7 @@ If FAST source verification finds contradictory evidence, more than two product 
 
 ## Step 3: Plan + approval
 
-Using the planner report (FAST or FULL), write a short plan:
+Using the planner report (POC, FAST, or FULL), write a short plan:
 - Spec (2-3 sentences)
 - Acceptance criteria (clear pass/fail)
 - Tasks (exact files, what changes)
@@ -323,6 +367,11 @@ Using the planner report (FAST or FULL), write a short plan:
 - Context compliance checklist (each routed guard and its required artifact)
 - Root/wrapper layout ownership table when any JSX root/wrapper is replaced
 - Repeated-item geometry target (selector, axis, metric) when Cards/rows/tiles/items repeat
+
+**POC profile:** keep only Spec, runnable acceptance check, exact edit tasks, requested/default final
+scenario, assumptions, and deferred production gates. Component-fit matrices, exhaustive scenario
+matrices, architecture tables, context audits, and layout inventories are deferred unless required
+to make the POC run at all.
 
 Save it locally to `/workspaces/odsp-web/.aero/<session>/plan.md` (a local working doc, not committed).
 
@@ -387,7 +436,16 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 4. **Build:** `ow-build` on the affected project. If it fails:
    - Classify: rush infra error (`shrinkwrap-deps.json` missing, `inputsSnapshot not found`) → run `ow-rush install` once, retry. Auth/network error → stop and report. Code error → fix and rebuild (max 3 attempts).
    - If the MCP request times out but a `rush build -t <project>` process is still running, do **not** treat it as build failure. Log `⚠️ Build tool timeout — tracking underlying Rush process`, wait for the real Rush process to exit, then read `common/temp/markdown-summary/build-summary.md` and the raw log. Record this in `agent-metrics.md` as `tool-timeout / self-recovered-by-process-tracking`.
-5. **Test:** `ow-test` scoped to tests that own the changed observable behavior (not every changed file and not the full suite). For Flight/KS changes, exercise enabled/fallback behavior through the nearest stable consumer. Do not add or run a dedicated unit test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent logic that can regress separately. If no meaningful test target exists, record the evidence-backed reason; don't run 600 unrelated tests.
+   - Build/typecheck is a hard gate in every profile, including POC. Never ship a POC with compiler
+    or type errors.
+5. **Test:** in POC profile, do not add or run tests unless the user explicitly requests them; append
+   `🧪 Tests skipped — POC profile` and record the skip in implementation/final artifacts and the PR
+   description. In STANDARD profile, run `ow-test` scoped to tests that own the changed observable
+   behavior (not every changed file and not the full suite). For Flight/KS changes, exercise
+   enabled/fallback behavior through the nearest stable consumer. Do not add or run a dedicated unit
+   test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent logic
+   that can regress separately. If no meaningful test target exists, record the evidence-backed
+   reason; don't run 600 unrelated tests.
 6. **Dev server / debug link:** follow the feature context docs for the surface's verification contract. For UI-visible changes, prefer `ow-start` + `ow-debuglink` before PR validation builds finish; if the context docs require additional guards, execute those guards and record the result.
 7. **Commit** (don't push yet).
 
@@ -415,7 +473,8 @@ Submit the generator/implementation record through `run-state.mjs report`.
 Record durable phase `evaluation`.
 Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
 
-Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, scenario
+Dispatch `@agentow-copilot:evaluator` with `verificationMode: poc` for POC profile or `full` for
+STANDARD, plus the request, acceptance criteria, surface trace, scenario
 matrix, changed files, cycle number, debug link, routed `contextDocuments`, `planPath`,
 `implementationArtifactPath`, `sessionDir`, `reportFile`, `reportWriterCommand`, `progressLog`, and
 `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for
@@ -428,6 +487,12 @@ must inventory them even when the evaluator omitted its final NDJSON line.
 **Never end the turn while a dispatched subagent is still running.** Wait for its verdict. A run that reports "the browser capture is still running, I'm waiting for its result" and then terminates has abandoned the work mid-flight: the subagent's findings are lost, nothing is written to the artifact, and the next run repeats the whole discovery. If the wait is genuinely unbounded, record what was dispatched and why you stopped, then return a `FAIL` naming that — an explicit abandonment is recoverable, a silent one is not.
 
 For UI-visible changes, visual validation is mandatory and the evaluator owns it:
+- **POC profile:** capture one full-viewport AFTER screenshot of the requested/default final scenario
+  and prove the changed bundle plus final-state discriminator. BEFORE, exhaustive scenario coverage,
+  supplemental crops, geometry comparison, and environment fleet exhaustion are deferred. The main
+  session must still inspect the AFTER image. If the final state cannot be rendered after the POC
+  retry budget, stop without creating a PR.
+- The remaining bullets in this section are STANDARD-only.
 - Every required scenario matrix row must have its own evaluator-produced full-viewport BEFORE and
   AFTER pair. `scenarioCoverage` must be `complete`, with captured count equal to required count.
   One default screenshot pair never substitutes for additional source-proven options or states.
@@ -458,6 +523,14 @@ Before accepting any evaluator claim about auth, FIC, tenant suitability, test-p
 
 ## Step 6: Fix loop
 
+**POC profile:** fix only compiler/type errors, obvious runtime failure, failure to render the
+requested final state, gross request mismatch, or a Critical safety finding. Allow at most two
+implementation cycles. Rebuild and rerun only the bounded POC evaluator/reviewer. If any of those failures remain after the second cycle, stop without creating a POC PR: a POC that
+does not run or show the requested result is not useful. Record everything else as promotion debt
+and continue to Step 7.
+
+The remaining Step 6 rules apply only to STANDARD profile.
+
 **Environment-discovery incomplete (any cycle):** re-dispatch only `@agentow-copilot:evaluator` in the same implementation cycle with the missing coverage requirements. If the retry is still incomplete, do not claim the environment is unsupported and do not claim the UI was verified.
 
 - If nothing has been committed yet, stop and report the blocker.
@@ -485,7 +558,20 @@ Before starting each fix cycle, append `[HH:MM:SS] 🔁 Fix cycle N+1 — <reaso
 Record durable phase `review`, dispatch the reviewer, then reconcile immediately after it returns. (dispatch reviewer)
 
 Append `[HH:MM:SS] 📝 Reviewer started` before dispatching.
-Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`. The review is a hard evidence gate in interactive, AUTO, and batch execution.
+In POC profile, dispatch the reviewer with `mode: poc-advisory`. It performs a bounded diff review
+only for security/privacy exposure, destructive behavior or data loss, obvious runtime failure,
+compiler/type errors, and gross mismatch with the requested result. Do not run the full review
+contract validator, require exhaustive references/evidence, or loop on Important/Minor findings.
+Critical safety findings still block the POC; everything else is recorded as promotion debt.
+Pass only the request, branch, changed files, session/report writer paths, and artifact paths. After
+it returns, reconcile and require `POC_SAFE_TO_DEMO` before continuing to Step 8. A `POC_BLOCKED`
+verdict returns to the bounded POC fix loop; if the second implementation cycle is exhausted, stop
+without creating a PR. Do not resolve a review ledger or run the validator.
+
+In STANDARD profile, read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`. The review is a hard
+evidence gate in interactive, AUTO, and batch execution.
+
+The remaining Step 7 procedure applies only to STANDARD profile.
 
 Resolve the branch's review ledger first, so a finding already dispositioned on this branch is never raised again:
 
@@ -525,7 +611,8 @@ evaluationArtifactPaths:
 
 Read the final evaluator NDJSON record immediately before dispatch. Pass only artifact paths that the record actually returned and that exist; do not synthesize conventional paths. If the final evaluator record or its required artifacts are missing, classify it as `evaluator-spec` and stop or retry under Step 6 rather than reviewing stale evidence.
 
-After the reviewer returns, independently recompute the merge base, HEAD, diff digest, and changed-file list, then validate:
+In STANDARD profile, after the reviewer returns, independently recompute the merge base, HEAD, diff
+digest, and changed-file list, then validate:
 
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
@@ -570,6 +657,9 @@ The reason is shown to the author and to every later reviewer, so it must say wh
 
 This phase never pauses the product workflow.
 
+**POC profile:** skip this phase and record `deferred-for-poc`. Promotion runs it after STANDARD
+evaluation and review.
+
 1. Append `evaluation` and `review` evidence events with artifact digests, outcomes, blockers, and citations.
 2. Dispatch `@agentow-copilot:context-maintainer` with `mode: as-built`, the actual commit/diff, approved plan, evaluator artifact, reviewer artifact, and prior candidate.
 3. The new immutable candidate must correct or supersede plan intent that the code did not implement.
@@ -580,7 +670,29 @@ No-update, patch-only, disabled, dirty-worktree, read-only, auth, or conflict ou
 
 ## Step 9: Ship
 
-1. **Push** the branch and **create the draft PR:** `ow-pr-create` with title (from the plan spec) and description (Summary + Changes — no generic auto-generated "Testing" section). For SP-Client runtime changes, the first line must be `Gate: <Flight/KS identifier> — <enabled/new-path direction>; <disabled/fallback direction>`, grounded in the validated `preReview.rolloutProtection` artifact. When the ledger has entries, append its rendered block to the description so the accepted nits and their reasons travel with the PR:
+1. **Push** the branch. For a new run, create the draft PR with `ow-pr-create`. When promoting an
+   existing POC, call `ow-pr-update` with its existing `prId`; never call `ow-pr-create`, never create
+   a second PR, and keep it draft. Use the title from the plan spec and a Summary + Changes
+   description (no generic auto-generated "Testing" section). POC titles start with `[POC]` and the
+   first description block must be:
+
+   ```text
+   > [!WARNING]
+   > POC — NOT PRODUCTION READY. Build/typecheck and final-result validation only.
+
+   ## Skipped quality gates
+   - Tests: skipped
+   - Planning: bounded POC source pass
+   - Visual comparison: AFTER only; exhaustive scenarios deferred
+   - Review: advisory; non-critical findings deferred
+   - Context maintenance: deferred
+   ```
+
+   POC PRs always remain draft and agentOW must never merge them. In STANDARD profile, for SP-Client
+   runtime changes, the first line must be `Gate: <Flight/KS identifier> — <enabled/new-path
+   direction>; <disabled/fallback direction>`, grounded in the validated
+   `preReview.rolloutProtection` artifact. When the ledger has entries, append its rendered block to
+   the description so the accepted nits and their reasons travel with the PR:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
@@ -588,8 +700,16 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
 ```
 
    The block is human-readable and carries a machine-readable comment, so a later reviewer on any machine recovers the same decisions with `review-ledger.mjs parse` instead of re-raising them.
-2. **Visual validation for UI changes:** prefer a dispatcher-provided, reachable compliant personal-account Playwright profile. It must compare target/current with the changed build under identical flights and set `visualValidation.source=personal-persistent-profile`. A Codespace that cannot reach the Devbox profile falls back immediately to the evaluator's FIC Playwright/Heft spec: local `rush start` first, then `ow-pr-debug-query` / `finalValidationMode=pr-cdn-fic` for a proven route-specific local failure. Playwright MCP and `browser_*` tools are not validation routes.
-3. **Attach screenshots** for UI changes. Attach only evaluator-produced screenshot paths. Render a
+2. **Visual validation for UI changes:** POC uses its validated AFTER-only result. STANDARD prefers a
+   dispatcher-provided, reachable compliant personal-account Playwright profile and compares
+   target/current with the changed build under identical flights. A Codespace that cannot reach the
+   Devbox profile falls back immediately to the evaluator's FIC Playwright/Heft spec: local
+   `rush start` first, then `ow-pr-debug-query` / `finalValidationMode=pr-cdn-fic` for a proven
+   route-specific local failure. Playwright MCP and `browser_*` tools are not validation routes.
+3. **Attach screenshots** for UI changes. In POC, attach `visualValidation.afterPath` and render one
+   `Final result` link/image; `poc=true`, `comparison=after-only`, and the final-state discriminator
+   are the completeness contract. Do not require `visualValidation.scenarios` or a BEFORE path.
+   In STANDARD, attach only evaluator-produced screenshot paths and render a
    compact PR table with one row per required scenario and BEFORE/AFTER links from
    `visualValidation.scenarios`. Component crops may be supplemental links, but never replace the
    primary images. Include `visualValidation.source`.
@@ -601,14 +721,17 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
      diagnostics may be wrapped in
      `<!-- agentow:disposable:start label --> ... <!-- agentow:disposable:end -->`; the attachment
      tool removes those only when needed. Never silently delete human-authored or required content.
-   - Missing/incomplete scenario evidence blocks PR creation unless Step 6 proved a complete
+   - In STANDARD, missing/incomplete scenario evidence blocks PR creation unless Step 6 proved a complete
      external fixture gap; only that case may ship as `success-with-blockers`.
-   - If visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.
+   - In STANDARD, if visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.
 4. **Report** the PR URL to the user.
 
 Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status,
 PR URL if any, screenshot paths if captured, any remaining blockers, and the timing summary from
 `run-state.mjs timing`.
+
+For POC, set final status `poc-complete`, list every skipped gate and promotion debt, and end with:
+`To make this production-ready, say "promote this POC".`
 
 Include the context library ID, plan-stage result, as-built result, latest candidate path, applied context commit/PR if any, and pending patch/conflict path. Append a compact reference entry to `~/.config/agentow/runs.ndjson` keyed by run ID and PR URL so `/ow-context-feedback` can resume the provenance chain later.
 

@@ -32,10 +32,22 @@ function runAsync(...args) {
   });
 }
 
-run('init', session, '--request-file', request, '--run-id', 'test-run');
+function runFailure(...args) {
+  const result = spawnSync(process.execPath, [tool, ...args], { encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  return result.stderr;
+}
+
+assert.match(
+  runFailure('init', path.join(root, '.aero', 'invalid-profile'), '--profile', 'unsafe'),
+  /unsupported execution profile/
+);
+
+run('init', session, '--request-file', request, '--run-id', 'test-run', '--profile', 'poc');
 const initialState = JSON.parse(fs.readFileSync(path.join(session, 'run-state.json')));
 assert.equal(initialState.revision, 1);
 assert.equal(initialState.schemaVersion, 2);
+assert.equal(initialState.executionProfile, 'poc');
 assert.equal(initialState.timing.summary.currentPhase, 'orient');
 
 initialState.timing.activeSince = new Date(Date.now() - 1_000).toISOString();
@@ -147,10 +159,13 @@ const reopened = run(
   '--message-file',
   change,
   '--event-id',
-  '../../change-2'
+  '../../change-2',
+  '--profile',
+  'standard'
 );
 assert.equal(reopened.status, 'active');
 assert.equal(reopened.revision, 3);
+assert.equal(reopened.executionProfile, 'standard');
 assert.equal(fs.existsSync(path.join(root, 'change-2')), false);
 const retriedReopen = run(
   'event',

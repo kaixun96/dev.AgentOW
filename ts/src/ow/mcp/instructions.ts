@@ -29,6 +29,7 @@ You are connected to the ow MCP server — a dev toolkit for odsp-web developmen
 
 ### PR Creation
 - ow-pr-create       — Push current branch and create a draft PR on Azure DevOps. Returns PR URL.
+- ow-pr-update       — Update an existing draft PR title and description, including POC promotion.
 - ow-pr-attach       — Upload screenshots/files as attachments to an existing PR and append them to the PR description. It never posts PR comments.
 - ow-pr-debug-query  — Fetch the PR SP-Client Validation CDN debug query from PR threads, with ADO auth fallback and CDN status probes.
 
@@ -43,7 +44,7 @@ Since Claude Code runs directly inside the Codespace, all commands execute local
 5. ow-start — rush start in tmux for dev server.
 6. ow-session-capture on 'agentow:rush' — poll until [WATCHING] or FAILURE:.
 7. ow-debuglink — extract debug URL from rush output.
-8. ow-pr-create — push and create draft PR when ready.
+8. ow-pr-create — push and create draft PR when ready; use ow-pr-update instead when promoting an existing POC PR.
 
 ## Rules
 

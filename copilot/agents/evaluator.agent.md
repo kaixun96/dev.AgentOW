@@ -37,7 +37,7 @@ The dispatcher gives you:
 - `progressLog` — user-visible progress log
 - `artifactPath` — `evaluation/iter<N>/evaluator-report.md`
 - `debugUrl` — debug URL/query from the implementer, if already known
-- `verificationMode` — optional `full` (default) or `environment_discovery`. Environment discovery resumes candidate search from prior evidence without requesting code changes or a rebuild.
+- `verificationMode` — optional `full` (default), `poc`, or `environment_discovery`. Environment discovery resumes candidate search from prior evidence without requesting code changes or a rebuild.
 - `finalValidationMode` — optional. `personal-browser` selects the provided personal evaluator. `pr-cdn-fic` selects final FIC validation against the PR CDN query.
 - `personalEvaluatorScript` — optional absolute path to the standard persistent-profile evaluator script on the current host.
 - `personalEvaluatorEvidence` — optional validated artifact bundle produced by that script (full-page paths, crop paths, metrics, source revisions, and flags).
@@ -53,6 +53,23 @@ Use `view` / `grep` to confirm the changed code matches the intent and the accep
 ### UI criteria (mandatory screenshots for Pattern A/B/C)
 
 If `surfaceTrace` describes a visible UI surface, screenshots are mandatory. You may skip screenshots only when `surfaceTrace` is explicitly `Pattern: skip` with a non-UI/server-side reason, or `Pattern: D` has been probed and confirmed unreachable. If unsure whether the change is visible, treat it as visible and attempt screenshots.
+
+When `verificationMode == "poc"`, replace the standard visual procedure with this bounded contract:
+
+1. Validate the changed build is served and the affected bundle loaded.
+2. Use the planner's requested/default scenario only. Establish its precondition, drive the real
+   trigger, and assert the final-state discriminator/expected visible result.
+3. Capture one full-viewport AFTER screenshot at
+   `<sessionDir>/evaluation/iter<N>/poc-after-<component>-full.png`.
+4. Inspect the final rendering for obvious broken/unstyled output and record the screenshot,
+   discriminator, viewport, affected-resource proof, and any blocker.
+5. Set `visualValidation.poc=true`, `comparison="after-only"`, and `afterPath`. BEFORE capture,
+   scenario-matrix completeness, crops/geometry, environment fleet exhaustion, and code-quality
+   review are explicitly deferred to promotion.
+
+POC PASS means only "the requested final result rendered on the changed build"; it never means
+production-ready or regression-safe. Missing affected-resource proof, discriminator, or AFTER image
+is FAIL. Do not run the remaining standard UI procedure in POC mode.
 
 For visible UI, `scenarioMatrix` is a hard coverage contract. It must contain one to five required
 scenarios. Execute every required row without waiting for the work item to name each option. Reuse
@@ -309,7 +326,18 @@ directly:
 {"sender":"evaluator","timestamp":"<ISO>","cycle":1,"status":"success|failure","verdict":"PASS|FAIL","failureKind":"product|evaluator-spec|environment-discovery-incomplete|fixture-gap","artifactPath":"<artifactPath>","contextGuardStatus":"complete|not-applicable|failure","layoutGeometry":{"required":true,"selector":"<repeated item selector>","axis":"vertical|horizontal","beforeRects":[{"top":0,"right":0,"bottom":0,"left":0}],"afterRects":[{"top":0,"right":0,"bottom":0,"left":0}],"beforeGap":0,"afterGap":0,"verdict":"PASS|FAIL"},"visualValidation":{"status":"captured|skipped|failed","source":"personal-persistent-profile|pr-cdn-fic|local-rush-start","captureMethod":"page","viewport":{"width":1440,"height":1000},"scenarioCoverage":"complete|incomplete","requiredScenarioCount":1,"capturedScenarioCount":1,"scenarios":[{"id":"<stable id>","label":"<label>","status":"captured|failed","beforePath":"<absolute full-viewport path>","afterPath":"<absolute full-viewport path>","beforeCropPath":"<optional/required crop>","afterCropPath":"<optional/required crop>","dimensionEvidence":"<verbatim file output>","reasonForFail":"<required if failed>"}],"beforePath":"<backward-compatible first scenario full-viewport path>","afterPath":"<backward-compatible first scenario full-viewport path>","reasonForSkipOrFail":"<required if not captured>"},"coverageManifest":{"status":"complete|incomplete","exactFixtureRequired":false,"capabilityPredicates":[],"pools":[],"discoveryPaths":[],"uniqueTenantCount":0,"candidatesDiscovered":0,"candidatesProbed":0,"candidateResults":[],"exhaustionReason":""},"blockers":[{"target":"generator|evaluator-spec|evaluator-environment|external","description":"<failure>","suggestedFix":"<specific next action>"}]}
 ```
 
-For UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured`,
+For POC, use the same outer record with this bounded visual object:
+
+```json
+{"visualValidation":{"status":"captured|failed","poc":true,"productionReady":false,"comparison":"after-only","source":"personal-persistent-profile|pr-cdn-fic|local-rush-start","captureMethod":"page","viewport":{"width":1440,"height":1000},"afterPath":"<absolute full-viewport path>","finalStateDiscriminator":"<observed proof>","affectedResourceProof":"<sanitized changed-bundle URL>","deferredGates":["before-comparison","scenario-matrix","geometry","fleet-exhaustion"]}}
+```
+
+For POC UI changes, `verdict` must be `FAIL` unless `visualValidation.poc` is `true`,
+`comparison` is `after-only`, `captureMethod` is `page`, `afterPath` is populated, its PNG
+dimensions match `visualValidation.viewport`, affected-resource proof is present, and visual
+inspection confirms the requested final state plus surrounding page context.
+
+For STANDARD UI-visible changes, `verdict` must be `FAIL` unless `visualValidation.status` is `captured`,
 `scenarioCoverage` is `complete`, every required scenario has one entry with status `captured`,
 `captureMethod` is `page`, every scenario's primary paths are populated, all PNG dimensions match
 `visualValidation.viewport`, and visual inspection confirms surrounding page context. Component-only

@@ -133,7 +133,20 @@ const checks = [
       "`context-completion pass`",
       "`context-routing-unstable`",
       "read every routed document before selecting planner mode",
-      "exhaustive `sourcePaths`"
+      "exhaustive `sourcePaths`",
+      "`--poc` selects **POC profile**",
+      "`--poc --auto` is valid",
+      "promote this POC",
+      "\"mode\":\"poc\"",
+      "Tests skipped — POC profile",
+      "mode: poc-advisory",
+      "POC — NOT PRODUCTION READY",
+      "agentOW must never merge them",
+      "final status `poc-complete`",
+      "require `POC_SAFE_TO_DEMO` before continuing",
+      "`ow-pr-update` with its existing `prId`",
+      "Do not require `visualValidation.scenarios` or a BEFORE path",
+      "does not run or show the requested result is not useful"
     ]
   },
   {
@@ -186,7 +199,11 @@ const checks = [
       "`visualValidation.source` to `personal-persistent-profile`, `local-rush-start`, or `pr-cdn-fic`",
       "`scenarioMatrix` is a hard coverage contract",
       "`scenarioCoverage` is `complete`",
-      "scenario-matrix-incomplete"
+      "scenario-matrix-incomplete",
+      "`verificationMode == \"poc\"`",
+      "`comparison=\"after-only\"`",
+      "POC PASS means only",
+      "\"productionReady\":false"
     ]
   },
   {
@@ -219,8 +236,30 @@ const checks = [
       "the main session must independently view both primary images",
       "bounded scenario matrix",
       "one-row-per-scenario table"
+      ,"`--poc`, optionally with `--auto`"
+      ,"`promote this POC` reuses the same `.aero` run"
     ]
   },
+  {
+    file: "copilot/agents/reviewer.agent.md",
+    snippets: [
+      "`poc-advisory`",
+      "POC_SAFE_TO_DEMO",
+      "\"productionReady\":false",
+      "Only a Critical safety finding blocks the POC",
+      "Do not continue into Pass 1"
+    ]
+  },
+  ...mirroredSnippetChecks(
+    "docs/USING-AGENTOW.md",
+    "docs/USING-AGENTOW.zh-CN.md",
+    [
+      "/agentow --poc",
+      "/agentow --poc --auto",
+      "promote this POC",
+      "NOT PRODUCTION READY"
+    ]
+  ),
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [

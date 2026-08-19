@@ -44,6 +44,12 @@ function parseArgs(argv) {
   return { command, sessionDir: sessionDirArg ? path.resolve(sessionDirArg) : undefined, options };
 }
 
+function validateExecutionProfile(profile) {
+  if (profile && !['standard', 'poc'].includes(profile)) {
+    throw new Error(`unsupported execution profile: ${profile}`);
+  }
+}
+
 function readJson(filePath, fallback) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -627,6 +633,7 @@ export function updateRunState(sessionDir, type, options = {}) {
     let requestEvidence;
     let eventId = options.eventId;
     const eventTimestamp = now();
+    validateExecutionProfile(options.profile);
     const replayedLifecycle =
       type !== 'requirement-change' && eventId
         ? findLifecycleEvent(sessionDir, eventId, type) ??
@@ -717,6 +724,7 @@ export function updateRunState(sessionDir, type, options = {}) {
       };
       state.status = 'active';
       state.phase = 'understand';
+      if (options.profile) state.executionProfile = options.profile;
       requestEvidence = { requestSha256: intent.sha256, eventId };
     } else if (type === 'interruption') {
       settleActiveTiming(state, eventTimestamp);
@@ -819,6 +827,7 @@ export function updateRunState(sessionDir, type, options = {}) {
 }
 
 function initSession(sessionDir, options) {
+  validateExecutionProfile(options.profile);
   fs.mkdirSync(sessionDir, { recursive: true });
   return withSessionLock(sessionDir, () => {
     for (const directory of ['planning', 'implementation', 'evaluation', 'context', 'checkpoints']) {
@@ -842,11 +851,15 @@ function initSession(sessionDir, options) {
         status: 'active',
         phase: 'orient',
         revision: 1,
+        executionProfile: options.profile ?? 'standard',
         createdAt: now(),
         updatedAt: now()
       };
       ensureTimingState(state, state.createdAt);
       refreshTimingSummary(state, state.createdAt);
+      atomicWriteJson(statePath, state);
+    } else if (!state.executionProfile) {
+      state.executionProfile = options.profile ?? 'standard';
       atomicWriteJson(statePath, state);
     }
     const initEventId = `initialized:${state.sessionId}`;
@@ -878,7 +891,7 @@ function main() {
   const { command, sessionDir, options } = parseArgs(process.argv.slice(2));
   if (!command || !sessionDir) {
     console.error(
-      'usage: node run-state.mjs <init|event|reconcile|timing|complete|report|unlock> <sessionDir> [--type <event>] [--phase <phase>] [--message-file <path>] [--record-file <path>]'
+      'usage: node run-state.mjs <init|event|reconcile|timing|complete|report|unlock> <sessionDir> [--type <event>] [--phase <phase>] [--profile <standard|poc>] [--message-file <path>] [--record-file <path>]'
     );
     process.exit(2);
   }
@@ -922,7 +935,8 @@ function main() {
           phase: options.phase,
           reason: options.reason,
           messageFile: options['message-file'],
-          eventId: options['event-id']
+          eventId: options['event-id'],
+          profile: options.profile
         })
       )
     );

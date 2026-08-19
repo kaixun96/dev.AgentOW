@@ -192,6 +192,7 @@ Re-run `/ow-init` once that finishes.
 |---|---|---|---|
 | Single task, requirements and plan need confirming | `/ow-team` | `/agentow` | yes |
 | Single task, context is already sufficient | `/ow-team --auto` | `/agentow --auto` | none |
+| Runnable proof of concept, quality gates deferred | n/a | `/agentow --poc` | optional |
 | Several independent tasks | `/ow-batch` | `/ow-batch` | none after launch |
 
 ### Interactive: for filling context gaps
@@ -213,6 +214,33 @@ Read ADO work item 1234567 and complete it per its description and acceptance cr
 ```
 
 Auto mode never waits for requirement clarification or plan approval. The agent records the assumptions it had to make into the run artifacts, so the task description has to point at a definite spec and definite acceptance criteria.
+
+### POC: fastest path to a runnable result
+
+```text
+/agentow --poc --auto
+Build a working prototype of the new PhotoGrid interaction so I can inspect the final result.
+```
+
+POC is an execution profile, while `--auto` controls interaction; use either `/agentow --poc` or
+`/agentow --poc --auto`. POC keeps build/typecheck and final-result validation, but uses a bounded
+main-session plan, skips tests by default, captures only an AFTER screenshot of the
+requested/default UI state, and treats review as advisory except for Critical safety defects.
+
+The output is always a `[POC]` draft PR with a **NOT PRODUCTION READY** warning and an explicit list
+of skipped gates. agentOW never merges it. POC mode is not available for authentication/security,
+privacy boundaries, destructive data operations, schema/data migrations, production configuration,
+or secrets.
+
+To turn the prototype into normal production work, reply in the same run:
+
+```text
+promote this POC
+```
+
+agentOW reuses the same `.aero` session, branch, and PR, then runs FULL planning, tests, complete
+scenario BEFORE/AFTER validation, strict review, and context maintenance. It removes the POC warning
+only after those gates pass.
 
 ### Automatic planner mode
 
