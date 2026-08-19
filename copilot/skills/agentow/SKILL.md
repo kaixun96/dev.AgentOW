@@ -13,6 +13,63 @@ If the prompt contains `--auto` (or the user says "no questions" / "just do it")
 
 Announce the mode in one line before starting, so the user knows what to expect.
 
+## Durable conversation and follow-up protocol
+
+The `.aero` directory is the source of truth for run continuity. Conversation context is not.
+Every run owns:
+
+- `run-state.json` — current status, phase, revision, artifact counts, and live timing summary;
+- `request-history.ndjson` — initial request plus every interruption/follow-up;
+- `lifecycle.ndjson` — append-only initialized/interrupted/resumed/revised/completed events;
+- `report-recovery.ndjson` — append-only report supplement used while another writer has an
+  incomplete trailing `report.json` record; downstream readers consume the union;
+- `artifact-index.json` — a content-hashed inventory of plans, implementation evidence,
+  evaluator output, screenshots, review, context, and final artifacts;
+- `checkpoints/revision-*/` — copies of mutable canonical artifacts before a requirement revision.
+
+For every inbound user message while a run is active or completed:
+
+1. Persist the exact message to a temporary file with a quoted heredoc before answering.
+2. Classify it:
+   - same-task clarification or extra evidence → `event --type note`;
+   - unrelated question or temporary steering → `event --type interruption`, answer it, then
+     `event --type resume` and continue the prior phase;
+   - changed acceptance criteria, scope, fix, or behavior — including after completion →
+     `event --type requirement-change`. This checkpoints the previous revision, increments the
+     revision, reopens the run at Understand, and requires re-planning/re-verification. Because a
+     completed run's watcher has exited, relaunch the detached watcher command from Step 0.
+3. Never abandon an in-flight planner/evaluator/reviewer because a message arrived. Persist the
+   interruption, collect its artifact, reconcile, then apply the user's message.
+4. Never create a fresh `.aero` directory for a follow-up to the same task/PR. Reuse the run and
+   increment its revision. Start a new run only for a genuinely separate deliverable.
+5. Never overwrite immutable iteration evidence. After a requirement change, choose the next
+   unused implementation/evaluation iteration number. Mutable `plan.md`, planner report, review,
+   and final files are copied into the revision checkpoint before replacement.
+
+Commands:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" event "<sessionDir>" \
+  --type note|interruption|resume|requirement-change \
+  --message-file "<messageFile>" --event-id "<unique inbound message id>" \
+  --reason "<concise reason>"
+
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" reconcile "<sessionDir>"
+
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" timing "<sessionDir>"
+
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" report "<sessionDir>" \
+  --record-file "<one-json-object-file>"
+```
+
+Run `reconcile` immediately before every user-visible status/final response. This repairs missing
+report/progress records from files already on disk, including evaluator screenshots.
+Use `timing` for status and final responses. Report wall-clock and active time plus the slowest
+major phases; active time excludes explicit user interruptions.
+If a command times out on `.run-state.lock`, inspect its reported owner PID. Use
+`run-state.mjs unlock "<sessionDir>"` only when that command confirms the owner is dead; it refuses
+to remove a live or freshly ownerless lock.
+
 ## Step 0: Orient
 
 Call `ow-status` (MCP) to confirm the git branch, node, and rush state. Note whether you're on `main` (you'll branch later) or already on a feature branch.
@@ -27,12 +84,34 @@ Create a durable session folder:
 ├── implementation/
 ├── evaluation/
 ├── context/
+├── checkpoints/
 ├── capabilities.json
+├── run-state.json
+├── request-history.ndjson
+├── lifecycle.ndjson
+├── report-recovery.ndjson
+├── artifact-index.json
 ├── progress.log
 └── report.json
 ```
 
-Append timestamped progress lines before each major state transition. `progress.log` is the user's real-time view when Copilot CLI does not show agent state. Treat it as a first-class UX surface: concise, emoji-prefixed, and complete enough that the user can understand the run by tailing the file. Append NDJSON records to `report.json` for planner, each implementation cycle, evaluator, reviewer, and final result.
+Write the exact initial user request to `<sessionDir>/request.txt` with a quoted heredoc. Initialize
+durable state and launch its detached reconciliation watcher before any research:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" init "<sessionDir>" \
+  --request-file "<sessionDir>/request.txt" --run-id "<session>"
+
+nohup node "${CLAUDE_PLUGIN_ROOT}/tools/progress-watcher.mjs" "<sessionDir>" \
+  > "<sessionDir>/.progress-watcher.out" 2>&1 &
+```
+
+The watcher is a backstop, not the only writer. It content-hashes artifacts recursively and
+idempotently restores missing screenshot/artifact entries in both `report.json` and
+`progress.log`. The main session must still call `run-state.mjs event ... --type phase` at every
+major transition and `reconcile` after every subagent return.
+
+Append timestamped progress lines before each major state transition. `progress.log` is the user's real-time view when Copilot CLI does not show agent state. Treat it as a first-class UX surface: concise, emoji-prefixed, and complete enough that the user can understand the run by tailing the file. Every planner, implementation, evaluator, reviewer, and final JSON record must be written to a one-object temporary file and submitted through `run-state.mjs report`; never append `report.json` directly. Readers consume and deduplicate the union of `report.json` and `report-recovery.ndjson`.
 
 Use the shared progress event contract from `AGENTS.md`. At minimum, write:
 
@@ -79,8 +158,8 @@ Append the refined request to `progress.log` before dispatching the planner.
 
 This step runs before context routing or planning. Read `${CLAUDE_PLUGIN_ROOT}/docs/capability-bootstrap.md`.
 
-1. Write the exact request to `<sessionDir>/request.txt` with a quoted heredoc.
-2. Append `[HH:MM:SS] 🩺 Bootstrap started`.
+1. Reuse the exact request already written to `<sessionDir>/request.txt`.
+2. Record durable phase `bootstrap` and append `[HH:MM:SS] 🩺 Bootstrap started`.
 3. Run:
 
    ```bash
@@ -112,6 +191,9 @@ agentOW is the routing and execution layer; feature-specific rules and execution
 
 Automatically select `FAST` or `FULL`; the user does not need to choose.
 
+Record durable phase `planning` before selecting or dispatching a planner. Reconcile immediately
+after every planner pass before reading its report.
+
 ### Planner mode decision
 
 Write `<sessionDir>/planning/planner-mode.json` before research:
@@ -134,7 +216,8 @@ Write `<sessionDir>/planning/planner-mode.json` before research:
 }
 ```
 
-Append `[HH:MM:SS] 🧭 Planner mode: FAST|FULL — <reason>` to `progress.log` and one NDJSON record to `report.json`:
+Append `[HH:MM:SS] 🧭 Planner mode: FAST|FULL — <reason>` to `progress.log`. Submit this
+record through `run-state.mjs report`:
 
 ```json
 {"sender":"planner-mode","timestamp":"<ISO>","status":"success","mode":"fast|full","artifactPath":"<sessionDir>/planning/planner-mode.json","reason":"<reason>"}
@@ -162,7 +245,7 @@ Do not dispatch the planner agent. Append `[HH:MM:SS] 📋 Planner started (fast
 5. Route the verified source paths through the context manifest, write the next immutable routing revision, and read every newly routed document.
 6. Re-evaluate file count, ownership, and context guards. Any scope expansion, contradictory evidence, or required audit/table/measurement escalates to `FULL`.
 
-Only after source-path routing passes, write `planning/planner-report.md` using the planner agent's normal output headings, including citations and an exhaustive `Source paths consulted` section. Mark it `Planner mode: FAST` and record only verified findings. Append the normal planner NDJSON line with `"mode":"fast","pass":1,"sourcePaths":[...]` and append `[HH:MM:SS] ✅ Planner completed (fast) — <classification>, <N> files, visual <pattern>`.
+Only after source-path routing passes, write `planning/planner-report.md` using the planner agent's normal output headings, including citations and an exhaustive `Source paths consulted` section. Mark it `Planner mode: FAST` and record only verified findings. Submit the normal planner record with `"mode":"fast","pass":1,"sourcePaths":[...]` through `run-state.mjs report`, then append `[HH:MM:SS] ✅ Planner completed (fast) — <classification>, <N> files, visual <pattern>`.
 
 ### FULL planner
 
@@ -177,6 +260,7 @@ request: <refined request>
 repoRoot: /workspaces/odsp-web
 sessionDir: /workspaces/odsp-web/.aero/<session>
 reportFile: /workspaces/odsp-web/.aero/<session>/report.json
+reportWriterCommand: node ${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs report /workspaces/odsp-web/.aero/<session>
 progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
 artifactPath: /workspaces/odsp-web/.aero/<session>/planning/planner-report.md
 contextDocuments:
@@ -202,7 +286,7 @@ Read the findings. If the planner reports it could not locate the root cause or 
 If FAST source verification finds contradictory evidence, more than two product files, unclear UI reachability/ownership, a mandatory context audit, or any cross-package/API/architecture/data/dependency impact:
 
 1. Rewrite `planning/planner-mode.json` with `"mode":"full"` and an `escalatedFrom:"fast"` field.
-2. Append a second `planner-mode` NDJSON record and `[HH:MM:SS] 🧭 Planner mode: FULL — escalated from FAST: <reason>`.
+2. Submit a second `planner-mode` record through `run-state.mjs report` and append `[HH:MM:SS] 🧭 Planner mode: FULL — escalated from FAST: <reason>`.
 3. Dispatch the full planner. Do not preserve unsupported FAST assumptions in the plan.
 
 ## Step 3: Plan + approval
@@ -267,6 +351,7 @@ If plan maintenance changed a routed context document, re-read it before impleme
 
 ## Step 4: Implement (you write the code)
 
+Record durable phase `implementation`.
 Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 
 1. **Branch.** If on `main`, create `user/<alias>/<feature>` from `origin/main` (use `ow-git`). `<alias>` from `whoami`.
@@ -323,17 +408,22 @@ Write `/workspaces/odsp-web/.aero/<session>/implementation/iter<N>.md` after eac
   boundaries, state ownership, any deviations from the approved responsibility map, and actual
   eager/lazy behavior plus bundle/build-output evidence for claimed loading changes
 
-Append a generator/implementation NDJSON line to `report.json`.
+Submit the generator/implementation record through `run-state.mjs report`.
 
 ## Step 5: Verify (dispatch evaluator)
 
+Record durable phase `evaluation`.
 Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
 
 Dispatch `@agentow-copilot:evaluator` with the request, acceptance criteria, surface trace, scenario
 matrix, changed files, cycle number, debug link, routed `contextDocuments`, `planPath`,
-`implementationArtifactPath`, `sessionDir`, `reportFile`, `progressLog`, and
+`implementationArtifactPath`, `sessionDir`, `reportFile`, `reportWriterCommand`, `progressLog`, and
 `artifactPath=/workspaces/odsp-web/.aero/<session>/evaluation/iter<N>/evaluator-report.md`. Wait for
 PASS/FAIL + blockers.
+
+Immediately after the evaluator returns, run `run-state.mjs reconcile` before reading its verdict.
+The evaluator may have written screenshots/findings just before a user interruption; reconciliation
+must inventory them even when the evaluator omitted its final NDJSON line.
 
 **Never end the turn while a dispatched subagent is still running.** Wait for its verdict. A run that reports "the browser capture is still running, I'm waiting for its result" and then terminates has abandoned the work mid-flight: the subagent's findings are lost, nothing is written to the artifact, and the next run repeats the whole discovery. If the wait is genuinely unbounded, record what was dispatched and why you stopped, then return a `FAIL` naming that — an explicit abandonment is recoverable, a silent one is not.
 
@@ -392,6 +482,8 @@ Before starting each fix cycle, append `[HH:MM:SS] 🔁 Fix cycle N+1 — <reaso
 
 ## Step 7: Review (dispatch reviewer)
 
+Record durable phase `review`, dispatch the reviewer, then reconcile immediately after it returns. (dispatch reviewer)
+
 Append `[HH:MM:SS] 📝 Reviewer started` before dispatching.
 Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`. The review is a hard evidence gate in interactive, AUTO, and batch execution.
 
@@ -416,6 +508,7 @@ branch: <branch>
 changedFiles: <changed files>
 sessionDir: /workspaces/odsp-web/.aero/<session>
 reportFile: /workspaces/odsp-web/.aero/<session>/report.json
+reportWriterCommand: node ${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs report /workspaces/odsp-web/.aero/<session>
 progressLog: /workspaces/odsp-web/.aero/<session>/progress.log
 artifactPath: /workspaces/odsp-web/.aero/<session>/review.md
 artifactJsonPath: /workspaces/odsp-web/.aero/<session>/review.json
@@ -423,7 +516,9 @@ reviewLedgerPath: <resolved $reviewLedgerPath>
 contextDocuments:
   - <every routed feature/domain context document>
 planPath: <actual planPath returned by the planner NDJSON record>
-implementationEvidencePath: /workspaces/odsp-web/.aero/<session>/report.json
+implementationEvidencePaths:
+  - /workspaces/odsp-web/.aero/<session>/report.json
+  - /workspaces/odsp-web/.aero/<session>/report-recovery.ndjson
 evaluationArtifactPaths:
   - <every existing artifact path from the final evaluator NDJSON record, including artifactPath/evalReportPath/ruleFindingsPath/visionFindingsPath when present>
 ```
@@ -511,11 +606,21 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
    - If visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.
 4. **Report** the PR URL to the user.
 
-Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status, PR URL if any, screenshot paths if captured, and any remaining blockers.
+Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status,
+PR URL if any, screenshot paths if captured, any remaining blockers, and the timing summary from
+`run-state.mjs timing`.
 
 Include the context library ID, plan-stage result, as-built result, latest candidate path, applied context commit/PR if any, and pending patch/conflict path. Append a compact reference entry to `~/.config/agentow/runs.ndjson` keyed by run ID and PR URL so `/ow-context-feedback` can resume the provenance chain later.
 
-Append `[HH:MM:SS] ✅ Workflow complete` after `final.md` is written.
+After `final.md` is written, run:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" complete "<sessionDir>"
+```
+
+This performs a final reconciliation before marking the run complete. Only then append/report
+`✅ Workflow complete` to the user. A later same-task requirement change reopens this same run as a
+new revision; it does not erase the completed revision.
 
 ## Notes
 

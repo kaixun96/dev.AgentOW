@@ -133,6 +133,7 @@ reviewRoot: <reviewRoot>
 baseRef: <baseRef>
 sessionDir: <sessionDir>
 reportFile: <sessionDir>/report.json
+reportWriterCommand: node ${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs report <sessionDir>
 progressLog: <sessionDir>/progress.log
 artifactPath: <sessionDir>/review.md
 artifactJsonPath: <sessionDir>/review.json
