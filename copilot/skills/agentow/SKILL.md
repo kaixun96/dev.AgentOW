@@ -18,7 +18,7 @@ Announce the mode in one line before starting, so the user knows what to expect.
 The `.aero` directory is the source of truth for run continuity. Conversation context is not.
 Every run owns:
 
-- `run-state.json` — current status, phase, revision, and artifact counts;
+- `run-state.json` — current status, phase, revision, artifact counts, and live timing summary;
 - `request-history.ndjson` — initial request plus every interruption/follow-up;
 - `lifecycle.ndjson` — append-only initialized/interrupted/resumed/revised/completed events;
 - `report-recovery.ndjson` — append-only report supplement used while another writer has an
@@ -56,12 +56,16 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" event "<sessionDir>" \
 
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" reconcile "<sessionDir>"
 
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" timing "<sessionDir>"
+
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" report "<sessionDir>" \
   --record-file "<one-json-object-file>"
 ```
 
 Run `reconcile` immediately before every user-visible status/final response. This repairs missing
 report/progress records from files already on disk, including evaluator screenshots.
+Use `timing` for status and final responses. Report wall-clock and active time plus the slowest
+major phases; active time excludes explicit user interruptions.
 If a command times out on `.run-state.lock`, inspect its reported owner PID. Use
 `run-state.mjs unlock "<sessionDir>"` only when that command confirms the owner is dead; it refuses
 to remove a live or freshly ownerless lock.
@@ -539,7 +543,9 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
    - If visual validation fails because a surface needs seeded data or a tenant capability, write `fixtureGap: true`, the missing fixture, and the complete `coverageManifest` in `final.md` / `report.json`. Batch mode reads this as `success-with-blockers`, not plain success. An incomplete manifest blocks shipment.
 4. **Report** the PR URL to the user.
 
-Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status, PR URL if any, screenshot paths if captured, and any remaining blockers.
+Write `/workspaces/odsp-web/.aero/<session>/final.md` with final build/test/evaluation/review status,
+PR URL if any, screenshot paths if captured, any remaining blockers, and the timing summary from
+`run-state.mjs timing`.
 
 Include the context library ID, plan-stage result, as-built result, latest candidate path, applied context commit/PR if any, and pending patch/conflict path. Append a compact reference entry to `~/.config/agentow/runs.ndjson` keyed by run ID and PR URL so `/ow-context-feedback` can resume the provenance chain later.
 

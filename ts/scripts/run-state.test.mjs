@@ -33,7 +33,27 @@ function runAsync(...args) {
 }
 
 run('init', session, '--request-file', request, '--run-id', 'test-run');
-assert.equal(JSON.parse(fs.readFileSync(path.join(session, 'run-state.json'))).revision, 1);
+const initialState = JSON.parse(fs.readFileSync(path.join(session, 'run-state.json')));
+assert.equal(initialState.revision, 1);
+assert.equal(initialState.schemaVersion, 2);
+assert.equal(initialState.timing.summary.currentPhase, 'orient');
+
+initialState.timing.activeSince = new Date(Date.now() - 1_000).toISOString();
+fs.writeFileSync(path.join(session, 'run-state.json'), JSON.stringify(initialState));
+run('event', session, '--type', 'phase', '--phase', 'planning', '--event-id', 'timing-phase');
+const phaseTiming = run('timing', session);
+assert.ok(phaseTiming.activeDurationMs >= 900);
+assert.ok(phaseTiming.phaseDurationsMs.orient >= 900);
+assert.equal(phaseTiming.currentPhase, 'planning');
+
+run('event', session, '--type', 'interruption', '--reason', 'timing check');
+const interruptedTimingState = JSON.parse(fs.readFileSync(path.join(session, 'run-state.json')));
+interruptedTimingState.interruptionStartedAt = new Date(Date.now() - 2_000).toISOString();
+fs.writeFileSync(path.join(session, 'run-state.json'), JSON.stringify(interruptedTimingState));
+run('event', session, '--type', 'resume');
+const resumedTiming = run('timing', session);
+assert.ok(resumedTiming.interruptedDurationMs >= 1_900);
+assert.equal(resumedTiming.currentPhase, 'planning');
 
 const screenshot = path.join(session, 'evaluation', 'iter1', 'after.png');
 fs.mkdirSync(path.dirname(screenshot), { recursive: true });

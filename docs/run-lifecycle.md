@@ -5,7 +5,7 @@ compacted, or continued after completion without being the only copy of run stat
 
 ## Files
 
-- `run-state.json`: status, phase, revision, timestamps, artifact counts.
+- `run-state.json`: status, phase, revision, timestamps, artifact counts, and live timing summary.
 - `request-history.ndjson`: exact initial request and later follow-ups.
 - `lifecycle.ndjson`: initialized, interrupted, resumed, requirement-change, and completed events.
 - `report-recovery.ndjson`: append-only supplement when the main report has an incomplete trailing
@@ -28,3 +28,10 @@ The detached `progress-watcher.mjs` continuously reconciles artifacts. The main 
 reconciliation after every subagent return, before every user-visible status, and before durable
 completion. This means evaluator screenshots remain indexed even if the conversation is steered
 before the evaluator writes its final report event.
+
+## Timing
+
+`run-state.json.timing.summary` exposes wall-clock, active, interrupted, current-phase, and
+per-phase durations in milliseconds. Active time excludes explicit user interruptions. Run
+`node tools/run-state.mjs timing <sessionDir>` for the compact machine-readable summary. Durable
+completion also writes a human-readable timing breakdown to `progress.log`.

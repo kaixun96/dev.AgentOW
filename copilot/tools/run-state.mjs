@@ -152,6 +152,103 @@ function appendProgress(sessionDir, message, marker) {
   fs.appendFileSync(path.join(sessionDir, 'progress.log'), `[${clock()}] ${message}${suffix}\n`);
 }
 
+function elapsedMs(start, end) {
+  const startMs = Date.parse(start);
+  const endMs = Date.parse(end);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return 0;
+  return Math.max(0, endMs - startMs);
+}
+
+function ensureTimingState(state, timestamp = now()) {
+  const startedAt = state.timing?.startedAt ?? state.createdAt ?? timestamp;
+  state.timing = {
+    startedAt,
+    settledActiveDurationMs: state.timing?.settledActiveDurationMs ?? 0,
+    settledInterruptedDurationMs: state.timing?.settledInterruptedDurationMs ?? 0,
+    phaseDurationsMs: state.timing?.phaseDurationsMs ?? {},
+    activeSince:
+      state.timing?.activeSince ??
+      (state.status === 'active' ? state.updatedAt ?? startedAt : undefined),
+    activePhase: state.timing?.activePhase ?? (state.status === 'active' ? state.phase : undefined),
+    completedAt: state.timing?.completedAt,
+    summary: state.timing?.summary
+  };
+  return state.timing;
+}
+
+function settleActiveTiming(state, timestamp) {
+  const timing = ensureTimingState(state, timestamp);
+  if (!timing.activeSince) return;
+  const duration = elapsedMs(timing.activeSince, timestamp);
+  const phase = timing.activePhase ?? state.phase ?? 'unknown';
+  timing.settledActiveDurationMs += duration;
+  timing.phaseDurationsMs[phase] = (timing.phaseDurationsMs[phase] ?? 0) + duration;
+  delete timing.activeSince;
+  delete timing.activePhase;
+}
+
+function startActiveTiming(state, timestamp) {
+  const timing = ensureTimingState(state, timestamp);
+  timing.activeSince = timestamp;
+  timing.activePhase = state.phase;
+}
+
+function settleInterruptionTiming(state, interruptionStartedAt, timestamp) {
+  if (!interruptionStartedAt) return;
+  const timing = ensureTimingState(state, timestamp);
+  timing.settledInterruptedDurationMs += elapsedMs(interruptionStartedAt, timestamp);
+}
+
+function refreshTimingSummary(state, timestamp = now()) {
+  const timing = ensureTimingState(state, timestamp);
+  const referenceTime = timing.completedAt ?? timestamp;
+  const liveActiveDurationMs = timing.activeSince
+    ? elapsedMs(timing.activeSince, referenceTime)
+    : 0;
+  const phaseDurationsMs = { ...timing.phaseDurationsMs };
+  if (timing.activeSince) {
+    const phase = timing.activePhase ?? state.phase ?? 'unknown';
+    phaseDurationsMs[phase] = (phaseDurationsMs[phase] ?? 0) + liveActiveDurationMs;
+  }
+  const liveInterruptedDurationMs =
+    state.status === 'interrupted' && state.interruptionStartedAt
+      ? elapsedMs(state.interruptionStartedAt, referenceTime)
+      : 0;
+  timing.summary = {
+    generatedAt: timestamp,
+    wallDurationMs: elapsedMs(timing.startedAt, referenceTime),
+    activeDurationMs: timing.settledActiveDurationMs + liveActiveDurationMs,
+    interruptedDurationMs: timing.settledInterruptedDurationMs + liveInterruptedDurationMs,
+    currentPhase: state.phase,
+    currentPhaseDurationMs: phaseDurationsMs[state.phase] ?? 0,
+    phaseDurationsMs
+  };
+  return timing.summary;
+}
+
+function formatDuration(durationMs) {
+  const totalSeconds = Math.round(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+function formatTimingSummary(summary) {
+  const phases = Object.entries(summary.phaseDurationsMs)
+    .filter(([, duration]) => duration > 0)
+    .map(([phase, duration]) => `${phase}=${formatDuration(duration)}`)
+    .join(', ');
+  return (
+    `wall ${formatDuration(summary.wallDurationMs)}, ` +
+    `active ${formatDuration(summary.activeDurationMs)}, ` +
+    `interrupted ${formatDuration(summary.interruptedDurationMs)}` +
+    (phases ? `; phases: ${phases}` : '')
+  );
+}
+
 function sha256Text(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -372,6 +469,7 @@ function reconcileSessionUnlocked(sessionDir) {
       artifacts.filter((artifact) => artifact.kind === kind).length
     ])
   );
+  refreshTimingSummary(state);
   atomicWriteJson(statePath, state);
   return { state, index, newReportRecords, newProgressRecords };
 }
@@ -528,6 +626,7 @@ export function updateRunState(sessionDir, type, options = {}) {
     let checkpointPath;
     let requestEvidence;
     let eventId = options.eventId;
+    const eventTimestamp = now();
     const replayedLifecycle =
       type !== 'requirement-change' && eventId
         ? findLifecycleEvent(sessionDir, eventId, type) ??
@@ -586,6 +685,7 @@ export function updateRunState(sessionDir, type, options = {}) {
         }
         return state;
       }
+      settleActiveTiming(state, eventTimestamp);
       const baseRevision = state.revision;
       const targetRevision = baseRevision + 1;
       checkpointPath = path
@@ -619,9 +719,10 @@ export function updateRunState(sessionDir, type, options = {}) {
       state.phase = 'understand';
       requestEvidence = { requestSha256: intent.sha256, eventId };
     } else if (type === 'interruption') {
+      settleActiveTiming(state, eventTimestamp);
       if (state.status !== 'interrupted') {
         state.statusBeforeInterruption = state.status;
-        state.interruptionStartedAt = now();
+        state.interruptionStartedAt = eventTimestamp;
       }
       if (state.status !== 'completed') state.status = 'interrupted';
       requestEvidence = saveRequest(sessionDir, state, type, options.messageFile, eventId);
@@ -637,6 +738,7 @@ export function updateRunState(sessionDir, type, options = {}) {
         }
         return state;
       }
+      settleInterruptionTiming(state, state.interruptionStartedAt, eventTimestamp);
       state.status = state.statusBeforeInterruption === 'completed' ? 'completed' : 'active';
       const deferredPhase = latestLifecycleEvent(
         sessionDir,
@@ -669,21 +771,27 @@ export function updateRunState(sessionDir, type, options = {}) {
         }
         return state;
       }
+      settleActiveTiming(state, eventTimestamp);
       state.status = 'active';
       state.phase = options.phase ?? state.phase;
     } else if (type === 'completed') {
       reconcileSessionUnlocked(sessionDir);
       state = readJson(statePath, state);
+      settleActiveTiming(state, eventTimestamp);
       state.status = 'completed';
       state.phase = 'complete';
+      ensureTimingState(state, eventTimestamp).completedAt = eventTimestamp;
     } else if (type === 'note') {
+      settleActiveTiming(state, eventTimestamp);
       requestEvidence = saveRequest(sessionDir, state, type, options.messageFile, eventId);
     } else {
       throw new Error(`unsupported event type: ${type}`);
     }
 
-    state.updatedAt = now();
+    if (state.status === 'active') startActiveTiming(state, eventTimestamp);
+    state.updatedAt = eventTimestamp;
     state.lastEvent = type;
+    const timingSummary = refreshTimingSummary(state, eventTimestamp);
     atomicWriteJson(statePath, state);
     if (!eventId || !lifecycleHasEvent(sessionDir, eventId, type)) {
       appendLifecycle(sessionDir, state, type, {
@@ -698,7 +806,7 @@ export function updateRunState(sessionDir, type, options = {}) {
       interruption: `⏸️ Run interrupted — ${options.reason ?? 'user message'}`,
       resume: `▶️ Run resumed — revision ${state.revision}, phase ${state.phase}`,
       phase: `🧭 Durable phase — ${state.phase}`,
-      completed: '✅ Durable run state completed',
+      completed: `✅ Durable run state completed — ${formatTimingSummary(timingSummary)}`,
       note: '💬 Follow-up recorded'
     };
     const progressMarker = eventId ? `event:${eventId}` : undefined;
@@ -729,7 +837,7 @@ function initSession(sessionDir, options) {
     let state = readJson(statePath, undefined);
     if (!state) {
       state = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         sessionId: options['run-id'] ?? path.basename(sessionDir),
         status: 'active',
         phase: 'orient',
@@ -737,6 +845,8 @@ function initSession(sessionDir, options) {
         createdAt: now(),
         updatedAt: now()
       };
+      ensureTimingState(state, state.createdAt);
+      refreshTimingSummary(state, state.createdAt);
       atomicWriteJson(statePath, state);
     }
     const initEventId = `initialized:${state.sessionId}`;
@@ -768,7 +878,7 @@ function main() {
   const { command, sessionDir, options } = parseArgs(process.argv.slice(2));
   if (!command || !sessionDir) {
     console.error(
-      'usage: node run-state.mjs <init|event|reconcile|complete|report|unlock> <sessionDir> [--type <event>] [--phase <phase>] [--message-file <path>] [--record-file <path>]'
+      'usage: node run-state.mjs <init|event|reconcile|timing|complete|report|unlock> <sessionDir> [--type <event>] [--phase <phase>] [--message-file <path>] [--record-file <path>]'
     );
     process.exit(2);
   }
@@ -778,6 +888,11 @@ function main() {
   }
   if (command === 'reconcile') {
     console.log(JSON.stringify(reconcileSession(sessionDir).state));
+    return;
+  }
+  if (command === 'timing') {
+    const state = reconcileSession(sessionDir).state;
+    console.log(JSON.stringify(state.timing.summary));
     return;
   }
   if (command === 'complete') {
