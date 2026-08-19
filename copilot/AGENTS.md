@@ -138,6 +138,12 @@ Never use `srr` to validate an SP-Client surface. Loading unrelated PR resources
 
 Primary PR screenshots must show the full browser page/viewport, including surrounding page context. Drawer/Dialog/component crops are supplemental only and must not be stored in `visualValidation.beforePath` / `afterPath` or embedded as the primary BEFORE/AFTER table. Before accepting evaluator PASS, the main session must independently view both primary images and compare their actual PNG dimensions with the recorded viewport.
 
+Visible UI plans also carry a bounded scenario matrix derived from source branches, menu options,
+enums, and acceptance criteria. The evaluator captures a full-viewport BEFORE/AFTER pair for every
+required row (maximum five, no Cartesian expansion). PASS requires complete matrix coverage; one
+default pair cannot represent several user-visible options. PR descriptions use a compact
+one-row-per-scenario table and replace the prior generated visual block rather than appending it.
+
 Pixel-identical or geometry-identical BEFORE/AFTER is never proof that a UI migration is safe. Treat exact equality as a source-verification alarm: re-check the affected resource, changed-branch DOM discriminator, and expected component semantics. If the PR should change the rendered component but the discriminator is unchanged, return `FAIL` even when both images look acceptable.
 
 Routed feature context is a hard execution contract, not background reading. If a context document requires a table, disposition, crop, or measurement, planner/implementation/evaluator/reviewer artifacts must contain that evidence. Missing evidence blocks PASS.

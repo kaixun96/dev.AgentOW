@@ -50,6 +50,15 @@ The dispatcher gives you:
    - Candidate discovery hints — available SharePoint search, API, tenant inventory, or repo fixture paths the evaluator can use to find alternatives
    - A test page is a starting candidate, not fixture identity, unless `exactFixtureRequired` is `true`
    - If you cannot trace a reliable trigger from source, mark `skip` with the reason. Do NOT fabricate a selector.
+   - A bounded **scenario matrix** derived from source and acceptance criteria. Inspect menu options,
+     enums, conditional render branches, status switches, and user-visible variants touched by the
+     change. Do not wait for the work item to enumerate obvious options exposed by source.
+   - Include every changed or acceptance-relevant scenario, up to five. Do not create a Cartesian product
+     of independent dimensions. If more than five are relevant, prioritize changed branches
+     and record each omitted scenario plus the reason.
+   - Each required scenario needs a stable ID, label, source evidence, precondition/application
+     state, fixture/setup, trigger, discriminator, and expected visible result. If only one scenario
+     exists, emit a one-row matrix; never omit the matrix for visible UI.
 9. **Context guards** — if `contextDocuments` were provided, read them and summarize the exact guard/checklist items that apply. Cite the doc path and section; do not duplicate or reinterpret domain rules from memory.
 10. **Root/wrapper layout ownership** — for any UI component migration or JSX root/wrapper replacement:
    - Open every class/style attached to the old root and cite its definition.
@@ -119,6 +128,19 @@ Write `artifactPath` and return the same structured report:
 - Candidate discovery hints: <search/API/inventory paths>
 - (skip/D reason if applicable)
 
+## Scenario matrix
+- Coverage: <complete|bounded; explain omitted scenarios>
+- Required scenarios:
+  - ID: <stable-kebab-case-id>
+    Label: <reviewer-facing label>
+    Source evidence: <file:line proving this option/state>
+    Precondition: <application state>
+    Setup: <fixture/data steps>
+    Trigger: <real user action and selector>
+    Discriminator: <unique DOM/text proof>
+    Expected: <visible result>
+- Omitted scenarios: <none, or scenario + bounded reason>
+
 ## Risks
 - <anything that could go wrong>
 
@@ -150,5 +172,5 @@ Before returning:
    directly:
 
 ```json
-{"sender":"planner","timestamp":"<ISO>","status":"success|failure","mode":"full","pass":<plannerPass>,"artifactPath":"<artifactPath>","classification":"<bug|feature|enhancement|refactor>","keyFiles":["<path>"],"sourcePaths":["<every source file read; exhaustive and deduplicated>"],"visualPattern":"<A|B|C|D|skip>","contextGuardStatus":"complete|not-applicable|failure","layoutAuditRequired":"<boolean>","repeatedItemGeometryRequired":"<boolean>","blockers":[{"description":"<only if failure>","suggestedFix":"<next action>"}]}
+{"sender":"planner","timestamp":"<ISO>","status":"success|failure","mode":"full","pass":<plannerPass>,"artifactPath":"<artifactPath>","classification":"<bug|feature|enhancement|refactor>","keyFiles":["<path>"],"sourcePaths":["<every source file read; exhaustive and deduplicated>"],"visualPattern":"<A|B|C|D|skip>","scenarioCount":1,"scenarioCoverage":"complete|bounded|not-applicable","contextGuardStatus":"complete|not-applicable|failure","layoutAuditRequired":"<boolean>","repeatedItemGeometryRequired":"<boolean>","blockers":[{"description":"<only if failure>","suggestedFix":"<next action>"}]}
 ```

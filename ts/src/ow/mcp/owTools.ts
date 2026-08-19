@@ -391,14 +391,14 @@ export function registerOwTools(
 
   // ── 16. ow-pr-attach ─────────────────────────────────────────────────────
   registerMcpTool(server, "ow-pr-attach", {
-    description: "Upload files (typically PNG screenshots) as attachments to an existing PR on Azure DevOps, then append them to the PR description. Never posts PR comments. Use {{name}} placeholders in appendToDescription to reference uploaded attachment URLs.",
+    description: "Upload files (typically PNG screenshots) to an Azure DevOps PR, then replace its generated visual-validation description block. Keeps the 4000-character limit by removing only explicitly disposable generated sections; never drops human-authored content or posts comments. Use {{name}} placeholders in appendToDescription.",
     inputSchema: {
       prId: z.number().describe("Pull request ID to attach files to"),
       attachments: z.array(z.object({
         name: z.string().describe("Filename used on ADO, e.g. 'before-pr2219557.png'"),
         localPath: z.string().describe("Absolute path to the local file to upload"),
       })).describe("Files to upload as PR attachments"),
-      appendToDescription: z.string().optional().describe("Markdown to append to the PR's existing description. Use {{name}} placeholders for attachment URLs. If omitted, a simple attachment section is appended."),
+      appendToDescription: z.string().optional().describe("Markdown for the generated visual-validation block. Replaces the prior block. Use {{name}} placeholders for attachment URLs. If omitted, a simple attachment section is generated."),
     },
   }, async (input, extras) => {
     const result = await prAttach.attach({
