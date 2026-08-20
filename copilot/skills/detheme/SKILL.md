@@ -21,6 +21,16 @@ the SharePoint theme, customer theming, or a fully neutral treatment.
 If ownership or presentation mode is unclear, trace the opener, host, and rendered container
 before coding. Do not infer the classification from the component name alone.
 
+## Trace existing provider coverage
+
+Before adding a theme provider, trace the rendered parent chain across module boundaries. Search
+the component's callers, page or pane root, opener, and host for an existing
+`NeutralThemeProvider`; do not stop at the changed file or diff. If an ancestor provider already
+has the required treatment and its `enabledCustomStyleHooks` cover the child's element types, do
+not wrap the child again. When a required hook is missing, update the owning ancestor when that is
+the appropriate shared scope; add a nested provider only when the child intentionally needs a
+different theme boundary or narrower treatment.
+
 ## SharePoint-owned surfaces
 
 For SharePoint-owned settings dialogs, callouts, panels, app-chrome surfaces, pages, and

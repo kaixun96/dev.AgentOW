@@ -100,12 +100,21 @@ If required context evidence is missing, return `FAIL` with `failureKind: "produ
 
 Before returning `fixtureGap`, `environment-unavailable`, or any equivalent conclusion:
 
-1. Enumerate the fresh and cached FIC pools exposed by the supported Playwright harness environments. Record allocation failures instead of silently dropping a pool.
-2. Deduplicate resources by tenant ID before counting coverage. Do not include credentials, tokens, user identities, or raw tenant IDs in human-readable summaries; use opaque resource keys.
-3. Derive eligibility predicates from the plan, source, or routed context documents.
-4. Discover alternate candidates through available SharePoint search, REST/API, tenant inventory, or repo fixture inventories. If one discovery path is permission-limited, try another documented path.
-5. Probe candidates until one satisfies every predicate or the available discovery space is actually exhausted. A configured probe cap or unavailable discovery mechanism makes coverage `incomplete`; it does not prove a fixture gap.
-6. Stop discovery on the first valid candidate and continue BEFORE/AFTER capture there.
+1. Derive eligibility predicates from the plan, source, or routed context documents.
+2. For a configuration-gated capability, search the repository's complete Playwright test corpus,
+   including specs, shared fixtures, helpers, global setup, and teardown, for the feature name,
+   capability predicate, admin API, and related configuration task. Read matching setup flows end
+   to end. If a supported precedent can configure the capability on a synthetic tenant, reuse its
+   helper or sequence in the temporary capture spec, verify the predicate after setup, and use that
+   tenant instead of continuing broad discovery. Do not invent an admin mutation, alter an existing
+   automation test merely for screenshot setup, or apply configuration to a personal, dogfood, or
+   other persistent tenant without an explicit test-owned provisioning contract. Record searched
+   paths, matches, setup result, and cleanup evidence.
+3. Enumerate the fresh and cached FIC pools exposed by the supported Playwright harness environments. Record allocation failures instead of silently dropping a pool.
+4. Deduplicate resources by tenant ID before counting coverage. Do not include credentials, tokens, user identities, or raw tenant IDs in human-readable summaries; use opaque resource keys.
+5. Discover alternate candidates through available SharePoint search, REST/API, tenant inventory, or repo fixture inventories. If one discovery path is permission-limited, try another documented path.
+6. Probe candidates until one satisfies every predicate or the available discovery space is actually exhausted. A configured probe cap or unavailable discovery mechanism makes coverage `incomplete`; it does not prove a fixture gap.
+7. Stop discovery on the first valid candidate and continue BEFORE/AFTER capture there.
 
 For PlanCreation, for example, the predicates are a non-empty group ID, `ExternalService_isplannerintegrationsupported` equal to string or numeric `1`, and a visible New → Plan command. `/sites/PlannerWebPartTabTest` is only a seed unless the user explicitly requires that route.
 
@@ -117,7 +126,7 @@ Any environment-related FAIL must include a `coverageManifest`:
   "exactFixtureRequired": false,
   "capabilityPredicates": [{"predicate": "...", "source": "file:line or doc section"}],
   "pools": [{"environment": "...", "pool": "...", "credentialSource": "fresh|cached", "authResult": "...", "evidencePath": "..."}],
-  "discoveryPaths": [{"method": "search|api|inventory", "status": "complete|blocked", "evidencePath": "..."}],
+   "discoveryPaths": [{"method": "repo-playwright-setup|search|api|inventory", "status": "complete|blocked", "evidencePath": "..."}],
   "uniqueTenantCount": 0,
   "candidatesDiscovered": 0,
   "candidatesProbed": 0,
@@ -265,9 +274,9 @@ Rules for this engine:
 
 Do not write "FIC unavailable" unless a `rushx playwright` probe has been attempted and its output proves FIC failed.
 
-If the surface needs tenant state mutation (created pages, seeded data), clean it up before returning — the synthetic tenant is shared.
+If the surface needs tenant state mutation or configuration (created pages, seeded data, admin-enabled capabilities), run the matching teardown or restore the prior state before returning — the synthetic tenant is shared.
 
-**A capture spec that reached the surface is an asset. Keep it.** Tenant data is disposable; the spec that navigates to a surface is not. Leave a working spec in the repo's integration-test project (alongside the existing specs for that area) and name it in the artifact, so the next run on the same surface starts from it rather than rediscovering the fixture, the trigger and the discriminator. Delete only specs that never reached the surface.
+**A capture spec that reached the surface is an asset. Preserve it as a session artifact, not as an automation change attached to the feature.** Name its artifact path and the repository setup precedent it reused so a later run can start from the proven fixture, trigger, and discriminator. Modify committed automation only when the production change demonstrably breaks an existing test; for Flight/KS work, that test must explicitly set the state it validates.
 
 **Once a spec has reached the surface it is frozen — change the minimum and nothing else.** A later run needing a different capture from that same surface starts from that exact committed spec and makes the smallest possible edit. Do not rewrite it, do not restructure its navigation, do not "improve" its fixture setup. Rewriting discards the one thing that was verified and re-enters a search space that has already been paid for: on the Amplify results panel a spec that had genuinely produced an image was re-derived from scratch across five later runs, each rediscovering the same dead ends. Name the committed spec you started from and state what you changed; a large diff means you threw the asset away.
 

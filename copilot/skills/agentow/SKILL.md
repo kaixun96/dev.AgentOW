@@ -449,7 +449,11 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
    `🧪 Tests skipped — POC profile` and record the skip in implementation/final artifacts and the PR
    description. In STANDARD profile, run `ow-test` scoped to tests that own the changed observable
    behavior (not every changed file and not the full suite). For Flight/KS changes, exercise
-   enabled/fallback behavior through the nearest stable consumer. Do not add or run a dedicated unit
+  enabled/fallback behavior through the nearest stable consumer, and update meaningful unit tests
+  in the same change as production code. Do not add or modify automation tests by default; they
+  normally follow after feature completion. Touch automation only when source inspection proves
+  the production change would break an existing test. In that exception, record the breakage and
+  make the test explicitly set the Flight/KS state for the branch it validates. Do not add or run a dedicated unit
    test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent logic
    that can regress separately. If no meaningful test target exists, record the evidence-backed
    reason; don't run 600 unrelated tests.
@@ -524,7 +528,7 @@ For UI-visible changes, visual validation is mandatory and the evaluator owns it
 Before accepting any evaluator claim about auth, FIC, tenant suitability, test-page availability, or a fixture gap, inspect its `coverageManifest`. A single URL, credential, tenant, or site failure is resource-local evidence only.
 
 - Missing manifest or `coverageManifest.status="incomplete"` → append `[HH:MM:SS] 🔎 Environment discovery retry — evaluator evidence incomplete`, then re-dispatch the evaluator in `environment_discovery` mode in the **same implementation cycle**. Do not edit code, rebuild, retest, increment the generator cycle, or proceed to PR shipment.
-- A self-declared complete manifest is still malformed unless predicates are cited, every supported pool has a result, tenants are deduplicated, discovery paths are complete or explicitly blocked with evidence, and every unique discovered candidate has exactly one disposition. For a gap, require `candidatesDiscovered == candidatesProbed == candidateResults.length`, all candidate results rejected with evidence, no `unprobed` entries, and a non-empty `exhaustionReason` proving no discovery path remains. Downgrade any malformed manifest to `environment-discovery-incomplete`, retarget its blocker to `evaluator-environment`, and redispatch it through the same-cycle environment gate.
+- A self-declared complete manifest is still malformed unless predicates are cited, every supported pool has a result, tenants are deduplicated, discovery paths are complete or explicitly blocked with evidence, and every unique discovered candidate has exactly one disposition. For a configuration-gated capability, the discovery paths must include a repository-wide Playwright setup search and its provisioning/cleanup result before broad tenant probing. For a gap, require `candidatesDiscovered == candidatesProbed == candidateResults.length`, all candidate results rejected with evidence, no `unprobed` entries, and a non-empty `exhaustionReason` proving no discovery path remains. Downgrade any malformed manifest to `environment-discovery-incomplete`, retarget its blocker to `evaluator-environment`, and redispatch it through the same-cycle environment gate.
 - Complete manifest with an eligible candidate → require the evaluator to capture screenshots on that candidate.
 - Complete manifest with no eligible candidate → classify as an external `fixture-gap`; do not route it to the implementer as a code defect.
 

@@ -7,7 +7,7 @@ Use this reference when a change adds or modifies visible UI text, non-visible a
 1. Flag hard-coded user-visible strings and non-visible assistive text, including tooltips, accessible names and descriptions, `aria-label` values, screen-reader-only text, announcements, and live-region content. Define them in `.resx` and import them from the generated resource module. Do not flag dynamic data from an API, such as a user name.
 2. Require a translator comment for each string that describes where and how the string appears.
 3. Require the translator comment to explain every placeholder, such as `{0}` and `{1}`. Do not lock placeholders; the formatter utility replaces them at runtime. Verify each formatter argument matches the placeholder described in the comment. Never require placeholder-lock metadata such as `{Locked={0}}` or `{Locked="{0}"}`.
-4. Keep punctuation inside the localized string.
+4. Keep punctuation inside the localized string. For user-visible lists, reject hard-coded separators such as `names.join(', ')`; format the list with `Intl.ListFormat` and the user's locale so conjunctions, punctuation, and ordering follow locale rules.
 5. Localize complete sentences, not fragments assembled in code. When placeholders contain React elements, keep the whole sentence in one resource and use a ReactNode-aware formatter such as `StringHelper.formatToArray` instead of concatenation or plain string formatting.
 6. For counts in visible UI and screen-reader announcements, use sentence-level interval strings with `StringHelper.formatWithLocalizedCountValue`. Apply this rule only when the placeholder represents a numeric count.
 7. Pluralization must include the `0`, `1`, and plural cases. Use plural wording for `0`. Do not infer English singular/plural rules; use split plural resources, interval metadata, and the shared count formatter. Verify all three cases in tests when count behavior changes. Do not force plural interval resources when `{0}` is not a count (for example, `{0}` is a skill name in `{0} deleted`).
@@ -70,6 +70,18 @@ Good `.resx` resource:
 ```
 
 Format it with an established repository utility, such as a formatter from `@msinternal/utilities-strings`, `Text.format`, or `StringHelper.format`, passing `name` and `description` as the placeholder values.
+
+For a list placeholder, do not hard-code an English-style separator:
+
+```ts
+const formatter = new Intl.ListFormat(navigator.language, {
+  style: 'long',
+  type: 'conjunction'
+});
+StringHelper.format(strings.ReplaceDialogDescription, formatter.format(props.conflictingFileNames));
+```
+
+For `['Alpha.otf', 'Zulu.ttf']`, this produces `Alpha.otf and Zulu.ttf` in English and `Alpha.otf 和 Zulu.ttf` in Chinese.
 
 ### React elements in localized sentences
 

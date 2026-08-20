@@ -171,12 +171,20 @@ One failed route, credential, tenant, or site is not fleet-wide evidence. Scope 
 
 The plan's **Exact fixture required** field defaults to false. Unless it is true, treat Test page and Starting URL candidates as seeds, then:
 
-1. Enumerate every supported fresh and cached FIC pool exposed by the harness. Record allocation failures; do not silently omit them.
-2. Deduplicate resources by tenant ID before counting coverage.
-3. Read the plan's source- or context-cited Capability predicates.
-4. Discover alternate candidate sites through available SharePoint search, REST/API, tenant inventory, or repo fixture inventories. If one path is permission-limited, try another documented path.
-5. Probe candidates until one satisfies every predicate or the available discovery space is actually exhausted. A configured candidate cap or unavailable discovery mechanism means coverage is incomplete, not that the fixture is absent.
-6. Stop on the first eligible candidate and continue BEFORE/AFTER capture there.
+1. Read the plan's source- or context-cited Capability predicates.
+2. For a configuration-gated capability, search the repository's complete Playwright test corpus,
+   including specs, shared fixtures, helpers, global setup, and teardown, for the feature name,
+   capability predicate, admin API, and related configuration task. Read matching setup flows end
+   to end. If a supported precedent can configure the capability on a synthetic tenant, reuse its
+   helper or sequence in the temporary capture spec, verify the predicate after setup, and use that
+   tenant before broad discovery. Do not invent admin mutations, edit existing automation merely
+   for screenshot setup, or configure a persistent tenant without an explicit test-owned contract.
+   Record searched paths, matches, setup result, teardown, and restored state.
+3. Enumerate every supported fresh and cached FIC pool exposed by the harness. Record allocation failures; do not silently omit them.
+4. Deduplicate resources by tenant ID before counting coverage.
+5. Discover alternate candidate sites through available SharePoint search, REST/API, tenant inventory, or repo fixture inventories. If one path is permission-limited, try another documented path.
+6. Probe candidates until one satisfies every predicate or the available discovery space is actually exhausted. A configured candidate cap or unavailable discovery mechanism means coverage is incomplete, not that the fixture is absent.
+7. Stop on the first eligible candidate and continue BEFORE/AFTER capture there.
 
 Every environment-related failure MUST write a `coverageManifest` into `rule-findings.json`:
 
@@ -186,7 +194,7 @@ Every environment-related failure MUST write a `coverageManifest` into `rule-fin
   "exactFixtureRequired": false,
   "capabilityPredicates": [{"predicate": "...", "source": "file:line or doc section"}],
   "pools": [{"environment": "...", "pool": "...", "credentialSource": "fresh|cached", "authResult": "...", "evidencePath": "..."}],
-  "discoveryPaths": [{"method": "search|api|inventory", "status": "complete|blocked", "evidencePath": "..."}],
+  "discoveryPaths": [{"method": "repo-playwright-setup|search|api|inventory", "status": "complete|blocked", "evidencePath": "..."}],
   "uniqueTenantCount": 0,
   "candidatesDiscovered": 0,
   "candidatesProbed": 0,
