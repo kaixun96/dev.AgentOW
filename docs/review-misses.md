@@ -46,6 +46,24 @@ had "not loading" and "no data" simultaneously, flashing the empty state before 
 **Rule:** when two pieces of initial state encode the same condition, derive them from one
 expression. Check the first render for state combinations the component treats as impossible.
 
+## M3. A completed checklist can still assert the opposite of its source
+
+**Missed:** PR 2317610 imported eager `Button` and `Card` controls from
+`@msinternal/sharepoint-ui-react-stable` under `sp-client/`, and added a full-overlay
+`OverlayDrawer` with unshimmed v8 `Announced` and `FontIcon` children but no
+`NeutralThemeProvider` or `NeutralV8ThemeProvider`. The reviewer loaded both the SPDS and
+Detheme references, marked their profile checks reviewed, and still approved the PR.
+
+**Mechanism:** generator and reviewer shared the same interpretation, while the report validator
+checked only that profile fields existed and contained topic words. The reviewer treated its own
+conclusion as evidence instead of comparing each import and provider against the normative source.
+
+**Rule:** self-attested checklist completion is not verification. For changed SP-Client UI,
+mechanically inventory exact component import routes and classify every added overlay surface.
+Compare the rendered v8 controls against migration config and shims, then require the providers
+the Detheme skill names. If deterministic source checks and the narrative conclusion disagree,
+the source check wins and APPROVE must fail.
+
 ---
 
 ## Calibration — findings that were wrong

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const validator = fileURLToPath(new URL("../../tools/validate-review-report.mjs", import.meta.url));
@@ -9,6 +10,20 @@ const tempDir = fs.mkdtempSync(`${os.tmpdir()}/agentow-review-contract-`);
 const changedFilesPath = `${tempDir}/changed-files.txt`;
 const diffNumstatPath = `${tempDir}/numstat.txt`;
 const reportPath = `${tempDir}/review.json`;
+const contractRepo = path.join(tempDir, "contract-repo");
+fs.mkdirSync(contractRepo, { recursive: true });
+const runGit = (repoRoot, ...args) =>
+  execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" }).trim();
+runGit(contractRepo, "init", "--quiet");
+runGit(contractRepo, "config", "user.name", "AgentOW Test");
+runGit(contractRepo, "config", "user.email", "agentow@example.test");
+fs.writeFileSync(path.join(contractRepo, "README.txt"), "base\n");
+runGit(contractRepo, "add", "README.txt");
+runGit(contractRepo, "commit", "--quiet", "-m", "base");
+const contractBase = runGit(contractRepo, "rev-parse", "HEAD");
+fs.writeFileSync(path.join(contractRepo, "README.txt"), "head\n");
+runGit(contractRepo, "commit", "--quiet", "-am", "head");
+const contractHead = runGit(contractRepo, "rev-parse", "HEAD");
 fs.writeFileSync(changedFilesPath, "src/example.ts\n");
 fs.writeFileSync(diffNumstatPath, "10\t2\tsrc/example.ts\n");
 
@@ -56,8 +71,8 @@ for (const key of dimensionNames) {
 function makeReport() {
   return {
     schemaVersion: 1,
-    reviewedHead: "a".repeat(40),
-    mergeBase: "b".repeat(40),
+    reviewedHead: contractHead,
+    mergeBase: contractBase,
     diffDigest: "c".repeat(64),
     verdict: "APPROVE",
     summary: "Reviewed the behavior and its direct consumer.",
@@ -140,22 +155,31 @@ function addBlockingRolloutFinding(report) {
   report.verdict = "REQUEST_CHANGES";
 }
 
-function validate(report) {
+function validate(
+  report,
+  {
+    expectedHead = contractHead,
+    expectedDigest = "c".repeat(64),
+    repoRoot = contractRepo,
+  } = {},
+) {
   fs.writeFileSync(reportPath, JSON.stringify(report));
+  const args = [
+    validator,
+    reportPath,
+    "--expected-head",
+    expectedHead,
+    "--expected-diff-digest",
+    expectedDigest,
+    "--changed-files",
+    changedFilesPath,
+    "--diff-numstat",
+    diffNumstatPath,
+  ];
+  if (repoRoot) args.push("--repo", repoRoot);
   return spawnSync(
     process.execPath,
-    [
-      validator,
-      reportPath,
-      "--expected-head",
-      "a".repeat(40),
-      "--expected-diff-digest",
-      "c".repeat(64),
-      "--changed-files",
-      changedFilesPath,
-      "--diff-numstat",
-      diffNumstatPath,
-    ],
+    args,
     { encoding: "utf8" },
   );
 }
@@ -678,6 +702,250 @@ mandatoryNit.findings.push({
 mandatoryNit.counts.minor = 1;
 mandatoryNit.verdict = "COMMENT";
 assert.equal(validate(mandatoryNit).status, 1, "Minor educational comments must use the Nit prefix");
+
+const auditRepo = path.join(tempDir, "audit-repo");
+fs.mkdirSync(auditRepo, { recursive: true });
+const auditFile = "sp-client/src/Drawer.tsx";
+const git = (...args) =>
+  execFileSync("git", ["-C", auditRepo, ...args], { encoding: "utf8" }).trim();
+git("init", "--quiet");
+git("config", "user.name", "AgentOW Test");
+git("config", "user.email", "agentow@example.test");
+fs.writeFileSync(path.join(auditRepo, "README.txt"), "base\n");
+fs.mkdirSync(path.join(auditRepo, "sp-client", "src"), { recursive: true });
+fs.writeFileSync(
+  path.join(auditRepo, auditFile),
+  [
+    "import {",
+    "  Existing,",
+    "} from '@msinternal/sharepoint-ui-react-stable';",
+    "",
+    "export const existing: unknown = Existing;",
+    "",
+  ].join("\n"),
+);
+git("add", "README.txt", auditFile);
+git("commit", "--quiet", "-m", "base");
+const auditBase = git("rev-parse", "HEAD");
+const auditSource = [
+    "import { Announced, FontIcon, Label } from '@fluentui/react';",
+    "import {",
+    "  Existing,",
+    "  Button,",
+    "  Card, type ButtonProps,",
+    "} from '@msinternal/sharepoint-ui-react-stable';",
+    "import { OverlayDrawer as DrawerAlias } from '@msinternal/sharepoint-ui-react-stable/lib/LazyComponents';",
+    "import { NeutralThemeProvider, NeutralV8ThemeProvider } from '@msinternal/fluentui-neutral-components';",
+    "",
+    "export function OutsideDrawer(): JSX.Element {",
+    "  return <Label>Outside</Label>;",
+    "}",
+    "",
+    "export function Drawer(): JSX.Element {",
+    "  return (",
+    "    <NeutralThemeProvider enabledCustomStyleHooks={{ button: true }}><DrawerAlias open>",
+    "",
+    "        <NeutralV8ThemeProvider>",
+    "          <Announced message='status' />",
+    "          <FontIcon iconName='Info' />",
+    "        </NeutralV8ThemeProvider>",
+    "        <Button>Close</Button>",
+    "        <Card>Body</Card>",
+    "      </DrawerAlias></NeutralThemeProvider>",
+    "",
+    "  );",
+    "}",
+    "",
+    "export function MissingThemeProvider(): JSX.Element {",
+    "  return (",
+    "    <DrawerAlias open><NeutralThemeProvider>",
+    "      <Button>Close</Button>",
+    "    </NeutralThemeProvider></DrawerAlias>",
+    "  );",
+    "}",
+    "",
+    "export function MissingV8Provider(): JSX.Element {",
+    "  return (",
+    "    <NeutralThemeProvider enabledCustomStyleHooks={{ button: true }}>",
+    "      <DrawerAlias open>",
+    "        <Announced message='status' />",
+    "      </DrawerAlias>",
+    "    </NeutralThemeProvider>",
+    "  );",
+    "}",
+    "",
+    "export function MissingThemeHooks(): JSX.Element {",
+    "  return (",
+    "    <NeutralThemeProvider>",
+    "      <DrawerAlias open>",
+    "        <Button>Close</Button>",
+    "      </DrawerAlias>",
+    "    </NeutralThemeProvider>",
+    "  );",
+    "}",
+    "",
+  ].join("\n");
+fs.writeFileSync(path.join(auditRepo, auditFile), auditSource);
+const auditLines = auditSource.split("\n");
+const lineOf = (fragment, occurrence = 1) => {
+  let seen = 0;
+  const index = auditLines.findIndex((line) => {
+    if (!line.includes(fragment)) return false;
+    seen++;
+    return seen === occurrence;
+  });
+  assert.notEqual(index, -1, `fixture line not found: ${fragment} occurrence ${occurrence}`);
+  return index + 1;
+};
+const linesOf = (fragment) =>
+  auditLines.flatMap((line, index) => (line.includes(fragment) ? [index + 1] : []));
+const stableImportLine = lineOf("} from '@msinternal/sharepoint-ui-react-stable'");
+const firstDrawerLine = lineOf("<DrawerAlias");
+const missingThemeDrawerLine = lineOf("<DrawerAlias", 2);
+const missingV8ControlLine = lineOf("<Announced", 2);
+const missingHooksDrawerLine = lineOf("<DrawerAlias", 4);
+git("add", auditFile);
+git("commit", "--quiet", "-m", "add violating drawer");
+const auditHead = git("rev-parse", "HEAD");
+const auditNumstat = git("diff", "--numstat", `${auditBase}...${auditHead}`);
+const [auditAdditions, auditDeletions] = auditNumstat
+  .split("\t")
+  .slice(0, 2)
+  .map((value) => Number.parseInt(value, 10));
+fs.writeFileSync(changedFilesPath, `${auditFile}\n`);
+fs.writeFileSync(diffNumstatPath, `${auditNumstat}\n`);
+
+const unsupportedUiApproval = structuredClone(missingSpClientProfile);
+unsupportedUiApproval.reviewedHead = auditHead;
+unsupportedUiApproval.mergeBase = auditBase;
+unsupportedUiApproval.riskMap[0].path = auditFile;
+unsupportedUiApproval.coverage.changedFiles[0].path = auditFile;
+unsupportedUiApproval.preReview.reviewability.changedFileCount = 1;
+unsupportedUiApproval.preReview.reviewability.additions = auditAdditions;
+unsupportedUiApproval.preReview.reviewability.deletions = auditDeletions;
+unsupportedUiApproval.preReview.reviewability.independentBehaviorUnits[0].paths = [auditFile];
+unsupportedUiApproval.preReview.rolloutProtection.runtimePaths = [auditFile];
+unsupportedUiApproval.preReview.rolloutProtection.pathCoverage[0].path = auditFile;
+for (const check of unsupportedUiApproval.preReview.profileChecks) {
+  check.evidence = [`${auditFile}:1`];
+}
+for (const dimension of Object.values(unsupportedUiApproval.coverage.dimensions)) {
+  dimension.evidence = [`${auditFile}:1`];
+}
+unsupportedUiApproval.preReview.rolloutProtection.entryPointEvidence = [`${auditFile}:5`];
+unsupportedUiApproval.preReview.rolloutProtection.gateCheckEvidence = [`${auditFile}:5`];
+unsupportedUiApproval.preReview.rolloutProtection.newPathEvidence = [`${auditFile}:${firstDrawerLine}`];
+unsupportedUiApproval.preReview.rolloutProtection.fallbackEvidence = [`${auditFile}:5`];
+unsupportedUiApproval.preReview.rolloutProtection.fallbackBehaviorChanged = false;
+unsupportedUiApproval.preReview.rolloutProtection.disabledStateTestEvidence = [];
+unsupportedUiApproval.preReview.rolloutProtection.pathCoverage[0] = {
+  path: auditFile,
+  changedEvidence: [`${auditFile}:1`],
+  gateEvidence: [`${auditFile}:5`],
+  fallbackEvidence: [`${auditFile}:5`],
+  conclusion: "The runtime path was reviewed against its declared test-only fixture gate",
+};
+const unsupportedUiResult = validate(unsupportedUiApproval, {
+  expectedHead: auditHead,
+  repoRoot: auditRepo,
+});
+assert.equal(
+  unsupportedUiResult.status,
+  1,
+  "unsupported stable-root and Detheme approval must fail deterministic source checks",
+);
+assert.match(unsupportedUiResult.stdout, /blocking stable-bundle import-route finding/);
+assert.match(unsupportedUiResult.stdout, /adds Button, Card from the SPDS root package/);
+assert.match(unsupportedUiResult.stdout, /blocking Detheme finding/);
+assert.match(unsupportedUiResult.stdout, /without NeutralV8ThemeProvider/);
+assert.match(unsupportedUiResult.stdout, /hooks \(button\)/);
+
+const reportedUiViolations = structuredClone(unsupportedUiApproval);
+reportedUiViolations.findings = [
+  {
+    id: "UI-STABLE-BUNDLE",
+    severity: "Important",
+    category: "dependenciesTooling",
+    path: auditFile,
+    line: stableImportLine,
+    description: "The eager SPDS controls bypass the SP-Client external stable bundle",
+    impact: "The lazy chunk can duplicate SPDS code and use an inconsistent servicing route",
+    suggestedFix: "Import Button and Card from @msinternal/sharepoint-ui-react-stable-bundle",
+    evidence: [`${auditFile}:${stableImportLine}`],
+    classSweep: {
+      query: "sharepoint-ui-react-stable",
+      scope: [auditFile],
+      accountedFor: linesOf("sharepoint-ui-react-stable")
+        .filter((line) => line !== stableImportLine)
+        .map((line) => `${auditFile}:${line}`),
+    },
+  },
+  {
+    id: "UI-DETHEME",
+    severity: "Important",
+    category: "themeDetheme",
+    path: auditFile,
+    line: missingThemeDrawerLine,
+    description: "The full-overlay Drawer omits the required SharePoint Detheme provider",
+    impact: "Customer and high-contrast themes can render the SharePoint-owned surface incorrectly",
+    suggestedFix: "Wrap the surface in NeutralThemeProvider with only the required hooks",
+    evidence: [`${auditFile}:${missingThemeDrawerLine}`],
+    classSweep: {
+      query: "DrawerAlias",
+      scope: [auditFile],
+      accountedFor: linesOf("DrawerAlias")
+        .filter((line) => line !== missingThemeDrawerLine)
+        .map((line) => `${auditFile}:${line}`),
+    },
+  },
+  {
+    id: "UI-V8-DETHEME",
+    severity: "Important",
+    category: "themeDetheme",
+    path: auditFile,
+    line: missingV8ControlLine,
+    description: "The Drawer renders unshimmed Fluent v8 controls without a neutral bridge",
+    impact: "Announced and FontIcon can inherit the wrong site theme",
+    suggestedFix: "Wrap the v8 subtree in NeutralV8ThemeProvider",
+    evidence: [`${auditFile}:1`, `${auditFile}:${missingV8ControlLine}`],
+    classSweep: {
+      query: "Announced",
+      scope: [auditFile],
+      accountedFor: linesOf("Announced")
+        .filter((line) => line !== missingV8ControlLine)
+        .map((line) => `${auditFile}:${line}`),
+    },
+  },
+  {
+    id: "UI-DETHEME-HOOKS",
+    severity: "Important",
+    category: "themeDetheme",
+    path: auditFile,
+    line: missingHooksDrawerLine,
+    description: "The Drawer provider omits required custom style hooks",
+    impact: "The primary button does not receive the required SharePoint-owned treatment",
+    suggestedFix: "Set NeutralThemeProvider enabledCustomStyleHooks={{ button: true }}",
+    evidence: [`${auditFile}:${missingHooksDrawerLine}`],
+    classSweep: {
+      query: "DrawerAlias",
+      scope: [auditFile],
+      accountedFor: linesOf("DrawerAlias")
+        .filter((line) => line !== missingHooksDrawerLine)
+        .map((line) => `${auditFile}:${line}`),
+    },
+  },
+];
+reportedUiViolations.counts.important = 4;
+reportedUiViolations.verdict = "REQUEST_CHANGES";
+const reportedUiResult = validate(reportedUiViolations, {
+  expectedHead: auditHead,
+  repoRoot: auditRepo,
+});
+assert.equal(
+  reportedUiResult.status,
+  0,
+  `deterministic UI violations pass only when the review reports matching blocking findings: ${reportedUiResult.stdout}`,
+);
 
 fs.rmSync(tempDir, { recursive: true });
 console.log("review report validator fixtures passed");

@@ -23,6 +23,11 @@ consumed by SP-Client, read and apply that profile's rollout and rollback rules 
 `${CLAUDE_PLUGIN_ROOT}/docs/review-misses.md` before finalizing. POC advisory mode uses only its
 bounded contract below.
 
+The report validator independently recomputes SP-Client stable-bundle and OverlayDrawer Detheme
+facts from Git. Perform that import/provider inventory yourself before writing conclusions. A
+profile check that says the provider flow is sufficient does not override a conflicting source
+fact; report the blocking finding instead.
+
 ### Reference routing
 
 Classify the changed behavior from the Git diff before loading optional reference documents. Evaluate each row independently and read only the references whose positive trigger matches; do not load all references by default.
