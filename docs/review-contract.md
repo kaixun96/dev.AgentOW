@@ -340,7 +340,8 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   --expected-head "$(git rev-parse HEAD)" \
   --expected-diff-digest "$(git diff --no-renames <mergeBase>...HEAD | sha256sum | cut -d' ' -f1)" \
   --changed-files <sessionDir>/review-changed-files.txt \
-  --diff-numstat <sessionDir>/review-numstat.txt
+  --diff-numstat <sessionDir>/review-numstat.txt \
+  --repo "$(git rev-parse --show-toplevel)"
 ```
 
 Malformed, incomplete, or stale review output is a reviewer-spec failure. Re-dispatch the reviewer once against the unchanged implementation. It does not consume a product fix cycle. If validation still fails, stop rather than shipping an unsupported approval.
@@ -464,4 +465,3 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" accept \
 ```
 
 The reason must be a reason, not a restatement: the tool rejects anything under 40 characters or equal to the finding description. A shipped PR carries the accepted set in its description so that a reviewer on another machine, agent or human, sees the same decisions.
-

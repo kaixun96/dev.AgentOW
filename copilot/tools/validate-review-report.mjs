@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import {
   acceptedFingerprints,
   annotateFindings,
@@ -610,6 +611,369 @@ function readNumstat(filePath) {
   return entries;
 }
 
+function readAddedLines(repoRoot, mergeBase, reviewedHead) {
+  let diff;
+  try {
+    diff = execFileSync(
+      "git",
+      [
+        "-C",
+        repoRoot,
+        "diff",
+        "--no-ext-diff",
+        "--no-renames",
+        "--unified=0",
+        `${mergeBase}...${reviewedHead}`,
+        "--",
+        "sp-client",
+      ],
+      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+    );
+  } catch {
+    return null;
+  }
+
+  const addedLines = new Map();
+  let currentPath;
+  let currentLine = 0;
+  for (const line of diff.split(/\r?\n/)) {
+    if (line.startsWith("+++ b/")) {
+      currentPath = line.slice(6);
+      continue;
+    }
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+    if (hunk) {
+      currentLine = Number.parseInt(hunk[1], 10);
+      continue;
+    }
+    if (!currentPath || line.startsWith("--- ")) continue;
+    if (line.startsWith("+")) {
+      const entries = addedLines.get(currentPath) ?? [];
+      entries.push({ line: currentLine, text: line.slice(1) });
+      addedLines.set(currentPath, entries);
+      currentLine++;
+    } else if (!line.startsWith("-") && !line.startsWith("\\")) {
+      currentLine++;
+    }
+  }
+  return addedLines;
+}
+
+function matchingBlockingFinding(report, pathName, line, pattern) {
+  return (report.findings ?? []).some(
+    (finding) =>
+      isObject(finding) &&
+      (finding.severity === "Critical" || finding.severity === "Important") &&
+      finding.path === pathName &&
+      finding.line === line &&
+      pattern.test(`${finding.description ?? ""} ${finding.suggestedFix ?? ""}`),
+  );
+}
+
+function fluentMigrationEnabled(repoRoot, filePath, reviewedHead) {
+  let directory = path.posix.dirname(filePath);
+  while (directory !== ".") {
+    const configPath = path.posix.join(directory, "config", "spfx-internal-bundling-options.json");
+    const configSource = readSource(repoRoot, configPath, reviewedHead);
+    if (configSource !== null) {
+      try {
+        return JSON.parse(configSource).enabledForFluentMigration === true;
+      } catch {
+        return false;
+      }
+    }
+    const parent = path.posix.dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  return false;
+}
+
+function hasFluentShim(repoRoot, componentName, reviewedHead) {
+  try {
+    return nonEmpty(
+      execFileSync(
+        "git",
+        [
+          "-C",
+          repoRoot,
+          "ls-tree",
+          "-r",
+          "--name-only",
+          reviewedHead,
+          "--",
+          `:(glob)**/${componentName}Shim.ts`,
+        ],
+        { encoding: "utf8" },
+      ),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function importDeclarations(source) {
+  if (source === null) return [];
+  const starts = [...source.matchAll(/^import\b/gm)].map(({ index }) => index);
+  const declarations = [];
+  for (const start of starts) {
+    let quote;
+    let end = start;
+    for (; end < source.length; end++) {
+      const character = source[end];
+      if (quote) {
+        if (character === quote && source[end - 1] !== "\\") quote = undefined;
+      } else if (character === "'" || character === '"') {
+        quote = character;
+      } else if (character === ";") {
+        end++;
+        break;
+      } else if (character === "\n" && /\bfrom\s+['"][^'"]+['"]\s*$/.test(source.slice(start, end))) {
+        break;
+      }
+    }
+    const text = source.slice(start, end);
+    const moduleMatch = /\bfrom\s+['"]([^'"]+)['"]\s*;?\s*$/.exec(text);
+    if (!moduleMatch) continue;
+    const clause = text.slice("import".length, moduleMatch.index).trim();
+    declarations.push({
+      clause,
+      module: moduleMatch[1],
+      sourceLine: source.slice(0, start + moduleMatch.index).split(/\r?\n/).length,
+      typeOnly: /^type\b/.test(clause),
+    });
+  }
+  return declarations;
+}
+
+function namedImportSpecifiers(declaration) {
+  if (declaration.typeOnly) return [];
+  const namedMatch = /\{([\s\S]*?)\}/.exec(declaration.clause);
+  if (!namedMatch) return [];
+  return namedMatch[1]
+    .split(",")
+    .map((specifier) => specifier.trim().replace(/\s+/g, " "))
+    .filter((specifier) => specifier && !specifier.startsWith("type "));
+}
+
+function stableRootImportSpecifiers(source) {
+  const imports = [];
+  for (const declaration of importDeclarations(source).filter(
+    ({ module }) => module === "@msinternal/sharepoint-ui-react-stable",
+  )) {
+    for (const specifier of namedImportSpecifiers(declaration)) {
+      imports.push({ key: specifier, sourceLine: declaration.sourceLine });
+    }
+    const defaultClause = declaration.clause
+      .replace(/^type\s+/, "")
+      .replace(/\{[\s\S]*?\}/, "")
+      .replace(/,\s*$/, "")
+      .trim();
+    if (defaultClause && !declaration.typeOnly) {
+      imports.push({
+        key: defaultClause.replace(/\s+/g, " "),
+        sourceLine: declaration.sourceLine,
+      });
+    }
+  }
+  return imports;
+}
+
+function fluentReactImports(source) {
+  const imports = [];
+  for (const declaration of importDeclarations(source).filter(
+    ({ module }) => module === "@fluentui/react",
+  )) {
+    for (const specifier of namedImportSpecifiers(declaration)) {
+      const importedName = specifier.split(/\s+as\s+/)[0].trim();
+      const localName = specifier.split(/\s+as\s+/).at(-1).trim();
+      imports.push({ importedName, localName });
+    }
+  }
+  return imports;
+}
+
+function importedLocalNames(source, importedName) {
+  const localNames = [];
+  for (const declaration of importDeclarations(source)) {
+    for (const specifier of namedImportSpecifiers(declaration)) {
+      const sourceName = specifier.split(/\s+as\s+/)[0].trim();
+      if (sourceName === importedName) {
+        localNames.push(specifier.split(/\s+as\s+/).at(-1).trim());
+      }
+    }
+  }
+  return [...new Set(localNames)];
+}
+
+function jsxTags(source, componentName) {
+  const tags = [];
+  const tagPattern = new RegExp(`<(/?)${componentName}\\b[^>]*>`, "g");
+  for (const match of source.matchAll(tagPattern)) {
+    tags.push({
+      closing: match[1] === "/",
+      end: match.index + match[0].length,
+      line: source.slice(0, match.index).split(/\r?\n/).length,
+      selfClosing: /\/\s*>$/.test(match[0]),
+      start: match.index,
+      text: match[0],
+    });
+  }
+  return tags;
+}
+
+function jsxElementEnd(source, startOffset, componentName) {
+  let depth = 0;
+  for (const tag of jsxTags(source, componentName).filter((entry) => entry.start >= startOffset)) {
+    if (tag.closing) {
+      depth--;
+    } else if (!tag.selfClosing) {
+      depth++;
+    }
+    if (depth === 0) return tag.end;
+  }
+  return source.length;
+}
+
+function openJsxProvider(source, targetOffset, providerName) {
+  const stack = [];
+  for (const tag of jsxTags(source, providerName)) {
+    if (tag.start >= targetOffset) break;
+    if (tag.closing) {
+      stack.pop();
+    } else if (!tag.selfClosing) {
+      stack.push(tag);
+    }
+  }
+  return stack.at(-1);
+}
+
+function requiredThemeHooks(source, startOffset, endOffset) {
+  const hooks = [];
+  for (const [componentName, hookName] of [
+    ["Button", "button"],
+    ["Link", "link"],
+    ["Tab", "tab"],
+  ]) {
+    const localNames = importedLocalNames(source, componentName);
+    if (
+      localNames.some((localName) =>
+        jsxTags(source, localName).some(
+          (tag) => !tag.closing && tag.start >= startOffset && tag.start < endOffset,
+        ),
+      )
+    ) {
+      hooks.push(hookName);
+    }
+  }
+  return hooks;
+}
+
+function crossCheckSpClientUiContracts(report, options, errors, expectedFiles) {
+  const repoRoot = options.get("--repo");
+  if (!repoRoot || !fs.existsSync(repoRoot)) {
+    errors.push("deterministic SP-Client UI audit requires --repo");
+    return;
+  }
+  const addedLines = readAddedLines(repoRoot, report.mergeBase, report.reviewedHead);
+  if (addedLines === null) {
+    errors.push("cannot recompute the deterministic SP-Client UI audit from the reviewed Git diff");
+    return;
+  }
+
+  for (const filePath of expectedFiles.filter(
+    (file) => file.startsWith("sp-client/") && /\.[jt]sx?$/.test(file),
+  )) {
+    const source = readSource(repoRoot, filePath, report.reviewedHead);
+    if (source === null) continue;
+    const baseSource = readSource(repoRoot, filePath, report.mergeBase);
+    const additions = addedLines.get(filePath) ?? [];
+
+    const baseStableSpecifiers = new Set(
+      stableRootImportSpecifiers(baseSource).map(({ key }) => key),
+    );
+    const newStableSpecifiers = stableRootImportSpecifiers(source).filter(
+      ({ key }) => !baseStableSpecifiers.has(key),
+    );
+    const stableImportsByLine = new Map();
+    for (const specifier of newStableSpecifiers) {
+      const specifiers = stableImportsByLine.get(specifier.sourceLine) ?? [];
+      specifiers.push(specifier.key);
+      stableImportsByLine.set(specifier.sourceLine, specifiers);
+    }
+    for (const [sourceLine, specifiers] of stableImportsByLine) {
+      if (
+        !matchingBlockingFinding(report, filePath, sourceLine, /\bstable-bundle\b/i)
+      ) {
+        errors.push(
+          `${filePath}:${sourceLine} adds ${specifiers.join(", ")} from the SPDS root package under sp-client; the review must report a blocking stable-bundle import-route finding`,
+        );
+      }
+    }
+
+    const fluentImports = fluentReactImports(source);
+    const migrationEnabled = fluentMigrationEnabled(repoRoot, filePath, report.reviewedHead);
+    const drawerLocalNames = importedLocalNames(source, "OverlayDrawer");
+    const addedDrawerLines = new Set(additions.map(({ line }) => line));
+    const addedDrawers = drawerLocalNames.flatMap((localName) =>
+      jsxTags(source, localName)
+        .filter((tag) => !tag.closing && addedDrawerLines.has(tag.line))
+        .map((tag) => ({ ...tag, localName })),
+    );
+    for (const drawer of addedDrawers) {
+      const drawerEnd = jsxElementEnd(source, drawer.start, drawer.localName);
+      const provider = openJsxProvider(source, drawer.start, "NeutralThemeProvider");
+      const missingHooks = requiredThemeHooks(source, drawer.start, drawerEnd).filter(
+        (hook) => !new RegExp(`\\b${hook}\\s*:\\s*true\\b`).test(provider?.text ?? ""),
+      );
+      if (
+        (!provider || missingHooks.length > 0) &&
+        !matchingBlockingFinding(
+          report,
+          filePath,
+          drawer.line,
+          /\b(?:NeutralThemeProvider|Detheme)\b/i,
+        )
+      ) {
+        errors.push(
+          `${filePath}:${drawer.line} adds an OverlayDrawer without the required NeutralThemeProvider${missingHooks.length > 0 ? ` hooks (${missingHooks.join(", ")})` : ""}; the review must report a blocking Detheme finding`,
+        );
+      }
+
+      const unprotectedV8Controls = [];
+      for (const { importedName, localName } of fluentImports) {
+        if (migrationEnabled && hasFluentShim(repoRoot, importedName, report.reviewedHead)) {
+          continue;
+        }
+        for (const usage of jsxTags(source, localName)) {
+          if (
+            !usage.closing &&
+            usage.start >= drawer.start &&
+            usage.start < drawerEnd &&
+            !openJsxProvider(source, usage.start, "NeutralV8ThemeProvider")
+          ) {
+            unprotectedV8Controls.push({ componentName: importedName, line: usage.line });
+          }
+        }
+      }
+      if (unprotectedV8Controls.length === 0) continue;
+      const findingLine = unprotectedV8Controls[0].line;
+      if (
+        !matchingBlockingFinding(
+          report,
+          filePath,
+          findingLine,
+          /\bNeutralV8ThemeProvider\b/i,
+        )
+      ) {
+        errors.push(
+          `${filePath}:${findingLine} renders unshimmed v8 controls (${[...new Set(unprotectedV8Controls.map(({ componentName }) => componentName))].join(", ")}) inside an added OverlayDrawer without NeutralV8ThemeProvider; the review must report a matching blocking finding`,
+        );
+      }
+    }
+  }
+}
+
 function sameStrings(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
@@ -740,6 +1104,7 @@ function validate(report, options) {
     }
     if (expectedFiles.some((file) => file.startsWith("sp-client/"))) {
       validateRolloutProtection(report, expectedFiles, errors);
+      crossCheckSpClientUiContracts(report, options, errors, expectedFiles);
     }
     validateExternalContracts(report, expectedFiles, errors);
     validatePriorArt(report, options, expectedFiles, errors);

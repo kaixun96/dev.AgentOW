@@ -66,6 +66,15 @@ Read every `contextDocuments` file and complete its required guards/artifacts. D
 
 For rendered UI, do not proceed unless the plan contains a component-fit analysis with interaction requirements, the strongest plausible SPDS candidates, a requirement-to-capability matrix, current Fluent V9 documentation and version-pinned SPDS source consulted, nearby ODSP-Web prior art, the selected import route, and rejection rationale for alternatives. For sortable/selectable tabular UX, this analysis must explicitly compare `DataGrid` and `Table`. If implementation-time source inspection changes the choice, update the plan evidence before coding; do not manually rebuild selection, sorting, grid keyboard navigation, or accessibility behavior with low-level `Table` primitives when `DataGrid` owns the interaction model.
 
+Before reporting rendered SP-Client UI complete, mechanically inventory every changed component
+import and overlay provider. Eager SPDS controls under `sp-client/` must use
+`@msinternal/sharepoint-ui-react-stable-bundle`; supported heavy families stay on
+`stable/lib/LazyComponents`. Every added `OverlayDrawer` must follow the Detheme skill's
+`NeutralThemeProvider` contract, and rendered `@fluentui/react` controls require checking both
+the package migration flag and matching shims before omitting `NeutralV8ThemeProvider`. Record
+the exact import and provider paths in the generator report; do not summarize them as “SPDS
+components used.”
+
 For a substantial UX, read `skills/ow-review/references/ux-architecture-and-bundle-boundaries.md` and do not proceed unless the plan contains a responsibility-to-module map for page composition, child regions, workflow hooks, API/data contracts, domain models/helpers, state ownership, public contracts, extraction rationale, reuse evidence, and each module's `eager|lazy|unchanged` loading decision. Implement those cohesive boundaries and keep the root focused on composition and shared coordination. If source evidence changes a boundary, revise the map before coding. Do not collapse independent UI, workflow, and data responsibilities into one component, but also do not create trivial wrappers, one-state hooks, circular imports, or generic utility files merely to increase file count. Treat source decomposition and runtime chunks separately; use established package loader and design-system lazy-entry patterns only for evidenced user-journey and dependency-weight boundaries, preserve async fallback/error/focus/telemetry/rollout behavior, avoid tiny chunk waterfalls, and inspect build output for claimed material bundle changes.
 
 Include the realized component/hook/service/model boundaries, state ownership, deviations from the approved responsibility map, and actual eager/lazy behavior with bundle/build evidence in the generator report. Do not claim bundle improvement merely because source moved into additional files.

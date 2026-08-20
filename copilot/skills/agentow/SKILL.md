@@ -419,6 +419,13 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
      rationale before coding. Do not recreate selection, sorting, grid keyboard navigation, or
      accessibility behavior with low-level `Table` primitives when `DataGrid` owns the required
      interaction model.
+   - Before declaring rendered SP-Client UI complete, mechanically inventory every changed
+     component import and overlay provider. Eager SPDS controls under `sp-client/` must use
+     `@msinternal/sharepoint-ui-react-stable-bundle`; supported heavy families stay on
+     `stable/lib/LazyComponents`. Every added `OverlayDrawer` must follow the Detheme skill's
+     `NeutralThemeProvider` contract. For rendered `@fluentui/react` children, verify both the
+     package migration flag and matching shims before omitting `NeutralV8ThemeProvider`. Record
+     exact import and provider evidence instead of writing only “SPDS components used.”
    - For a substantial UX, do not begin implementation without the responsibility-to-module map.
      Read and follow `skills/ow-review/references/ux-architecture-and-bundle-boundaries.md`.
      Keep the root focused on composition and shared coordination; implement cohesive child

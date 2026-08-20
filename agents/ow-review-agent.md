@@ -36,6 +36,11 @@ Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before reviewing. It is nor
 If any Git-changed path is under `sp-client/`, also read `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in `preReview.profiles`. If changed shared code outside `sp-client/` implements a Flight or killswitch consumed by SP-Client, read and apply that profile's rollout and rollback rules as well.
 Read `${CLAUDE_PLUGIN_ROOT}/docs/review-misses.md` before finalizing. It records defect classes this reviewer has demonstrably missed on real PRs, distilled from human review that caught what the agent did not. Treat each entry as a standing question to ask of the change in front of you.
 
+The report validator independently recomputes SP-Client stable-bundle and OverlayDrawer Detheme
+facts from Git. Perform that import/provider inventory yourself before writing conclusions. A
+profile check that says the provider flow is sufficient does not override a conflicting source
+fact; report the blocking finding instead.
+
 ### Reference routing
 
 Classify the changed behavior from the Git diff before loading optional reference documents. Evaluate each row independently and read only the references whose positive trigger matches; do not load all references by default.
