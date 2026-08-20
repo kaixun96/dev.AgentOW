@@ -25,8 +25,9 @@ assume that every surface inside SharePoint should inherit the customer site the
 
 1. Identify the rendered surface as app-chrome-invoked, a SharePoint-owned full page, a
    customer-content full page, an inline pane, or a full-overlay drawer.
-2. Trace the established SharePoint theme/Detheme provider and token flow into the changed
-   component. Verify that local providers or overrides do not bypass the surface contract.
+2. Trace the rendered ancestor chain across module boundaries, including callers, page or pane
+   roots, openers, and hosts. Verify the established SharePoint theme/Detheme provider and token
+   flow into the changed component; do not limit review to the diff or changed module.
 3. Inspect screenshots of the changed experience. Code or token names alone are not enough
    to prove the final theme treatment.
 4. In the screenshots, verify the background and general chrome, primary button, active tab,
@@ -39,7 +40,8 @@ assume that every surface inside SharePoint should inherit the customer site the
    needed to validate changed visible theme behavior are unavailable, report the evidence gap
    rather than assuming the result is correct.
 7. Check the implementation mechanics from the Detheme skill: correctly scoped
-   `NeutralThemeProvider` hooks, no redundant property-pane wrapper, v8 shim detection and
+   `NeutralThemeProvider` hooks, no redundant child wrapper when an ancestor provider already
+   supplies the required treatment and hooks, no redundant property-pane wrapper, v8 shim detection and
    `NeutralV8ThemeProvider` where required, removal of a site-themed nested `FluentProvider`,
    killswitch protection for existing surfaces, and correctly imported/layered v9 SCSS tokens.
 
@@ -47,6 +49,8 @@ assume that every surface inside SharePoint should inherit the customer site the
 
 - What kind of surface is this, and who owns the experience?
 - Does the provider and token path match that surface classification?
+- Does an ancestor outside the changed module already provide equivalent neutral treatment and
+   all hooks required by the changed child?
 - Is the surface neutral except for the explicitly allowed SharePoint teal accents?
 - For an inline pane, are primary buttons and active tabs neutral?
 - For a drawer, app-chrome surface, or SharePoint-owned page, are primary buttons and active
@@ -64,14 +68,18 @@ Request changes when evidence shows customer theming leaking into SharePoint-own
 settings, panes, or drawers; SharePoint teal accents appearing in an inline pane; missing
 SharePoint teal accents in a drawer or SharePoint-owned surface; links that violate the
 SharePoint treatment; a local override bypassing the established Detheme flow; or a visible
-theme change that cannot be validated because required screenshots are missing.
+theme change that cannot be validated because required screenshots are missing. Also request
+changes when the changed UX adds a redundant nested provider or lacks provider/hook coverage it
+needs. If ancestor inspection reveals a pre-existing Detheme gap that does not affect the changed
+UX, report it only as a Nit for the author rather than blocking the change.
 
 ## Required fix guidance
 
 Every Detheme finding must tell the author to apply `skills/detheme/SKILL.md` from this Copilot
 plugin and name the exact applicable remediation:
 surface reclassification; `NeutralThemeProvider` plus only the required
-`enabledCustomStyleHooks`; no additional wrapper for a correctly implemented property pane;
+`enabledCustomStyleHooks`; reuse of an ancestor provider whose hooks already cover the child;
+updating the owning ancestor when shared hook coverage is missing; no additional wrapper for a correctly implemented property pane;
 `NeutralV8ThemeProvider` for an unshimmed v8 component; removal of a nested site-themed
 `FluentProvider`; killswitch protection for an existing surface; or layered v9 SCSS tokens with
 the required token import. Do not report only that the colors are wrong.

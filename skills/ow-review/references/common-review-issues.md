@@ -48,8 +48,10 @@ When applicable, test these first because they have high regression or rollback 
 12. Express required and optional data in types instead of relying on assertions that can crash
    rendering.
 13. Consume `ServiceScope`/`PageContext` only after readiness and account for preloaded chunks.
-14. Add behavioral regression tests for changed states, errors, and enabled/disabled rollout
-  paths at the behavior-owning consumer boundary. Do not add a unit test solely because a
+14. Add unit regression tests with the production change for changed states, errors, and
+  enabled/disabled rollout paths at the behavior-owning consumer boundary. Do not require
+  automation-test changes unless the production change demonstrably breaks an existing test; any
+  necessary automation update must explicitly set the Flight/KS state it validates. Do not add a unit test solely because a
   `Flights.ts`, `KillSwitches.ts`, or similar module gained a trivial constant/pass-through
   wrapper; screenshots protect behavior only when meaningful regressions fail the test.
 15. Use one shared, normalized, same-origin, fail-closed navigation resolver.
