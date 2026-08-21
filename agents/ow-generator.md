@@ -64,6 +64,11 @@ Parse all tasks, acceptance criteria, and key files.
 
 Read every `contextDocuments` file and complete its required guards/artifacts. Do not infer feature-specific rules from agentOW itself. Before writing code, classify whether the change renders or modifies user-facing UI, including components, JSX/HTML, layout, styling, typography, colors, spacing, icons, responsive behavior, or theme tokens. Only for those UI changes, read and apply `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`, `skills/ow-review/references/sharepoint-theme-and-detheme.md`, and `skills/detheme/SKILL.md`. Pure data, service, business-logic, configuration, or test-only changes with no rendered UI or styling impact do not require these references.
 
+When the change modifies runtime imports, dependencies, lazy boundaries, SPFx manifests or
+assemblies, Webpack/Rspack configuration, shared bundles, or workaround-loader mappings, read
+`skills/ow-review/references/size-regression.md` before implementation and identify the affected
+project and packaging model. Do not infer bundle ownership from package declarations alone.
+
 For rendered UI, do not proceed unless the plan contains a component-fit analysis with interaction requirements, the strongest plausible SPDS candidates, a requirement-to-capability matrix, current Fluent V9 documentation and version-pinned SPDS source consulted, nearby ODSP-Web prior art, the selected import route, and rejection rationale for alternatives. For sortable/selectable tabular UX, this analysis must explicitly compare `DataGrid` and `Table`. If implementation-time source inspection changes the choice, update the plan evidence before coding; do not manually rebuild selection, sorting, grid keyboard navigation, or accessibility behavior with low-level `Table` primitives when `DataGrid` owns the interaction model.
 
 Before reporting rendered SP-Client UI complete, mechanically inventory every changed component
@@ -244,6 +249,32 @@ SendMessage to ow-orchestrator:
 ```
 
 Failing without notifying the orchestrator deadlocks the entire pipeline.
+
+### Step 7e: Production size audit
+
+After a successful build, run the affected project's local production size audit when that
+project supports size auditing. Fetch the baseline and run `rush size-audit --to <project-name>`,
+then inspect the official diff and policy result using
+`skills/ow-review/references/size-regression.md`.
+
+- If policy reports no regression, record `sizeAuditStatus: "passed-no-regression"` and stop size
+   analysis. Do not run `analyze-cli` or search for speculative size issues.
+- If policy reports a regression, record the scenario, FMP/FCI/All criterion, allowed, actual,
+   margin, and baseline warning. Run the analyzer only for failed scenarios, diagnose the owning
+   import/package/configuration boundary and packaging model, apply the narrowest correct fix,
+   rebuild, and rerun the production size audit. Repeat only while making grounded local fixes.
+- Record a repaired result as `sizeAuditStatus: "regression-fixed"`. Do not increase policy
+   thresholds, move bytes merely to change ownership, or request approval before understanding
+   root cause.
+- Record a remaining regression as `sizeAuditStatus: "regression-unresolved"` with root cause,
+   user impact, attempted fixes, and concrete next action. It is a release blocker unless an
+   authorized, evidence-backed exception already exists.
+- If the project has no size-auditor configuration, record `sizeAuditStatus: "not-supported"`.
+   If baseline, auth, network, or infrastructure prevents the audit, record
+   `sizeAuditStatus: "blocked"` and the exact cause; never report that as a product regression.
+
+If fixing a regression changes code, commit the fix and rerun the affected scoped tests after the
+build. Include size-audit status and evidence in the implementation iteration and final report.
 
 ### Step 8: Test
 

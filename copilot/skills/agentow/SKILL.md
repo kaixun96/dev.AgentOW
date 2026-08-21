@@ -364,6 +364,10 @@ Using the planner report (POC, FAST, or FULL), write a short plan:
   Pure data, service,
   business-logic, configuration, or test-only changes with no rendered UI or styling impact do
   not need these references.
+- For changes to runtime imports, dependencies, lazy boundaries, SPFx manifests/assemblies,
+  Webpack/Rspack configuration, shared bundles, or workaround-loader mappings, read
+  `skills/ow-review/references/size-regression.md`. Record the affected project and packaging
+  model; package declarations alone do not prove bundle ownership.
 - Context compliance checklist (each routed guard and its required artifact)
 - Root/wrapper layout ownership table when any JSX root/wrapper is replaced
 - Repeated-item geometry target (selector, axis, metric) when Cards/rows/tiles/items repeat
@@ -445,7 +449,25 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
    - If the MCP request times out but a `rush build -t <project>` process is still running, do **not** treat it as build failure. Log `⚠️ Build tool timeout — tracking underlying Rush process`, wait for the real Rush process to exit, then read `common/temp/markdown-summary/build-summary.md` and the raw log. Record this in `agent-metrics.md` as `tool-timeout / self-recovered-by-process-tracking`.
    - Build/typecheck is a hard gate in every profile, including POC. Never ship a POC with compiler
     or type errors.
-5. **Test:** in POC profile, do not add or run tests unless the user explicitly requests them; append
+5. **Production size audit:** after a successful build, run the affected project's local production
+   size audit when supported. Fetch the baseline, run `rush size-audit --to <project-name>`, then
+   inspect the official diff and policy result using
+   `skills/ow-review/references/size-regression.md`.
+   - No policy regression: record `sizeAuditStatus: passed-no-regression` and stop. Do not run the
+     analyzer or search for speculative size issues.
+   - Regression: record scenario, FMP/FCI/All criterion, allowed, actual, margin, and baseline
+     warning; analyze only failed scenarios, diagnose the owning import/package/configuration and
+     packaging model, make the narrowest grounded fix, rebuild, and rerun the audit.
+   - Record the result as `regression-fixed` or `regression-unresolved`. Never increase thresholds,
+     move bytes merely to change report ownership, or seek approval before understanding root
+     cause. An unresolved regression blocks completion unless an authorized, evidence-backed
+     exception already exists.
+   - Record `not-supported` when the project has no size-auditor configuration. Record `blocked`
+     with the exact cause for baseline/auth/network/infrastructure failures; do not classify those
+     failures as product regressions.
+   If a size fix changes code, commit it, rebuild, and rerun affected scoped tests. Include the
+   size-audit status and evidence in implementation/final artifacts and the PR description.
+6. **Test:** in POC profile, do not add or run tests unless the user explicitly requests them; append
    `🧪 Tests skipped — POC profile` and record the skip in implementation/final artifacts and the PR
    description. In STANDARD profile, run `ow-test` scoped to tests that own the changed observable
    behavior (not every changed file and not the full suite). For Flight/KS changes, exercise
@@ -457,8 +479,8 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
    test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent logic
    that can regress separately. If no meaningful test target exists, record the evidence-backed
    reason; don't run 600 unrelated tests.
-6. **Dev server / debug link:** follow the feature context docs for the surface's verification contract. For UI-visible changes, prefer `ow-start` + `ow-debuglink` before PR validation builds finish; if the context docs require additional guards, execute those guards and record the result.
-7. **Commit** (don't push yet).
+7. **Dev server / debug link:** follow the feature context docs for the surface's verification contract. For UI-visible changes, prefer `ow-start` + `ow-debuglink` before PR validation builds finish; if the context docs require additional guards, execute those guards and record the result.
+8. **Commit** (don't push yet).
 
 After commit, append a `code` event to `context/evidence.ndjson` containing the commit SHA, changed files, diff digest, and grounded implementation outcomes. Do not copy unrestricted source into the context artifacts.
 

@@ -119,6 +119,8 @@ Be thorough — read the actual source files, not just file names.
 
 For rendered UI, read `skills/ow-review/references/sharepoint-design-system-and-ux-components.md` before choosing components. Translate the request into interaction requirements and compare at least the strongest two plausible SPDS controls when more than one could fit. Search the current Fluent V9 Storybook documentation by component name, inspect the version-pinned SPDS export/API, and cite nearby ODSP-Web production usage. For sortable/selectable tabular UX, explicitly compare `DataGrid` and `Table`; never choose `Table` merely because the request calls the UX a list. Missing component-fit evidence is a planning failure.
 
+For theme-affecting SharePoint UI, also read `skills/ow-review/references/sharepoint-theme-and-detheme.md` and `skills/detheme/SKILL.md`. Classify the surface as app-chrome-invoked, a SharePoint-owned full page, a customer-content full page, an inline pane, or a full-overlay drawer. Trace callers, page or pane roots, openers, and hosts across module boundaries to determine whether an ancestor `NeutralThemeProvider` already supplies the required treatment and hooks. Record the provider owner, required hooks, v8 shim/provider treatment, and killswitch direction for existing surfaces; do not plan a redundant child provider.
+
 For a substantial rendered UX, including a net-new page or a component combining multiple independent regions, workflows, or data contracts, read `skills/ow-review/references/ux-architecture-and-bundle-boundaries.md`. Inventory page composition, child interaction regions, shared state, stateful workflows, API/data contracts, domain mapping, and pure helpers. Search nearby architecture and reusable hooks/providers/utilities. Produce a responsibility-to-module map naming each component/hook/service/model, its public contract and state owner, why it remains inline or is extracted, and its `eager|lazy|unchanged` loading decision. Base async boundaries on real user journeys, dependency weight, package conventions, and build evidence; moving code to another file does not create a bundle split. Do not use line count as the decomposition rule or create trivial wrappers and one-state hooks.
 
 ### Phase 6: Draft Grounded Plan
@@ -150,6 +152,12 @@ Write a plan file to `{planDir}/plan.md` with this structure:
 - **Selected component/import route**: <component + SPDS package>
 - **Alternatives rejected**: <candidate + evidence-based reason>
 - **Sources consulted**: <current Fluent V9 docs, version-pinned API/source, nearby production usage>
+
+## SharePoint Theme and Detheme
+- **Classification**: <app-chrome-invoked | SharePoint-owned full page | customer-content full page | inline pane | full-overlay drawer | not applicable>
+- **Provider path**: <ancestor provider owner and caller/host evidence, or exact new provider boundary>
+- **Required treatment**: <custom style hooks, v8 provider/shim handling, SCSS token treatment>
+- **Rollout protection**: <Flight/KS direction for an existing surface, or not required for new code>
 
 ## UX Architecture and Loading Boundaries
 - **Substantial UX**: <true|false + reason>
