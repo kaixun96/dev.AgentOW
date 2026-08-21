@@ -74,6 +74,23 @@ const localizationFormattingSnippets = [
   "Verify claimed resolutions in the actual PR source"
 ];
 
+const accessibilitySnippets = [
+  "SPDS components commonly style, compose, or re-export an underlying Fluent V9 component",
+  "contract to the SPDS component too",
+  "SPDS styling does not waive Fluent semantics",
+  "only when SPDS explicitly documents an accessibility override",
+  "## SPDS and Fluent V9 MessageBar announcement contract",
+  "every SPDS component backed by it",
+  "one `AriaLiveAnnouncer` toward the top of the React tree",
+  "do not add another one at the feature or MessageBar level",
+  "Do not add `role=\"alert\"`, `role=\"status\"`, or an ad hoc `aria-live` attribute",
+  "Use the documented `intent` preset",
+  "`politeness` prop unless an accessibility owner",
+  "<AriaLiveAnnouncer>",
+  "<div className={styles.downloadError}>",
+  "do not add `@msinternal/screen-reader-alert` to duplicate a Fluent V9 `MessageBar` announcement"
+];
+
 const sharepointDesignSystemSnippets = [
   "highest supported ODSP-Web design-system layer",
   "Do not skip a higher layer merely to obtain a small styling or API preference",
@@ -500,6 +517,11 @@ const checks = [
     "skills/ow-review/references/localization-and-formatting.md",
     "copilot/skills/ow-review/references/localization-and-formatting.md",
     localizationFormattingSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/accessibility.md",
+    "copilot/skills/ow-review/references/accessibility.md",
+    accessibilitySnippets,
   ),
   ...mirroredSnippetChecks(
     "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",

@@ -9,6 +9,13 @@ This repository primarily builds UI with SPDS and Fluent UI React V9. Review acc
 
 When a change uses SPDS or Fluent V9, review against the Fluent UI React V9 accessibility guidance, especially the Accessibility docs in `https://storybooks.fluentui.dev/react/`, and the specific component's documented accessibility behavior and props.
 
+SPDS components commonly style, compose, or re-export an underlying Fluent V9 component rather
+than replace its behavior. Therefore, apply the underlying Fluent V9 component's accessibility
+contract to the SPDS component too. SPDS styling does not waive Fluent semantics, composition,
+keyboard, focus, or announcement requirements. Inspect the SPDS wrapper/export to identify the
+underlying Fluent component and honor any additional SPDS requirements; depart from the Fluent
+contract only when SPDS explicitly documents an accessibility override.
+
 Use this Fluent V9 accessibility reference map to choose the corresponding doc based on the component or behavior under review:
 
 | Review this when the change uses or affects | Fluent V9 accessibility doc |
@@ -23,15 +30,61 @@ Use this Fluent V9 accessibility reference map to choose the corresponding doc b
 | `SpinButton`, numeric entry, stepper controls, or increment/decrement semantics | [SpinButton](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-components-spinbutton--docs) |
 | `SplitButton`, primary action plus menu action, or mixed trigger semantics | [SplitButton](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-components-splitbutton--docs) |
 | `Textarea`, multiline text input, field descriptions, or validation messaging | [Textarea](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-components-textarea--docs) |
+| `MessageBar`, message intent, actions, or announcement behavior | [MessageBar](https://storybooks.fluentui.dev/react/?path=/docs/components-messagebar--docs) and [AriaLiveAnnouncer](https://storybooks.fluentui.dev/react/?path=/docs/utilities-aria-live-arialiveannouncer--docs) |
 | general Fluent component accessibility expectations when no component-specific page above is a better fit | [Components overview](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-components-overview--docs) |
 | end-to-end user journeys, interaction patterns, or broader accessibility experience guidance beyond a single component | [Experiences](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-experiences--docs) |
 | focus visibility, custom focus styling, or focus indicator regressions | [Focus indicator](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-focus-indicator--docs) |
 | toast/status/alert messaging, announcements, or notification timing/behavior | [Notification best practices](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-notification-best-practices--docs) |
 | text truncation, clipped labels/content, tooltip fallback for truncated text, or loss of meaning from overflow | [Truncation](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-truncation--docs) |
 
+## SPDS and Fluent V9 MessageBar announcement contract
+
+This contract applies to Fluent V9 `MessageBar` and every SPDS component backed by it. `MessageBar`
+intents provide built-in announcement presets. For those announcements to work, the application
+must render one `AriaLiveAnnouncer` toward the top of the React tree, above every `MessageBar` that
+needs to announce. First trace the host/root to determine whether it already provides the
+announcer; do not add another one at the feature or MessageBar level.
+
+Do not add `role="alert"`, `role="status"`, or an ad hoc `aria-live` attribute to a `MessageBar`,
+its parent, `MessageBarBody`, or a duplicate hidden element. Those wrappers bypass or duplicate
+the documented announcement mechanism. Use the documented `intent` preset. Do not customize the
+`politeness` prop unless an accessibility owner has confirmed that the preset is wrong for the
+specific experience.
+
+Configure the announcer once at the application root:
+
+```tsx
+import { AriaLiveAnnouncer, FluentProvider } from '@fluentui/react-components';
+
+export function AppRoot(): JSX.Element {
+  return (
+    <FluentProvider theme={appTheme}>
+      <AriaLiveAnnouncer>
+        <App />
+      </AriaLiveAnnouncer>
+    </FluentProvider>
+  );
+}
+```
+
+Then render the error and retry action without an alert wrapper:
+
+```tsx
+<div className={styles.downloadError}>
+  <MessageBar intent="error">
+    <MessageBarBody>{strings.DownloadError}</MessageBarBody>
+  </MessageBar>
+  <Button onClick={onDownload}>{strings.RetryButton}</Button>
+</div>
+```
+
+When the surface uses `MessageBarGroup`, keep each `MessageBar` as a direct child as required by
+the component's animation contract. Prefer the component's documented action slots/composition
+when the retry action belongs to the message itself.
+
 ## Repository accessibility utilities when Fluent or SPDS does not already own the behavior
 
-Main authoring rule: first use the SPDS or Fluent component that models the interaction. Its documented composition, slots, keyboard handling, focus behavior, semantics, and high-contrast support are the default accessibility implementation. Use the repository utilities below only for behavior Fluent or SPDS does not already own.
+Main authoring rule: first use the SPDS or Fluent component that models the interaction. Its documented composition, slots, keyboard handling, focus behavior, semantics, and high-contrast support are the default accessibility implementation. Use the repository utilities below only for behavior Fluent or SPDS does not already own. In particular, do not add `@msinternal/screen-reader-alert` to duplicate a Fluent V9 `MessageBar` announcement; configure the application-level `AriaLiveAnnouncer` instead.
 
 ### 1. Screen-reader announcements — preferred shared React API
 
@@ -104,28 +157,29 @@ Gap identified: the repo has no central author-facing `VisuallyHidden` or `sr-on
 9. Verify transient UI built from Fluent or SPDS components, such as dialogs, menus, popovers, tooltips, toasts, and disclosures, is wired with the documented trigger, focus, dismissal, and labeling pattern.
 10. Verify decorative icons remain hidden from assistive technology and meaningful icons do not become the only accessible name source unless that is the documented pattern.
 11. Verify tests cover the changed accessibility contract when behavior changes. Prefer assertions on roles, names, states, focus movement, and announcements rather than implementation details.
+12. For Fluent V9 `MessageBar` or an SPDS component backed by it, verify an ancestor application root provides `AriaLiveAnnouncer`, the documented intent supplies announcement behavior, and no parent or duplicate node adds `role="alert"`, `role="status"`, or `aria-live`.
 
 ### Scenario 2: Custom component authoring when no suitable SPDS or Fluent V9 component fits
 
-12. Preserve semantic HTML first. Use native elements such as `button`, `a`, `input`, `select`, `textarea`, `table`, `ul`, and heading tags before adding ARIA roles to generic containers.
-13. Require the semantic interaction to match the user action. Use links for navigation, buttons for actions, checkboxes for binary selection, radios for mutually exclusive choices, and tables only for tabular relationships.
-14. Do not accept clickable `div` or `span` implementations when a native control would work. Adding `role="button"` and key handlers to generic elements is a fallback, not the preferred solution.
-15. Verify keyboard access for every interactive path. A keyboard user must be able to reach, operate, and dismiss the UI without requiring a mouse.
-16. Reject positive `tabIndex` values and focus-order hacks unless there is a documented, exceptional reason. Prefer DOM order that already produces the intended tab sequence.
-17. Verify visible focus indication remains clear in default, themed, and high-contrast modes. Do not remove outlines without a replacement that is at least as visible.
-18. Require an accessible name for every interactive control and meaningful form field. Derive it from visible text, associated labels, `aria-label`, `aria-labelledby`, or other valid naming mechanisms.
-19. Require accessible descriptions only when they add necessary context beyond the accessible name. Do not duplicate the same text in both name and description paths.
-20. Treat placeholder text as supplementary only. It does not replace a real label or an accessible name.
-21. When content updates without a page reload, verify assistive technologies receive the update through the correct pattern, such as `aria-live`, `role="status"`, `role="alert"`, focus movement, or semantic state changes. Do not announce the same event multiple times through overlapping mechanisms.
-22. For dialogs, popovers, flyouts, menus, and disclosure UI, verify trigger semantics, focus entry, focus containment when required, Escape handling, restore-focus behavior, and correct relationships such as `aria-expanded`, `aria-controls`, or dialog labeling.
-23. Reject ARIA that conflicts with visible behavior or native semantics. No ARIA is better than incorrect ARIA.
-24. Verify validation and error flows are accessible. Associate error text to the field, expose invalid state, and ensure summary or inline feedback is reachable and announced when it appears.
-25. Verify heading order, list structure, landmarks, and region labels remain meaningful after the change. Do not skip heading levels solely for visual styling.
-26. For tables and grids, verify the chosen pattern matches the interaction complexity. Simple data should stay a semantic table with proper header associations; only use grid patterns when the richer keyboard model is truly required.
-27. For images and media, require meaningful alternative text only when the asset conveys information not already present in adjacent text. Decorative images should use empty alt text or equivalent hiding.
-28. Do not rely on color, position, shape, or hover-only behavior as the sole way to understand content or discover an action. The state and action must remain available through text, semantics, or another non-visual cue.
-29. When custom widgets are unavoidable, require the full interaction contract: semantics, keyboard behavior, focus management, state announcements, high-contrast support, and tests. Reject partial reimplementations.
-30. Verify claimed accessibility fixes in the current PR source. A resolved thread or follow-up promise is not evidence that the current implementation is accessible.
+13. Preserve semantic HTML first. Use native elements such as `button`, `a`, `input`, `select`, `textarea`, `table`, `ul`, and heading tags before adding ARIA roles to generic containers.
+14. Require the semantic interaction to match the user action. Use links for navigation, buttons for actions, checkboxes for binary selection, radios for mutually exclusive choices, and tables only for tabular relationships.
+15. Do not accept clickable `div` or `span` implementations when a native control would work. Adding `role="button"` and key handlers to generic elements is a fallback, not the preferred solution.
+16. Verify keyboard access for every interactive path. A keyboard user must be able to reach, operate, and dismiss the UI without requiring a mouse.
+17. Reject positive `tabIndex` values and focus-order hacks unless there is a documented, exceptional reason. Prefer DOM order that already produces the intended tab sequence.
+18. Verify visible focus indication remains clear in default, themed, and high-contrast modes. Do not remove outlines without a replacement that is at least as visible.
+19. Require an accessible name for every interactive control and meaningful form field. Derive it from visible text, associated labels, `aria-label`, `aria-labelledby`, or other valid naming mechanisms.
+20. Require accessible descriptions only when they add necessary context beyond the accessible name. Do not duplicate the same text in both name and description paths.
+21. Treat placeholder text as supplementary only. It does not replace a real label or an accessible name.
+22. When content updates without a page reload, verify assistive technologies receive the update through the correct pattern, such as `aria-live`, `role="status"`, `role="alert"`, focus movement, or semantic state changes. Do not announce the same event multiple times through overlapping mechanisms.
+23. For dialogs, popovers, flyouts, menus, and disclosure UI, verify trigger semantics, focus entry, focus containment when required, Escape handling, restore-focus behavior, and correct relationships such as `aria-expanded`, `aria-controls`, or dialog labeling.
+24. Reject ARIA that conflicts with visible behavior or native semantics. No ARIA is better than incorrect ARIA.
+25. Verify validation and error flows are accessible. Associate error text to the field, expose invalid state, and ensure summary or inline feedback is reachable and announced when it appears.
+26. Verify heading order, list structure, landmarks, and region labels remain meaningful after the change. Do not skip heading levels solely for visual styling.
+27. For tables and grids, verify the chosen pattern matches the interaction complexity. Simple data should stay a semantic table with proper header associations; only use grid patterns when the richer keyboard model is truly required.
+28. For images and media, require meaningful alternative text only when the asset conveys information not already present in adjacent text. Decorative images should use empty alt text or equivalent hiding.
+29. Do not rely on color, position, shape, or hover-only behavior as the sole way to understand content or discover an action. The state and action must remain available through text, semantics, or another non-visual cue.
+30. When custom widgets are unavoidable, require the full interaction contract: semantics, keyboard behavior, focus management, state announcements, high-contrast support, and tests. Reject partial reimplementations.
+31. Verify claimed accessibility fixes in the current PR source. A resolved thread or follow-up promise is not evidence that the current implementation is accessible.
 
 ## Review questions
 
