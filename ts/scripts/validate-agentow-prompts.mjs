@@ -110,6 +110,17 @@ const uxArchitectureBundleSnippets = [
   "This reference owns rendered-feature decomposition"
 ];
 
+const sizeRegressionSnippets = [
+  "the regressed scenario and policy criterion",
+  "FMP, FCI, or All timing bucket",
+  "The official local/PR policy report is the source of truth",
+  "A package declaration is not a bundling instruction",
+  "If and only if the policy result reports a regression",
+  "Do not increase the allowance first",
+  "diagnostic evidence, not a replacement for the official policy result",
+  "Every finding must name the likely owning import/package/configuration boundary"
+];
+
 const checks = [
   {
     file: "copilot/skills/agentow/SKILL.md",
@@ -419,6 +430,8 @@ const checks = [
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
       "ux-architecture-and-bundle-boundaries.md",
+      "size-regression.md",
+      "PR's official size-audit report",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -433,7 +446,9 @@ const checks = [
       "classify it as `reviewer-spec`",
       "REQUEST_CHANGES with any Critical or Important finding",
       "Draft status and AUTO mode do not bypass the review quality gate.",
-      "--diff-numstat"
+      "--diff-numstat",
+      "sizeAuditStatus: passed-no-regression",
+      "analyzer or search for speculative size issues"
     ]
   },
   {
@@ -461,6 +476,8 @@ const checks = [
       "localization-and-formatting.md",
       "sharepoint-design-system-and-ux-components.md",
       "ux-architecture-and-bundle-boundaries.md",
+      "size-regression.md",
+      "PR's official size-audit report",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -493,6 +510,11 @@ const checks = [
     "skills/ow-review/references/ux-architecture-and-bundle-boundaries.md",
     "copilot/skills/ow-review/references/ux-architecture-and-bundle-boundaries.md",
     uxArchitectureBundleSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/size-regression.md",
+    "copilot/skills/ow-review/references/size-regression.md",
+    sizeRegressionSnippets,
   ),
   {
     file: "agents/ow-orchestrator.md",
@@ -660,7 +682,12 @@ const checks = [
   },
   {
     file: "agents/ow-generator.md",
-    snippets: ["`contextLinkPath`", "`contextDocuments`"]
+    snippets: [
+      "`contextLinkPath`",
+      "`contextDocuments`",
+      "sizeAuditStatus: \"passed-no-regression\"",
+      "Do not run `analyze-cli` or search for speculative size issues"
+    ]
   },
   {
     file: "agents/ow-planner.md",
