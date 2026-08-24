@@ -373,6 +373,12 @@ When the plan requires adding a killswitch:
    - Ternary: `!isMyKSActivated() ? newValue : oldValue`
 4. Use `odsp-get-user-alias` and `odsp-get-timestamp` for killswitch comments if the blueprint tool is not available.
 
+When graduating a killswitch, remove the gate and fully simplify every dependent expression and
+control-flow path. Keep only the graduated behavior; inline surviving ternary branches, remove the
+KS term from compound conditions, and delete booleans, helpers, imports, fallback branches, and
+tests made obsolete by the graduation. Never replace a gate with a `true` or `false` variable while
+leaving its conditional structure in place.
+
 ### Merge Conflicts
 
 If you encounter merge conflicts after `git pull` or branch operations:

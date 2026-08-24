@@ -104,7 +104,9 @@ existing Flight, ECS, experiment, or KS.
   or error behavior differs.
 - For Flight/KS-graduation-only PRs, prioritize fallback equivalence and cleanup completeness.
   Verify removed-branch strings, styles, helpers/functions, and constants are also removed when
-  no longer referenced.
+  no longer referenced. Reject replacing the retired gate with a fixed boolean while preserving
+  dependent ternaries or guards: inline the surviving expressions, simplify compound conditions,
+  and remove dead branches and newly unused symbols.
 - For KS graduation, require evidence that the KS is inactive in all rings. If the PR description
   does not include Merlin verification output, leave an explicit reminder for the author to attach
   it.

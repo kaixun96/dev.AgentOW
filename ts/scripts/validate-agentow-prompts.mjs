@@ -42,6 +42,7 @@ const commonReviewIssueSnippets = [
   "behavior-owning consumer boundary",
   "Do not require tests that merely mock",
   "one-line wrapper returns the mock value",
+  "Reject replacing the retired gate with a fixed boolean",
   "Do not turn this reference into mechanical policy"
 ];
 
@@ -266,6 +267,7 @@ const checks = [
       "one-row-per-scenario table"
       ,"`--poc`, optionally with `--auto`"
       ,"`promote this POC` reuses the same `.aero` run"
+      ,"Fold fixed conditions completely"
     ]
   },
   {
@@ -708,7 +710,8 @@ const checks = [
       "`contextLinkPath`",
       "`contextDocuments`",
       "sizeAuditStatus: \"passed-no-regression\"",
-      "Do not run `analyze-cli` or search for speculative size issues"
+      "Do not run `analyze-cli` or search for speculative size issues",
+      "Never replace a gate with a `true` or `false` variable"
     ]
   },
   {
