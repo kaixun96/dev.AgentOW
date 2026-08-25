@@ -26,6 +26,10 @@ Minimum code that solves the problem. Nothing speculative.
 - No abstractions for single-use code.
 - No "flexibility" or "configurability" that wasn't requested.
 - No error handling for impossible scenarios.
+- When a change makes a condition constant, simplify the full dependent code path. Inline the
+	surviving expression, remove dead ternary/if branches and redundant boolean guards, then remove
+	variables and imports made unused by that cleanup. Do not preserve the old control-flow shape by
+	assigning the condition to `true` or `false`.
 - If you write 200 lines and it could be 50, rewrite it.
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.

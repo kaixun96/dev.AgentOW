@@ -64,6 +64,12 @@ Parse all tasks, acceptance criteria, and key files.
 
 Read every `contextDocuments` file and complete its required guards/artifacts. Do not infer feature-specific rules from agentOW itself. Before writing code, classify whether the change renders or modifies user-facing UI, including components, JSX/HTML, layout, styling, typography, colors, spacing, icons, responsive behavior, or theme tokens. Only for those UI changes, read and apply `skills/ow-review/references/sharepoint-design-system-and-ux-components.md`, `skills/ow-review/references/sharepoint-theme-and-detheme.md`, and `skills/detheme/SKILL.md`. Pure data, service, business-logic, configuration, or test-only changes with no rendered UI or styling impact do not require these references.
 
+When any task graduates a Flight, KS, Feature, experiment, or rollout flag, read and follow
+`skills/ow-review/references/graduation.md` before planning the edit. For graduation-related lines,
+that reference is exclusive: remove only the gate and code made obsolete by selecting its required
+branch. Preserve unrelated predicates, operators, behavior, comments, and formatting. If the same
+plan contains separate feature work, apply normal implementation rules only to that separate work.
+
 When the change modifies runtime imports, dependencies, lazy boundaries, SPFx manifests or
 assemblies, Webpack/Rspack configuration, shared bundles, or workaround-loader mappings, read
 `skills/ow-review/references/size-regression.md` before implementation and identify the affected
@@ -280,7 +286,7 @@ build. Include size-audit status and evidence in the implementation iteration an
 
 **Always scope tests to the changed observable behavior.** Do NOT run the full package test suite or mechanically target every changed module.
 
-1. **Find relevant tests**: Use `Grep` or `Glob` to locate unit tests for the component/service/helper that owns the changed behavior (e.g. `Glob("**/ViewEditMotion*.test.ts")`). For Flight/KS changes, update meaningful unit tests with the production change and prefer the nearest stable consumer where enabled/fallback state changes an output, rendering, request, mutation, or error path. Do not add or modify automation tests by default; they normally follow feature completion. Touch automation only when source inspection proves the production change would break an existing test, record that evidence, and make the test set the intended Flight/KS state explicitly. Do not add a dedicated test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent branching, composition, transformation, caching, fallback policy, side effects, or another separately regressible contract.
+1. **Find relevant tests**: Use `Grep` or `Glob` to locate unit tests for the component/service/helper that owns the changed behavior (e.g. `Glob("**/ViewEditMotion*.test.ts")`). For Flight/KS graduation, do not add, update, rewrite, or reorganize tests; only delete cases for the removed branch and test support used exclusively by it, then run existing scoped tests and the project coverage command. If coverage actually fails its configured threshold, prefer updating the threshold with no new tests and recommend a separate follow-up test PR. If the developer chooses to retain the current threshold, add only the minimum tests for surviving behavior. In either case, record the failing result, threshold, chosen resolution, and final result in the PR description. For new or still-live Flight/KS changes, update meaningful unit tests with the production change and prefer the nearest stable consumer where enabled/fallback state changes an output, rendering, request, mutation, or error path. Do not add or modify automation tests by default; they normally follow feature completion. Touch automation only when source inspection proves the production change would break an existing test, record that evidence, and make the test set the intended Flight/KS state explicitly. Do not add a dedicated test for a trivial ID/GUID or rollout-SDK pass-through wrapper unless it has independent branching, composition, transformation, caching, fallback policy, side effects, or another separately regressible contract.
 2. **If tests exist**: Run scoped:
    ```
    ow-test: project="<package-name>", testPattern="<ModuleName>"
@@ -372,6 +378,9 @@ When the plan requires adding a killswitch:
    - Pattern: `if (!isMyKSActivated()) { newCode } else { oldCode }`
    - Ternary: `!isMyKSActivated() ? newValue : oldValue`
 4. Use `odsp-get-user-alias` and `odsp-get-timestamp` for killswitch comments if the blueprint tool is not available.
+
+When graduating a Flight/KS, follow `skills/ow-review/references/graduation.md`. Do not substitute a
+fixed boolean for the gate, and do not modify any surviving non-gate logic or comment as cleanup.
 
 ### Merge Conflicts
 

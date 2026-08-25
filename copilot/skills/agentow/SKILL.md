@@ -410,6 +410,12 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 1. **Branch.** If on `main`, create `user/<alias>/<feature>` from `origin/main` (use `ow-git`). `<alias>` from `whoami`.
 2. **Write the code** yourself, following the planner's "patterns to follow". Surgical changes only — every line traces to the request.
    - Complete every context compliance item before build.
+  - When any task graduates a Flight, KS, Feature, experiment, or rollout flag, read and follow
+    `skills/ow-review/references/graduation.md`. For graduation-related lines, that reference is
+    exclusive: remove only the gate and code made obsolete by selecting its required branch.
+    Preserve unrelated predicates, operators, behavior, comments, and formatting. Do not treat
+    graduation as permission to polish nearby code. If the same task includes separate feature
+    work, apply normal implementation rules only to that separate work.
    - For any rendered UI, component, layout, or styling change, read and follow the SPDS and
      Detheme references plus `skills/detheme/SKILL.md` before implementation. For non-UI
      changes, skip these references and record that they are not applicable. For any
@@ -470,9 +476,15 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 6. **Test:** in POC profile, do not add or run tests unless the user explicitly requests them; append
    `🧪 Tests skipped — POC profile` and record the skip in implementation/final artifacts and the PR
    description. In STANDARD profile, run `ow-test` scoped to tests that own the changed observable
-   behavior (not every changed file and not the full suite). For Flight/KS changes, exercise
-  enabled/fallback behavior through the nearest stable consumer, and update meaningful unit tests
-  in the same change as production code. Do not add or modify automation tests by default; they
+  behavior (not every changed file and not the full suite). For Flight/KS graduation, do not add,
+  update, rewrite, or reorganize tests; only delete cases for the removed branch and test support
+  used exclusively by it, then run existing scoped tests and the project coverage command. If
+  coverage actually fails its configured threshold, prefer updating the threshold with no new
+  tests and recommend a separate follow-up test PR. If the developer chooses to retain the current
+  threshold, add only the minimum tests for surviving behavior. In either case, record the failing
+  result, threshold, chosen resolution, and final result in the PR description. For new or still-live
+  Flight/KS changes, exercise enabled/fallback behavior through the nearest stable consumer, and
+  update meaningful unit tests in the same change as production code. Do not add or modify automation tests by default; they
   normally follow after feature completion. Touch automation only when source inspection proves
   the production change would break an existing test. In that exception, record the breakage and
   make the test explicitly set the Flight/KS state for the branch it validates. Do not add or run a dedicated unit

@@ -45,6 +45,59 @@ const commonReviewIssueSnippets = [
   "Do not turn this reference into mechanical policy"
 ];
 
+const graduationReviewSnippets = [
+  "this is the only code-review policy reference to apply",
+  "Do not apply graduation rules merely because a changed file mentions a gate",
+  "Do not turn a graduation-only review into an opportunity to polish nearby logic",
+  "Do not reuse KS inactive",
+  "construct the gate truth table before judging the diff",
+  "must preserve the KS-inactive/new path unless the PR description explains",
+  "activated globally because the inactive/new path is a regression",
+  "must instead preserve the KS-active/fallback path",
+  "must preserve the enabled/treatment path unless the PR description states",
+  "Flight was never rolled out anywhere and its gated code must be removed",
+  "preserve the disabled/control path",
+  "local or exported `true`/`false` constant",
+  "is still an ungraduated gate",
+  "find every reference",
+  "This propagation crosses function boundaries",
+  "inspect the function definition and every call site",
+  "remove the parameter from the",
+  "not replace the argument with `true`/`false`",
+  "external callers cannot be ruled out, preserve the parameter",
+  "values that are not gate booleans but exist only to share the same expression across",
+  "local temporary with exactly one",
+  "This includes JSX elements",
+  "preserves evaluation count, order, timing, side effects, and object",
+  "Incorrect: the gate call is gone, but its obsolete control-flow shape remains",
+  "Correct: inline the surviving value and simplify every consumer",
+  "Gate-derived function parameters require the same cleanup",
+  "Incorrect: the permanent value is still represented as configurable input",
+  "Correct when every call site passed the enabled state",
+  "Branch-sharing temporaries must not survive as single-use indirection",
+  "Incomplete: the branch is gone, but its sharing temporary remains",
+  "Correct when the temporary existed only to serve both branches",
+  "Find all references to the gate-derived value",
+  "For each function parameter or options property carrying that value, inspect every call site",
+  "Find local values introduced only for reuse across the retired branches",
+  "Preserve every non-gate operand, predicate, operator, fallback value, call, and evaluation order",
+  "do not change `some` to `every`",
+  "removing the gate does not authorize changing the existing predicate",
+  "Preserve comments by default",
+  "Do not delete, rewrite, shorten, or otherwise polish comments merely because the gate is removed",
+  "Graduation test work is deletion-only",
+  "preserve tests for the surviving branch unchanged",
+  "do not create any unit, integration, automation, or manual test task for graduation",
+  "running an existing scoped test is validation, not a test implementation task",
+  "Preferred:** update the unit-test coverage threshold",
+  "Recommend a separate follow-up PR",
+  "Allowed alternative:** the developer may instead add the minimum meaningful tests",
+  "Do not predict a coverage failure or create a test task before running",
+  "The PR description must state that graduation caused the threshold failure",
+  "Search by gate identifier, GUID, helper name, attribution comment",
+  "Do not raise graduation findings"
+];
+
 const localizationFormattingSnippets = [
   "hard-coded user-visible strings and non-visible assistive text",
   "announcements, and live-region content",
@@ -266,6 +319,7 @@ const checks = [
       "one-row-per-scenario table"
       ,"`--poc`, optionally with `--auto`"
       ,"`promote this POC` reuses the same `.aero` run"
+      ,"Fold fixed conditions completely"
     ]
   },
   {
@@ -453,7 +507,10 @@ const checks = [
       "screen-reader or other assistive text",
       "Reference routing",
       "The artifact requirement remains narrower and mandatory",
-      "A data-provider-only PR loads `common-review-issues.md` only"
+      "A data-provider-only PR loads `common-review-issues.md` only",
+      "Apply `skills/ow-review/references/graduation.md` only to gates classified as retired",
+      "load only `graduation.md` and stop reference routing",
+      "this exclusive scope overrides every subsequent instruction"
     ]
   },
   {
@@ -499,7 +556,10 @@ const checks = [
       "screen-reader or other assistive text",
       "Reference routing",
       "The artifact requirement remains narrower and mandatory",
-      "A data-provider-only PR loads `common-review-issues.md` only"
+      "A data-provider-only PR loads `common-review-issues.md` only",
+      "Apply `skills/ow-review/references/graduation.md` only to gates classified as retired",
+      "load only `graduation.md` and stop reference routing",
+      "this exclusive scope overrides every subsequent instruction"
     ]
   },
   ...mirroredSnippetChecks("docs/review-misses.md", "copilot/docs/review-misses.md", reviewMissSnippets),
@@ -512,6 +572,11 @@ const checks = [
     "skills/ow-review/references/common-review-issues.md",
     "copilot/skills/ow-review/references/common-review-issues.md",
     commonReviewIssueSnippets,
+  ),
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/graduation.md",
+    "copilot/skills/ow-review/references/graduation.md",
+    graduationReviewSnippets,
   ),
   ...mirroredSnippetChecks(
     "skills/ow-review/references/localization-and-formatting.md",
@@ -708,7 +773,25 @@ const checks = [
       "`contextLinkPath`",
       "`contextDocuments`",
       "sizeAuditStatus: \"passed-no-regression\"",
-      "Do not run `analyze-cli` or search for speculative size issues"
+      "Do not run `analyze-cli` or search for speculative size issues",
+      "When graduating a Flight/KS, follow `skills/ow-review/references/graduation.md`",
+      "do not modify any surviving non-gate logic or comment as cleanup",
+      "For Flight/KS graduation, do not add, update, rewrite, or reorganize tests",
+      "prefer updating the threshold with no new tests",
+      "If the developer chooses to retain the current threshold"
+    ]
+  },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: [
+      "When any task graduates a Flight, KS, Feature, experiment, or rollout flag",
+      "For graduation-related lines, that reference is",
+      "Preserve unrelated predicates, operators, behavior, comments, and formatting",
+      "normal implementation rules only to that separate work",
+      "For Flight/KS graduation, do not add,",
+      "only delete cases for the removed branch",
+      "prefer updating the threshold with no new",
+      "If the developer chooses to retain the current"
     ]
   },
   {
@@ -716,7 +799,21 @@ const checks = [
     snippets: [
       "`contextLinkPath`",
       "`contextDocuments`",
-      "Read every `contextDocuments` file"
+      "Read every `contextDocuments` file",
+      "For a Flight/KS graduation",
+      "do not create any TEST task",
+      "prefer updating that threshold with no new tests",
+      "The developer may instead choose minimum surviving-behavior tests"
+    ]
+  },
+  {
+    file: "copilot/agents/planner.agent.md",
+    snippets: [
+      "For a Flight/KS graduation",
+      "do not create any test task",
+      "only delete cases for the removed branch",
+      "prefer updating that threshold with no new tests",
+      "The developer may instead choose minimum surviving-behavior tests"
     ]
   },
   {
@@ -874,6 +971,7 @@ const mirroredChecks = [
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
   ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
+  ["skills/ow-review/references/graduation.md", "copilot/skills/ow-review/references/graduation.md"],
   ["skills/ow-review/references/shared-utility-reuse.md", "copilot/skills/ow-review/references/shared-utility-reuse.md"],
   ["skills/ow-review/references/ux-architecture-and-bundle-boundaries.md", "copilot/skills/ow-review/references/ux-architecture-and-bundle-boundaries.md"],
   ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"]

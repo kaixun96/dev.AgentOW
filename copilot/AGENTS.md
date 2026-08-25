@@ -200,6 +200,9 @@ the POC warning.
 ## Core principles
 
 - **DRY, YAGNI** — minimum code that solves the problem; no speculative abstractions.
+- **Fold fixed conditions completely** — when a change makes a condition constant, inline the
+  surviving expression and remove dead branches, redundant guards, and newly unused symbols. Do
+  not preserve obsolete control flow behind a boolean assigned to `true` or `false`.
 - **Surgical changes** — every changed line traces to the request. Don't refactor adjacent code, don't fix unrelated dead code (mention it instead).
 - **Follow existing patterns** — search odsp-web first; never hand-craft what the monorepo already provides. Match local naming, imports, error handling.
 - **Evidence before claims** — run `ow-build` / `ow-test` and read the output before saying it works. "Should work" / "seems fine" = unverified assumption.
