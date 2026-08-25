@@ -416,6 +416,19 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
     Preserve unrelated predicates, operators, behavior, comments, and formatting. Do not treat
     graduation as permission to polish nearby code. If the same task includes separate feature
     work, apply normal implementation rules only to that separate work.
+   - Before editing a Flight/KS graduation, prove direction at every call site. Never infer it from
+     names such as `Fix`, `Enabled`, `New`, `Legacy`, `Fallback`, or `Optimized`. Read the wrapper
+     implementation and establish the literal for the policy-required permanent state: KS inactive
+     and Flight enabled by default, or the explicitly evidenced exception in the PR description.
+     Write the full original expression; replace only the target Flight/KS expression with that
+     proven literal; simplify mechanically; and use the result as the substitution oracle for the
+     final code. For example, if `targetKs()` is inactive
+     when `false`, `targetKs() && !independentKs() ? filtered : original` simplifies to `original`.
+     The independent gate does not become unconditional and is not a reason to retain `filtered`.
+     Apply the same substitution process to a Flight using its proven enabled literal. Repeat the
+     proof for every call site. If the wrapper semantics, required permanent state, literal, or any
+     result cannot be proven from source and required rollout evidence, stop without editing;
+     reversed graduation is worse than leaving the gate in place.
    - For any rendered UI, component, layout, or styling change, read and follow the SPDS and
      Detheme references plus `skills/detheme/SKILL.md` before implementation. For non-UI
      changes, skip these references and record that they are not applicable. For any
