@@ -85,6 +85,7 @@ copilot -p "/agentow fix the elevation background on mobile"          # auto-ish
 copilot -p "/ow-review 1234567"                                       # review an existing PR only
 copilot                                                               # interactive session
 > /agentow add a loading spinner to PhotoGrid
+> /agentow-a11y fix the dialog focus announcement
 > /ow-batch tasks.md
 > /ow-review                                                          # review the current branch
 ```
@@ -120,8 +121,10 @@ copilot/
 ├── agents/
 │   ├── planner.agent.md         stateless: research → findings
 │   ├── evaluator.agent.md       stateless: verify → PASS/FAIL
+│   ├── a11y-evaluator.agent.md  validates Twin-produced AT evidence
 │   └── reviewer.agent.md        stateless: review → verdict
 └── skills/
     ├── agentow/SKILL.md         main-session orchestration
+    ├── agentow-a11y/SKILL.md    lightweight reproduce-first A11y flow
     └── ow-batch/SKILL.md        serial main-session agentOW loop with task checkpoints
 ```

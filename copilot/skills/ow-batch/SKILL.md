@@ -110,28 +110,42 @@ Before the first task:
 
 For each task `i`:
 
+Before preparing the checkout, classify and persist exactly one `taskRoute`:
+
+- `a11y` when Accessibility behavior is the primary acceptance criterion;
+- `standard` otherwise.
+
+Do not create a branch while classifying.
+
 ### 4a. Prepare a clean baseline
 
-Prefer:
+If a previous task left uncommitted changes, preserve them before switching:
+
+```bash
+git -C /workspaces/odsp-web stash push -u -m "agentow-batch-task<i>-leftovers"
+```
+
+Record the stash in `summary.md`.
+
+For every A11y route, unconditionally use a detached baseline so reproduction has no branch:
+
+```bash
+git -C /workspaces/odsp-web switch --detach origin/main
+```
+
+For the standard route, prefer:
 
 ```bash
 git -C /workspaces/odsp-web checkout main
 git -C /workspaces/odsp-web pull --ff-only origin main
 ```
 
-If local `main` has diverged from `origin/main`, do not reset, rebase, or rewrite it. Create a temporary baseline branch from `origin/main`:
+If local `main` has diverged from `origin/main`, do not reset, rebase, or rewrite it. The standard
+route may create a temporary baseline branch:
 
 ```bash
 git -C /workspaces/odsp-web switch -c agentow-batch/<timestamp>-task<i> origin/main
 ```
-
-If a previous task left uncommitted changes, preserve them:
-
-```bash
-git -C /workspaces/odsp-web stash push -u -m "agentow-batch-task<i>-leftovers"
-```
-
-Record the stash in `summary.md`, then continue from a clean baseline.
 
 ### 4b. Run agentOW directly in the current session
 
@@ -141,7 +155,16 @@ Treat the task exactly as if the user had invoked:
 /agentow --auto <normalized task text>
 ```
 
-Invoke the `agentow` skill if it is not already loaded, then execute its complete pipeline in the current session:
+Execute the previously persisted route:
+
+- **`taskRoute == a11y`:** invoke `/agentow-a11y --auto <normalized task text>` and execute only that skill.
+  Its reproduce-first gate is authoritative: `not-reproduced`, `blocked`, or `inconclusive` ends
+  the item without a branch, source edit, or PR. When it finishes, skip the remainder of Step 4b
+  and continue directly to Step 4c.
+- **`taskRoute == standard`:** invoke the `agentow` skill if it is not already loaded, then execute its
+  complete pipeline below.
+
+The following numbered flow applies only to the non-A11y route:
 
 1. The current session performs request refinement, plan synthesis, implementation, build/test, fix cycles, and shipping.
 2. Dispatch the agentOW planner, evaluator, and reviewer only for their bounded roles.
