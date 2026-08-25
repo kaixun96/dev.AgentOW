@@ -70,6 +70,27 @@ that reference is exclusive: remove only the gate and code made obsolete by sele
 branch. Preserve unrelated predicates, operators, behavior, comments, and formatting. If the same
 plan contains separate feature work, apply normal implementation rules only to that separate work.
 
+### Prove Flight/KS graduation direction before editing
+
+Never infer direction from names such as `Fix`, `Enabled`, `New`, `Legacy`, `Fallback`, or
+`Optimized`. For every call site:
+
+1. Read the wrapper implementation and establish the literal for the permanent state required by
+   the graduation policy: KS inactive and Flight enabled by default, or the explicitly evidenced
+   exception documented in the PR description.
+2. Write the full original expression.
+3. Replace only the target Flight/KS expression with that proven literal.
+4. Simplify mechanically.
+5. Treat the result as the substitution oracle for the final code.
+
+For example, if `targetKs()` is inactive when `false`, then
+`targetKs() && !independentKs() ? filtered : original` simplifies to `original`. The independent
+gate does not become unconditional and is not a reason to retain `filtered`. Do this separately at
+every call site; do not generalize from one syntactic shape to another. Apply the same substitution
+process to a Flight using its proven enabled literal. If the wrapper semantics, required permanent
+state, literal, or any call-site result cannot be proven from source and required rollout evidence,
+stop without editing. A reversed graduation is worse than leaving the gate in place.
+
 When the change modifies runtime imports, dependencies, lazy boundaries, SPFx manifests or
 assemblies, Webpack/Rspack configuration, shared bundles, or workaround-loader mappings, read
 `skills/ow-review/references/size-regression.md` before implementation and identify the affected
@@ -379,8 +400,8 @@ When the plan requires adding a killswitch:
    - Ternary: `!isMyKSActivated() ? newValue : oldValue`
 4. Use `odsp-get-user-alias` and `odsp-get-timestamp` for killswitch comments if the blueprint tool is not available.
 
-When graduating a Flight/KS, follow `skills/ow-review/references/graduation.md`. Do not substitute a
-fixed boolean for the gate, and do not modify any surviving non-gate logic or comment as cleanup.
+The direction examples above apply only when adding a live KS. For graduation, use the per-callsite
+substitution oracle in Step 1; never select a branch from names or these generic pattern labels.
 
 ### Merge Conflicts
 
