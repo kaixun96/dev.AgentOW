@@ -92,8 +92,8 @@ existing Flight, ECS, experiment, or KS.
 - Prove whether an upstream gate protects every changed path and whether another configuration
   condition is required. Do not demand a redundant gate or accept an incomplete one.
 - Verify both states while rollout is active. The PR evidence should name the gate, direction,
-  stage, rollback behavior, and cleanup plan. Remove retired branches and tests only after
-  graduation is established.
+  stage, rollback behavior, and cleanup plan. Do not remove either branch while the gate remains
+  live.
 - Test the observable behavior controlled by the Flight/KS, not the rollout SDK or a trivial gate
   wrapper. A direct wrapper test is meaningful only when the wrapper contains independent
   branching, composition, transformation, caching, fallback policy, side effects, or another
@@ -102,14 +102,6 @@ existing Flight, ECS, experiment, or KS.
   one-line wrapper returns the mock value. When rollout changes behavior, cover enabled and
   fallback states through the nearest stable consumer whose output, rendering, request, mutation,
   or error behavior differs.
-- For Flight/KS-graduation-only PRs, prioritize fallback equivalence and cleanup completeness.
-  Verify removed-branch strings, styles, helpers/functions, and constants are also removed when
-  no longer referenced. Reject replacing the retired gate with a fixed boolean while preserving
-  dependent ternaries or guards: inline the surviving expressions, simplify compound conditions,
-  and remove dead branches and newly unused symbols.
-- For KS graduation, require evidence that the KS is inactive in all rings. If the PR description
-  does not include Merlin verification output, leave an explicit reminder for the author to attach
-  it.
 - Treat the choice of Flight versus KS and the lifetime of either as current-policy questions;
   do not infer them from an old gate that happens to exist.
 

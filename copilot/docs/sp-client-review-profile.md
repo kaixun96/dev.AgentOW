@@ -18,7 +18,8 @@ Runtime behavior and styling changes must be protected by a flight or killswitch
 For every review with SP-Client runtime changes, first apply the rollout-isolation rules in
 `skills/ow-review/references/common-review-issues.md`. That reference is authoritative for gate
 ordering, invocation-boundary protection, legacy equivalence, call-time evaluation, both-state
-testing, and graduation cleanup. This profile adds the SP-Client-specific requirements below:
+testing, and live-gate behavior. For a retired gate, also apply
+`skills/ow-review/references/graduation.md`. This profile adds the SP-Client-specific requirements below:
 
 - Read the PR description first. It must identify the flight/KS, state whether it is a Flight, KS, or KS+Flight, explain the enabled/disabled direction, and name the fallback. If reviewing before PR creation, require this information in the plan and ensure the generated PR description puts it on the first line.
 - Enumerate every changed runtime path, then follow imported helpers and callees transitively from each reachable entry point to the changed behavior. A gate inside a helper counts when it guards the behavior added by the PR and the fallback state remains equivalent to the pre-change implementation; do not stop at the caller or infer protection from an unrelated nearby check.
@@ -29,7 +30,6 @@ testing, and graduation cleanup. This profile adds the SP-Client-specific requir
 - For any KS that gates SP-Client behavior, including an implementation in `odsp-common`, use `_SPKillSwitch` and a lowercase unique GUID; apply the reference's call-time evaluation requirement. An uppercase or mixed-case KS GUID is an `Important` finding because a KS activation lookup will not match the identifier used by product code, so activating the KS does not activate its fallback behavior. Debug Link may surface this as a debug-mode error, but that is only a symptom of the production rollout-control failure. The KS method comment convention (`/* 'MM/DD/YYYY', 'alias - Description' */`), including its date, alias, and description, is documentation only: `08/11/2026` already satisfies `MM/DD/YYYY`. A harmless comment-format deviation is at most a `Minor` finding prefixed `Nit:` and must not block the PR.
 - For flights, use the established ID/name and attribution comment convention. For performance comparisons, require an experiment and exposure logging; a flight alone is not valid measurement.
 - Flag composite KS logic when one KS over a flight provides a clearer emergency control.
-- For Flight/KS graduation-only PRs, verify both logical equivalence and cleanup completeness. Deleted-branch strings, styles, helpers/functions, and constants must be removed when no longer used. A KS graduation change needs evidence that the KS is inactive in all rings (for example Merlin `Test-GridKillSwitch` output); if the PR description omits that Merlin evidence, leave a reminder for the author to add it.
 
 ## Tests and review evidence
 
