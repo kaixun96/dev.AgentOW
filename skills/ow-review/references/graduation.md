@@ -83,6 +83,22 @@ alias when any consumer continues to branch on it. Before approving, find every 
 gate and every variable, helper, property, or parameter derived from it, then simplify each
 consumer until no control flow depends on the permanent value.
 
+This propagation crosses function boundaries. When a gate-derived value is passed as an option or
+parameter, inspect the function definition and every call site. If every reachable call supplies
+the same permanent value and the parameter exists only for that gate, remove the parameter from the
+type/signature and all calls, then keep only the corresponding behavior in the function body. Do
+not replace the argument with `true`/`false`, add a default with that value, or move the fixed value
+inside the function. If any call supplies another value, the parameter has independent non-gate
+meaning, or external callers cannot be ruled out, preserve the parameter and simplify only the
+graduated call path.
+
+Also trace values that are not gate booleans but exist only to share the same expression across
+gate branches. If selecting the permanent branch leaves such a local temporary with exactly one
+reference, inline it at that reference and delete the declaration. This includes JSX elements,
+object literals, and other expressions extracted only because both rollout branches consumed them.
+Inline only when doing so preserves evaluation count, order, timing, side effects, and object
+identity; otherwise keep the temporary and record why it still has independent semantic value.
+
 Generic example:
 
 ```ts
@@ -107,6 +123,48 @@ if (isReady) {
 }
 ```
 
+Gate-derived function parameters require the same cleanup:
+
+```ts
+// Before graduation
+useInteraction({ isEnabled: isFeatureEnabled, item });
+
+function useInteraction(options: { isEnabled: boolean; item: Item }): void {
+  if (options.isEnabled) {
+    enableInteraction(options.item);
+  }
+}
+
+// Incorrect: the permanent value is still represented as configurable input
+useInteraction({ isEnabled: true, item });
+
+// Correct when every call site passed the enabled state
+useInteraction({ item });
+
+function useInteraction(options: { item: Item }): void {
+  enableInteraction(options.item);
+}
+```
+
+Branch-sharing temporaries must not survive as single-use indirection:
+
+```tsx
+// Before graduation
+const content: JSX.Element = <Content item={item} />;
+return isFeatureEnabled ? <Provider>{content}</Provider> : content;
+
+// Incomplete: the branch is gone, but its sharing temporary remains
+const content: JSX.Element = <Content item={item} />;
+return <Provider>{content}</Provider>;
+
+// Correct when the temporary existed only to serve both branches
+return (
+  <Provider>
+    <Content item={item} />
+  </Provider>
+);
+```
+
 Unrelated logic must remain unchanged:
 
 ```ts
@@ -124,15 +182,20 @@ For every value made constant by graduation:
 
 1. Find all references to the gate-derived value, including aliases passed to helpers or stored in
    properties, before deleting it.
-2. Inline the surviving ternary expression or branch body.
-3. Remove only the retired term from compound conditions. Preserve all remaining operands and
+2. For each function parameter or options property carrying that value, inspect every call site.
+   Remove it from calls, types, and implementations only when all reachable callers prove the same
+   permanent value and it has no independent meaning.
+3. Find local values introduced only for reuse across the retired branches. When branch selection
+   leaves exactly one reference, inline and delete them if evaluation and identity remain unchanged.
+4. Inline the surviving ternary expression or branch body.
+5. Remove only the retired term from compound conditions. Preserve all remaining operands and
   operators exactly unless syntax requires a semantics-preserving parenthesis change.
-4. Delete unreachable `if`, `else`, switch, fallback, and early-return paths.
-5. Remove variables, wrappers, imports, exports, IDs/GUIDs, registrations, mocks, fixtures, and test
+6. Delete unreachable `if`, `else`, switch, fallback, and early-return paths.
+7. Remove variables, wrappers, imports, exports, IDs/GUIDs, registrations, mocks, fixtures, and test
   setup made unused by the simplification.
-6. Remove branch-only strings, resources, styles, telemetry, helpers, models, and dependencies when
+8. Remove branch-only strings, resources, styles, telemetry, helpers, models, and dependencies when
    no remaining path uses them.
-7. Search by gate identifier, GUID, helper name, attribution comment, and deleted-branch symbols to
+9. Search by gate identifier, GUID, helper name, attribution comment, and deleted-branch symbols to
    prove no stale references remain.
 
 Preserve comments by default, including comments that mention the Flight/KS but still explain
