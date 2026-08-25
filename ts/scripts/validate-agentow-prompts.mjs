@@ -69,6 +69,15 @@ const graduationReviewSnippets = [
   "local temporary with exactly one",
   "This includes JSX elements",
   "preserves evaluation count, order, timing, side effects, and object",
+  "A retired gate invocation must not survive only to discard its result",
+  "`void retiredGate()`",
+  "stale gate references, not behavior preservation",
+  "Selecting one gate's permanent branch can also make another gate behaviorally irrelevant",
+  "that KS as a value-discarded call",
+  "remove its wrapper, ID/GUID, registration, imports, mocks",
+  "gate invocation as an accidental side-effect mechanism",
+  "Incorrect: the KS no longer selects behavior but remains executable",
+  "Correct: remove the behaviorally unused KS call",
   "Incorrect: the gate call is gone, but its obsolete control-flow shape remains",
   "Correct: inline the surviving value and simplify every consumer",
   "Gate-derived function parameters require the same cleanup",
@@ -95,6 +104,8 @@ const graduationReviewSnippets = [
   "Do not predict a coverage failure or create a test task before running",
   "The PR description must state that graduation caused the threshold failure",
   "Search by gate identifier, GUID, helper name, attribution comment",
+  "Reject value-discarded gate calls",
+  "retains a value-discarded gate invocation",
   "Do not raise graduation findings"
 ];
 

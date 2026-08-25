@@ -99,6 +99,34 @@ object literals, and other expressions extracted only because both rollout branc
 Inline only when doing so preserves evaluation count, order, timing, side effects, and object
 identity; otherwise keep the temporary and record why it still has independent semantic value.
 
+A retired gate invocation must not survive only to discard its result. Expressions such as
+`void retiredGate()`, `retiredGate();`, a discarded assignment, or a comma-expression call are
+stale gate references, not behavior preservation. They still evaluate the retired wrapper and can
+keep its SDK import, ID/GUID, registration, mocks, and attribution scaffolding alive without
+controlling any behavior. Request their removal.
+
+Selecting one gate's permanent branch can also make another gate behaviorally irrelevant. For
+example, Flight simplification may eliminate the only branch selected by a nested KS. Do not retain
+that KS as a value-discarded call. Remove the call, search every reference to the nested gate, and,
+when no behavioral consumer remains, remove its wrapper, ID/GUID, registration, imports, mocks, and
+other gate-only artifacts as transitive graduation cleanup. If the wrapper performs an independent
+required side effect, prove and preserve that behavior through its owning API; do not preserve the
+gate invocation as an accidental side-effect mechanism.
+
+```ts
+// Before Flight graduation
+const includeExtension: boolean = isWorkbenchKsActive()
+  ? isDashboardFlightEnabled() && (isExtensionFlightEnabled() || isWorkbench)
+  : (isDashboardFlightEnabled() && isExtensionFlightEnabled()) || isWorkbench;
+
+// Incorrect: the KS no longer selects behavior but remains executable
+void isWorkbenchKsActive();
+const includeExtension: boolean = isExtensionFlightEnabled() || isWorkbench;
+
+// Correct: remove the behaviorally unused KS call
+const includeExtension: boolean = isExtensionFlightEnabled() || isWorkbench;
+```
+
 Generic example:
 
 ```ts
@@ -197,6 +225,9 @@ For every value made constant by graduation:
    no remaining path uses them.
 9. Search by gate identifier, GUID, helper name, attribution comment, and deleted-branch symbols to
    prove no stale references remain.
+10. Reject value-discarded gate calls. If simplifying one gate makes another gate behaviorally
+  unused, remove that invocation and graduate its gate-only artifacts when the global reference
+  search proves no consumer remains.
 
 Preserve comments by default, including comments that mention the Flight/KS but still explain
 surviving behavior. Remove or update a comment only when it is physically part of the deleted gate
@@ -243,8 +274,9 @@ must remain separate from graduation test cleanup.
 
 Request changes when the diff preserves the wrong branch, lacks required authorization evidence,
 leaves reachable retired behavior, keeps a fixed gate behind old conditional structure, misses a
-runtime entry point, changes coverage threshold or tests without an actual coverage failure and
-required PR-description evidence, or mixes unrelated behavior into the graduation edit.
+runtime entry point, retains a value-discarded gate invocation, changes coverage threshold or tests
+without an actual coverage failure and required PR-description evidence, or mixes unrelated
+behavior into the graduation edit.
 
 Do not raise findings for unrelated pre-existing issues or optional improvements. If the diff
 contains an unrelated change, classify that change outside graduation-only scope and route only
