@@ -5,6 +5,21 @@ description: "Take an odsp-web feature or bug description to a draft PR on Azure
 
 # agentOW pipeline (Copilot CLI)
 
+## Accessibility routing — before Step 0
+
+If the request's primary acceptance criteria concern Accessibility behavior — for example
+screen-reader output, NVDA, Narrator, Voice Access, keyboard/focus behavior, accessible
+name/role/state/value, ARIA, live regions, headings/landmarks, zoom/reflow, contrast, or a WCAG
+failure — invoke the `agentow-a11y` skill with the original request and stop this standard flow.
+
+Do not create a standard agentOW session first. Do not dispatch the standard planner or evaluator.
+The A11y skill owns its isolated session, knowledge, Twin evidence bridge, and strict
+reproduce-before-fix gate.
+
+Stay in the standard flow when Accessibility is only an incidental quality dimension of a broader
+feature request. Route to A11y mode only when assistive-technology or accessibility behavior is the
+bug being fixed.
+
 You (the main session) drive this end to end. You are the orchestrator AND the implementer — you keep full context across every step and every fix cycle. You dispatch stateless subagents (`planner`, `evaluator`, `reviewer`) only for bounded "look and report" work.
 
 ## Mode
