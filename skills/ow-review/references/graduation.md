@@ -193,6 +193,39 @@ stale gate references, not behavior preservation. They still evaluate the retire
 keep its SDK import, ID/GUID, registration, mocks, and attribution scaffolding alive without
 controlling any behavior. Request their removal.
 
+The same rule applies to gate-only property reads and optional chains whose values are discarded.
+Do not preserve expressions such as `void ref.current?.offsetWidth`, `void object.property`, or a
+bare `object.property;` merely because the read occurred before the retired gate evaluation. An
+ordinary property read is not an independent behavior contract. Browser DOM geometry reads such as
+`offsetWidth`, `offsetHeight`, `clientWidth`, `clientHeight`, and `getBoundingClientRect()` can force
+layout; that performance cost is a reason to remove an obsolete read, not a side effect to preserve.
+If a custom getter, Proxy trap, or method may perform an independently required side effect, inspect
+its definition and preserve that behavior through its owning API only when the contract is proven.
+
+After removing a discarded gate-only property or DOM read, trace its complete value-supply chain.
+Delete locals and imports used only by the read, then follow the ref/object through hook results,
+component props, function parameters, destructuring, forwarding wrappers, and every caller. Remove
+each prop, parameter, type member, ref creation, and forwarded argument that has no surviving
+consumer. Do not stop after replacing the original declarations with `void` reads or after deleting
+only the leaf expression.
+
+```ts
+// Before graduation: dimensions serve only the retired Flight branch
+const width: number | undefined = containerDivRef?.current?.offsetWidth;
+const height: number | undefined = containerDivRef?.current?.offsetHeight;
+const editorialCardAspectRatio: AdvancedEditorAspectRatio | undefined =
+  isAdvancedEditorUnificationEnabled() && width && height
+    ? createEditorialCardAspectRatio(width, height)
+    : undefined;
+
+// Incorrect: property-read pseudo-side effects keep obsolete DOM work and the ref chain alive
+void containerDivRef?.current?.offsetWidth;
+void containerDivRef?.current?.offsetHeight;
+
+// Correct: remove both reads and remove containerDivRef from locals, props, parameters, and callers
+// when repository-wide references prove that no surviving consumer remains.
+```
+
 ### Fixed-return wrappers require symbol closure
 
 Treat any function, method, getter, or exported helper changed by graduation to return a fixed
@@ -366,6 +399,28 @@ or state preservation. When the Fragment is unkeyed, semantically redundant, and
 because of the retired gate, report it as a non-blocking **Minor** suggestion whose description
 starts with `Nit:`. Do not request changes or block approval for this cleanup alone.
 
+Remove a JSX prop assignment that graduation leaves permanently `undefined` when omitting the prop
+is proven equivalent. Inspect the receiving component's prop type, destructuring/default value,
+`defaultProps`, forwarding/spread behavior, tests, and all checks using `in`, `hasOwnProperty`,
+`Object.keys`, or equivalent own-property reflection. If none distinguishes an absent prop from an
+explicitly undefined prop, prefer omitting the JSX attribute instead of retaining
+`propName={undefined}`. This is a non-blocking **Minor** suggestion prefixed `Nit:` because the
+rendered behavior is already correct; do not request changes for this cleanup alone. If the
+receiver contract is external, unavailable, or can observe property presence, make no suggestion.
+
+```tsx
+// Before graduation
+<AdvancedEditor
+  allowedAspectRatios={heroAspectRatio ? [heroAspectRatio] : undefined}
+/>
+
+// Incomplete: graduation fixed the optional prop but retained a redundant assignment
+<AdvancedEditor allowedAspectRatios={undefined} />
+
+// Preferred when receiver inspection proves absent and explicit undefined are equivalent
+<AdvancedEditor />
+```
+
 Collapse a style modifier that graduation makes permanent when repository-wide references prove
 that the base style and modifier now exist only for the same single consumption site. If the
 surviving JSX always calls `css(styles.base, styles.modifier)`, move the modifier's declarations
@@ -444,12 +499,17 @@ For every value made constant by graduation:
 10. Reject value-discarded gate calls. If simplifying one gate makes another gate behaviorally
   unused, remove that invocation and graduate its gate-only artifacts when the global reference
   search proves no consumer remains.
-11. For every wrapper changed to return a literal, inspect its merge-base body, simplify every
+11. Reject discarded gate-only property and DOM reads, including `void` optional chains. Remove the
+  read and trace its ref/object supply chain through props, parameters, forwarding wrappers, and
+  callers until every now-unused carrier is removed or a proven independent consumer is reached.
+12. For every wrapper changed to return a literal, inspect its merge-base body, simplify every
   caller transitively, and reject standalone calls retained in either the wrapper or its consumers.
-12. Inspect JSX made unconditional by graduation. Remove an unkeyed Fragment that existed only to
+13. Inspect JSX made unconditional by graduation. Remove an unkeyed Fragment that existed only to
   group the retired conditional's siblings when its children can safely remain directly under the
   same parent.
-13. When graduation leaves a permanent `css(base, modifier)` composition, search both style slots.
+14. Inspect JSX props made permanently `undefined`. When the receiving component cannot distinguish
+  omission from explicit undefined, suggest deleting the whole prop assignment as `Minor`/`Nit:`.
+15. When graduation leaves a permanent `css(base, modifier)` composition, search both style slots.
   If both now serve only that site and declarations can move with identical precedence and
   semantics, suggest merging the modifier into the base and deleting the extra slot.
 
@@ -518,10 +578,11 @@ must remain separate from graduation test cleanup.
 
 Request changes when the diff preserves the wrong branch, lacks required authorization evidence,
 leaves reachable retired behavior, keeps a fixed gate behind old conditional structure, misses a
-runtime entry point, retains a value-discarded gate invocation, changes coverage threshold or tests
-without an actual coverage failure and required PR-description evidence, leaves a fixed-return
-wrapper or any transitive consumer unsimplified, or mixes unrelated behavior into the graduation
-edit.
+runtime entry point, retains a value-discarded gate invocation, retains a discarded gate-only
+property or DOM read or its unused ref/prop/parameter supply chain, changes coverage threshold or
+tests without an actual coverage failure and required PR-description evidence, leaves a
+fixed-return wrapper or any transitive consumer unsimplified, or mixes unrelated behavior into the
+graduation edit.
 
 Do not raise a finding merely because a graduation-only PR description omits generic test results,
 a risk assessment, rollback/recovery prose, or per-family shipping details. These are not required
@@ -536,6 +597,11 @@ uncertain Fragments receive no cleanup finding.
 A safely mergeable, single-consumer style modifier left by graduation is also only a **Minor**
 suggestion prefixed `Nit:`. It must not produce `REQUEST_CHANGES`. If references, precedence, or
 style semantics are uncertain, raise no consolidation finding.
+
+A JSX prop left as `propName={undefined}` after graduation is only a **Minor** suggestion prefixed
+`Nit:` when receiver inspection proves omission-equivalence. It must not produce
+`REQUEST_CHANGES`. If prop presence is observable or the receiving contract cannot be inspected,
+raise no removal finding.
 
 Do not raise findings for unrelated pre-existing issues or optional improvements. If the diff
 contains an unrelated change, classify that change outside graduation-only scope and route only
