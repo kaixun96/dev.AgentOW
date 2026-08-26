@@ -1129,6 +1129,10 @@ function validate(report, options) {
   }
 
   const reviewability = report.preReview?.reviewability;
+  const graduationOnly = report.preReview?.profiles?.includes("graduation-only") === true;
+  if (graduationOnly && report.findings?.some((finding) => finding.category === "reviewability")) {
+    errors.push("graduation-only reviews must not include reviewability or split findings");
+  }
   const validUnits =
     Array.isArray(reviewability?.independentBehaviorUnits) &&
     reviewability.independentBehaviorUnits.length > 0 &&
@@ -1218,9 +1222,10 @@ function validate(report, options) {
       errors.push("behavior units must cover every Git changed file");
     }
     const mustSplit =
-      totalChurn >= HARD_CHURN_LIMIT ||
-      substantiveChurn >= LARGE_CHURN_LIMIT ||
-      (structurallyLargeChange && !validException);
+      !graduationOnly &&
+      (totalChurn >= HARD_CHURN_LIMIT ||
+        substantiveChurn >= LARGE_CHURN_LIMIT ||
+        (structurallyLargeChange && !validException));
     if (mustSplit && reviewability.status !== "must-split") {
       errors.push("oversized or multi-surface change must be classified as must-split");
     }

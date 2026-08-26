@@ -29,6 +29,13 @@ branch, updates directly affected tests or metadata, or removes code made obsole
 selection. Do not turn a graduation-only review into an opportunity to polish nearby logic,
 formatting, naming, abstractions, tests, telemetry, UI, or other pre-existing code.
 
+Graduation-only PRs have no PR-size or split limit. Do not request a split, emit a `reviewability`
+finding, or classify the PR as `must-split` because of changed lines, file count, behavior-unit
+count, or high-risk-domain count. Complete retirement is intentionally allowed to span every
+caller, wrapper, registration, test artifact, and resource in one PR. This exemption does not apply
+to a mixed PR containing separate feature or refactor work, and it does not reduce exhaustive
+changed-file review, transitive consumer tracing, evidence, or correctness requirements.
+
 ## 1. Establish that graduation is authorized
 
 Identify every retired gate by type, identifier, owner, and all registration and consumption sites.
@@ -104,6 +111,54 @@ A retired gate invocation must not survive only to discard its result. Expressio
 stale gate references, not behavior preservation. They still evaluate the retired wrapper and can
 keep its SDK import, ID/GUID, registration, mocks, and attribution scaffolding alive without
 controlling any behavior. Request their removal.
+
+### Fixed-return wrappers require symbol closure
+
+Treat any function, method, getter, or exported helper changed by graduation to return a fixed
+literal as a gate-derived constant, even when its name and signature remain unchanged. Direct
+changed-file review is insufficient. Before approving:
+
+1. Compare the wrapper with its merge-base implementation and identify every Flight, experiment,
+   KS, configuration, or alias that previously contributed to its returned value.
+2. Find every symbol reference across the repository, not only imports or changed files.
+3. Substitute the fixed return literal at every call site and simplify mechanically. Delete bare,
+   `void`, discarded-assignment, and comma-expression calls; make a surviving branch unconditional
+   when substitution proves it is always selected.
+4. Reinspect the wrapper body. Delete former return operands that were converted into standalone
+   expression statements merely to keep calls alive. Extracting an operand from a boolean return
+   expression does not create an independent side-effect contract.
+5. When no behavioral caller remains and no independently owned external API contract requires the
+   symbol, delete the wrapper, export/imports, underlying gate references, IDs, registrations,
+   mocks, and gate-only tests. If external callers or an independent side effect cannot be ruled
+   out from source, stop and report the unresolved ownership instead of approving a fixed wrapper.
+
+This propagation is transitive. A fixed wrapper called by another wrapper, property initializer,
+or callback remains unfinished until every downstream consumer has been simplified or a proven
+independent contract boundary is reached.
+
+```ts
+// Before graduation: gate wrapper
+export function isEditBehaviorEnabled(): boolean {
+  return isExperimentOn(EditExperiment) || isFlightEnabled(EditFlight);
+}
+
+// Before graduation: consumer
+if (isEditBehaviorEnabled()) {
+  viewportManager.reset();
+}
+
+// Incorrect: both former boolean results are now discarded
+export function isEditBehaviorEnabled(): boolean {
+  isExperimentOn(EditExperiment);
+  return true;
+}
+
+isEditBehaviorEnabled();
+viewportManager.reset();
+
+// Correct when repository-wide references prove no independent contract remains
+viewportManager.reset();
+```
 
 Selecting one gate's permanent branch can also make another gate behaviorally irrelevant. For
 example, Flight simplification may eliminate the only branch selected by a nested KS. Do not retain
@@ -193,6 +248,86 @@ return (
 );
 ```
 
+Remove JSX Fragments introduced only to group siblings inside a retired gate expression. After
+`gate && (<>...</>)` or a gated ternary becomes unconditional, an unkeyed Fragment is redundant
+when the same children can be direct children of the existing parent. Remove the `<>` and `</>`;
+do not retain rollout-induced JSX structure merely because it still renders correctly.
+
+```tsx
+// Before graduation
+<TabList>
+  {isCopyStyleFlightEnabled() && (
+    <>
+      <Divider />
+      <CopyStyleButton />
+    </>
+  )}
+</TabList>
+
+// Incomplete: the condition is gone, but its grouping Fragment remains
+<TabList>
+  <>
+    <Divider />
+    <CopyStyleButton />
+  </>
+</TabList>
+
+// Preferred cleanup
+<TabList>
+  <Divider />
+  <CopyStyleButton />
+</TabList>
+```
+
+Do not apply this mechanically to a keyed Fragment, a Fragment required to produce one expression
+for an API or syntax position, or a boundary whose removal could change reconciliation, identity,
+or state preservation. When the Fragment is unkeyed, semantically redundant, and exists only
+because of the retired gate, report it as a non-blocking **Minor** suggestion whose description
+starts with `Nit:`. Do not request changes or block approval for this cleanup alone.
+
+Collapse a style modifier that graduation makes permanent when repository-wide references prove
+that the base style and modifier now exist only for the same single consumption site. If the
+surviving JSX always calls `css(styles.base, styles.modifier)`, move the modifier's declarations
+into the base style in the same effective precedence, delete the modifier slot, and use
+`styles.base` directly.
+
+```tsx
+// Before graduation
+<div
+  className={
+    !isAlignmentKsActivated()
+      ? css(styles.chartContainer, styles.chartContainerBottomAlign)
+      : styles.chartContainer
+  }
+/>
+
+// Incomplete: permanent modifier remains as a separate single-use style
+<div className={css(styles.chartContainer, styles.chartContainerBottomAlign)} />
+
+const styles = {
+  chartContainer: { display: 'flex' },
+  chartContainerBottomAlign: { alignItems: 'flex-end' }
+};
+
+// Preferred cleanup when both style slots have only this consumer
+<div className={styles.chartContainer} />
+
+const styles = {
+  chartContainer: {
+    display: 'flex',
+    alignItems: 'flex-end'
+  }
+};
+```
+
+Require a symbol/reference search for both style slots. Do not suggest this merge when the base or
+modifier has another independent consumer, when composition order resolves conflicting properties,
+when either slot contains selectors, media queries, tokens, or runtime-dependent declarations that
+cannot be moved equivalently, or when the style name is part of a public or tested contract. This
+is graduation cleanup only when the separate modifier existed to represent the retired branch.
+Report a proven safe merge only as a non-blocking **Minor** suggestion prefixed `Nit:`; never block
+approval or use this rule for general style consolidation.
+
 Unrelated logic must remain unchanged:
 
 ```ts
@@ -208,8 +343,8 @@ const hasFailure: boolean = results.some((result) => result.failed);
 
 For every value made constant by graduation:
 
-1. Find all references to the gate-derived value, including aliases passed to helpers or stored in
-   properties, before deleting it.
+1. Find all symbol references to the gate-derived value across the repository, including fixed-
+  return wrappers, aliases passed to helpers, and values stored in properties, before deleting it.
 2. For each function parameter or options property carrying that value, inspect every call site.
    Remove it from calls, types, and implementations only when all reachable callers prove the same
    permanent value and it has no independent meaning.
@@ -228,6 +363,14 @@ For every value made constant by graduation:
 10. Reject value-discarded gate calls. If simplifying one gate makes another gate behaviorally
   unused, remove that invocation and graduate its gate-only artifacts when the global reference
   search proves no consumer remains.
+11. For every wrapper changed to return a literal, inspect its merge-base body, simplify every
+  caller transitively, and reject standalone calls retained in either the wrapper or its consumers.
+12. Inspect JSX made unconditional by graduation. Remove an unkeyed Fragment that existed only to
+  group the retired conditional's siblings when its children can safely remain directly under the
+  same parent.
+13. When graduation leaves a permanent `css(base, modifier)` composition, search both style slots.
+  If both now serve only that site and declarations can move with identical precedence and
+  semantics, suggest merging the modifier into the base and deleting the extra slot.
 
 Preserve comments by default, including comments that mention the Flight/KS but still explain
 surviving behavior. Remove or update a comment only when it is physically part of the deleted gate
@@ -275,8 +418,18 @@ must remain separate from graduation test cleanup.
 Request changes when the diff preserves the wrong branch, lacks required authorization evidence,
 leaves reachable retired behavior, keeps a fixed gate behind old conditional structure, misses a
 runtime entry point, retains a value-discarded gate invocation, changes coverage threshold or tests
-without an actual coverage failure and required PR-description evidence, or mixes unrelated
-behavior into the graduation edit.
+without an actual coverage failure and required PR-description evidence, leaves a fixed-return
+wrapper or any transitive consumer unsimplified, or mixes unrelated behavior into the graduation
+edit.
+
+A redundant unkeyed Fragment left after removing a gate condition is not reachable retired
+behavior. When removal is proven reconciliation-safe, report only a **Minor** suggestion prefixed
+`Nit:`. It must not produce `REQUEST_CHANGES`; keyed, structurally required, or semantically
+uncertain Fragments receive no cleanup finding.
+
+A safely mergeable, single-consumer style modifier left by graduation is also only a **Minor**
+suggestion prefixed `Nit:`. It must not produce `REQUEST_CHANGES`. If references, precedence, or
+style semantics are uncertain, raise no consolidation finding.
 
 Do not raise findings for unrelated pre-existing issues or optional improvements. If the diff
 contains an unrelated change, classify that change outside graduation-only scope and route only

@@ -21,7 +21,11 @@ graduation work as defined by `skills/ow-review/references/graduation.md`. For a
 change, read and apply only that reference; do not load or apply `sp-client-review-profile.md`,
 `review-misses.md`, or any other optional review reference. Keep only the review contract's
 artifact and evidence requirements and mark unrelated review dimensions not applicable because
-graduation-only scope is exclusive.
+graduation-only scope is exclusive. Add `graduation-only` to `preReview.profiles`. Do not apply
+PR-size, churn, file-count, behavior-unit, high-risk-domain, or `must-split` thresholds: classify
+the change as `reviewable`, claim `exhaustive` only after completing the required coverage, and
+emit no split boundaries or `reviewability` finding. A mixed graduation/feature PR does not receive
+this exemption.
 
 Otherwise, in STANDARD mode, if any Git-changed path is under `sp-client/`, also read
 `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in
@@ -131,7 +135,7 @@ production-ready fields, then return immediately. Do not continue into Pass 1.
 
 First inspect the request, actual plan, available PR title/description, linked work item/design, and bug repro evidence. Record the intended outcome, whether the change is necessary and scoped appropriately, and whether the implementation matches that intent. Missing optional context must be reported, not invented.
 
-Run the contract's reviewability gate before detailed review. Enumerate independent behavior units and high-risk domains; do not equate reading every line with reliable exhaustive review. A `must-split` change still gets a preliminary risk scan, an Important `reviewability` finding asking the author to split, explicit split boundaries, and a `preliminary-non-exhaustive` completeness claim. Continue the available review. Churn, file count, behavior-unit count, or high-risk-domain count alone must not produce `REQUEST_CHANGES`; the `reviewability` category is advisory for verdict purposes.
+Run the contract's reviewability gate before detailed review. Graduation-only PRs use its explicit no-size-limit/no-split exemption. For every other PR, enumerate independent behavior units and high-risk domains; do not equate reading every line with reliable exhaustive review. A `must-split` change still gets a preliminary risk scan, an Important `reviewability` finding asking the author to split, explicit split boundaries, and a `preliminary-non-exhaustive` completeness claim. Continue the available review. Churn, file count, behavior-unit count, or high-risk-domain count alone must not produce `REQUEST_CHANGES`; the `reviewability` category is advisory for verdict purposes.
 
 ```bash
 cd "${reviewRoot:-$(git rev-parse --show-toplevel)}"

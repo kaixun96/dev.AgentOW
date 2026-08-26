@@ -394,6 +394,15 @@ hardOversizeApproval.preReview.reviewability.additions = 5001;
 fs.writeFileSync(diffNumstatPath, "5001\t2\tsrc/example.ts\n");
 assert.equal(validate(hardOversizeApproval).status, 1, "5000 or more substantive lines cannot be approved as exhaustive");
 
+const hardOversizeGraduation = makeReport();
+hardOversizeGraduation.preReview.profiles.push("graduation-only");
+hardOversizeGraduation.preReview.reviewability.additions = 5001;
+assert.equal(
+  validate(hardOversizeGraduation).status,
+  0,
+  "graduation-only changes remain reviewable regardless of churn",
+);
+
 const hardOversizeBlocked = makeReport();
 hardOversizeBlocked.summary = "Preliminary non-exhaustive scan found an oversized change that requires splitting";
 hardOversizeBlocked.preReview.reviewability.additions = 5001;

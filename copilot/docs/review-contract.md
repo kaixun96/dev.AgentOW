@@ -17,6 +17,15 @@ Missing optional context is not itself a defect, but the reviewer must state wha
 
 Before detailed review, decide whether the change can be reviewed reliably as one unit. This is not the same as whether an agent can read every line. Measure Git numstat, then enumerate independent behavior units and high-risk domains (for example security, permissions, destructive writes, privacy/telemetry, shared UI, migration compatibility, or performance).
 
+A graduation-only PR is exempt from every reviewability size and split threshold. This exemption
+applies only when every substantive change is retirement work under
+`skills/ow-review/references/graduation.md`; mixed PRs do not qualify. Record `graduation-only` in
+`preReview.profiles`, set reviewability to `reviewable` with an `exhaustive` completeness claim,
+and do not create split boundaries or a `reviewability` finding regardless of changed lines, file
+count, behavior-unit count, or high-risk-domain count. Large graduation PRs are expected because
+complete retirement may span all callers and gate artifacts. The exemption removes only size and
+split limits; it does not relax whole-file coverage, consumer tracing, evidence, or defect findings.
+
 - At 5,000 or more total changed lines, the change is always `must-split`; generated/mechanical claims cannot override this hard ceiling.
 - At 2,000 or more substantive changed lines, the change is always `must-split`.
 - At 40 or more files, three or more independent behavior units, or four or more high-risk domains, presume `must-split`.
