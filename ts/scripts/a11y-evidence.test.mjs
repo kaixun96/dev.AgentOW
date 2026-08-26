@@ -305,3 +305,205 @@ assert.throws(
 );
 
 console.log("A11y evidence contract fixtures passed");
+
+const voiceTypes = [
+  "screenshot",
+  "voice-access-result",
+  "voice-access-audio",
+  "capture-state",
+  "overlay-map",
+];
+const voiceRequest = {
+  version: 1,
+  phase: "reproduce",
+  scenarioId: "voice-overlay",
+  bug: { title: "Static text is numbered" },
+  target: {
+    url: "https://example.test/page",
+    build: "target",
+    fixture: "page",
+    route: "/page",
+    flags: [],
+    viewport: { width: 1024, height: 768 },
+  },
+  assistiveTechnology: {
+    name: "Voice Access",
+    mode: "audio-loop",
+    required: true,
+  },
+  steps: [
+    {
+      id: "numbers",
+      action: "Say Show numbers",
+      expected: "Only actionable page elements are numbered",
+      requiredEvidenceTypes: voiceTypes,
+    },
+  ],
+  requiredEvidenceTypes: voiceTypes,
+};
+voiceRequest.scenarioHash = computeScenarioHash(voiceRequest);
+const voiceEvidence = voiceTypes.map((type, index) => ({
+  id: type,
+  type,
+  uri: `evidence://${type}`,
+  sha256: String(index + 1).repeat(64),
+}));
+const captureState = {
+  canonicalUrl: voiceRequest.target.url,
+  viewport: voiceRequest.target.viewport,
+  deviceScaleFactor: 1,
+  scrollX: 0,
+  scrollY: 100,
+  targetSelector: "#target",
+  targetRect: { x: 10, y: 20, width: 300, height: 200 },
+  debugBar: "hidden",
+  dialogs: [],
+  browserChromeIncluded: true,
+  taskbarIncluded: true,
+};
+const voiceResult = {
+  version: 1,
+  phase: "reproduce",
+  scenarioId: voiceRequest.scenarioId,
+  scenarioHash: voiceRequest.scenarioHash,
+  outcome: "reproduced",
+  testedBuild: "target",
+  captureState,
+  reportedOverlayLabels: [1],
+  overlayMap: [
+    {
+      label: 1,
+      screenPoint: { x: 40, y: 80 },
+      surface: "page",
+      selector: "#target p",
+      role: "text",
+      name: "Static explanation",
+      actionable: false,
+      domRect: { x: 30, y: 70, width: 100, height: 20 },
+    },
+  ],
+  stepResults: [
+    {
+      stepId: "numbers",
+      status: "fail",
+      actual: "Static text was numbered",
+      evidence: voiceTypes,
+    },
+  ],
+  evidence: voiceEvidence,
+};
+assert.equal(
+  validateA11yEvidence("reproduce", voiceRequest, voiceResult).outcome,
+  "reproduced",
+);
+for (const overlay of [
+  { ...voiceResult.overlayMap[0], surface: "os-taskbar", actionable: true },
+  {
+    ...voiceResult.overlayMap[0],
+    role: "link",
+    name: "Learn more",
+    actionable: true,
+  },
+]) {
+  assert.throws(
+    () =>
+      validateA11yEvidence("reproduce", voiceRequest, {
+        ...voiceResult,
+        overlayMap: [overlay],
+      }),
+    /requires a mapped non-actionable page overlay/,
+  );
+}
+
+assert.throws(
+  () =>
+    validateA11yEvidence("reproduce", voiceRequest, {
+      ...voiceResult,
+      reportedOverlayLabels: [1, 2],
+    }),
+  /complete reported overlay labels/,
+);
+assert.throws(
+  () =>
+    validateA11yEvidence("reproduce", voiceRequest, {
+      ...voiceResult,
+      overlayMap: [
+        {
+          ...voiceResult.overlayMap[0],
+          role: "link",
+          name: "Learn more",
+          actionable: false,
+        },
+      ],
+    }),
+  /actionable role contradicts/,
+);
+
+const voiceBaselineBytes = Buffer.from(JSON.stringify(voiceResult));
+const voiceBaselineDigest = crypto
+  .createHash("sha256")
+  .update(voiceBaselineBytes)
+  .digest("hex");
+const voiceCommit = "f".repeat(40);
+const voiceVerifyRequest = {
+  ...voiceRequest,
+  phase: "verify",
+  target: {
+    ...voiceRequest.target,
+    build: `commit:${voiceCommit}`,
+    commitSha: voiceCommit,
+  },
+  baselineEvidenceSha256: voiceBaselineDigest,
+};
+const voiceVerifyResult = {
+  ...voiceResult,
+  phase: "verify",
+  outcome: "pass",
+  testedBuild: `commit:${voiceCommit}`,
+  testedCommitSha: voiceCommit,
+  baselineEvidenceSha256: voiceBaselineDigest,
+  overlayMap: [
+    {
+      ...voiceResult.overlayMap[0],
+      role: "link",
+      name: "Learn more",
+      actionable: true,
+    },
+  ],
+  stepResults: [
+    {
+      ...voiceResult.stepResults[0],
+      status: "pass",
+      actual: "Only an actionable link was numbered",
+    },
+  ],
+};
+const voiceBaseline = {
+  request: voiceRequest,
+  result: voiceResult,
+  resultBytes: voiceBaselineBytes,
+};
+assert.equal(
+  validateA11yEvidence(
+    "verify",
+    voiceVerifyRequest,
+    voiceVerifyResult,
+    voiceBaseline,
+    voiceCommit,
+  ).outcome,
+  "pass",
+);
+assert.throws(
+  () =>
+    validateA11yEvidence(
+      "verify",
+      voiceVerifyRequest,
+      {
+        ...voiceVerifyResult,
+        captureState: { ...captureState, scrollY: captureState.scrollY + 10 },
+      },
+      voiceBaseline,
+      voiceCommit,
+    ),
+  /capture-state mismatch: scrollY/,
+);
