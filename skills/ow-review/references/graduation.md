@@ -2,9 +2,67 @@
 
 Review retirement of rollout controls as a distinct lifecycle operation. Graduation should preserve
 the already-deployed final behavior while removing the gate, fallback, and obsolete scaffolding.
-For a graduation-only task, this is the only code-review policy reference to apply. Keep the normal
-review artifact and evidence contract, but do not load other optional review references, apply
-unrelated code-quality rules, or request cleanup beyond what graduation directly makes obsolete.
+For a graduation-only task, this is the only review policy and artifact contract to apply. Do not
+read or apply the general `docs/review-contract.md`, profiles, review-miss documents, or optional
+references. Do not request cleanup beyond what graduation directly makes obsolete.
+
+## Graduation-only report contract
+
+Write `review.json` with this minimal schema and validate it with
+`tools/validate-graduation-review-report.mjs`, never the general review-report validator:
+
+```json
+{
+  "schemaVersion": 1,
+  "reviewMode": "graduation-only",
+  "reviewedHead": "<40-character lowercase SHA>",
+  "mergeBase": "<40-character lowercase SHA>",
+  "diffDigest": "<64-character lowercase SHA-256>",
+  "summary": "<specific graduation conclusion>",
+  "authorizationEvidence": ["<PR description, work item, rollout evidence, or source-history citation>"],
+  "gates": [
+    {
+      "name": "<retired gate identifier>",
+      "type": "Flight|KS|Experiment|Feature|Rollout",
+      "permanentState": "<enabled, inactive, treatment, control, or evidenced exception>",
+      "directionEvidence": ["<source or rollout citation>"],
+      "callSitesChecked": ["<path:line>"],
+      "cleanupEvidence": ["<path:line or bounded no-match search evidence>"],
+      "disposition": "complete|finding"
+    }
+  ],
+  "changedFiles": [
+    {
+      "path": "<every Git-changed path>",
+      "reviewedWholeFile": true,
+      "graduationDisposition": "<specific result>"
+    }
+  ],
+  "validation": {
+    "commandsRun": ["<command and result>"],
+    "notRun": ["<check and reason>"]
+  },
+  "findings": [
+    {
+      "id": "<stable id>",
+      "severity": "Critical|Important|Minor",
+      "path": "<changed path>",
+      "line": 1,
+      "description": "<specific defect or Nit: suggestion>",
+      "suggestedFix": "<concrete correction>",
+      "evidence": ["<path:line or authorization citation>"]
+    }
+  ],
+  "counts": { "critical": 0, "important": 0, "minor": 0 },
+  "verdict": "APPROVE|REQUEST_CHANGES|COMMENT"
+}
+```
+
+The report is reviewer-owned. `changedFiles` must exactly match Git and every retired gate must have
+direction, call-site, and cleanup evidence. Critical or Important findings produce
+`REQUEST_CHANGES`; Minor-only findings produce `COMMENT`; zero findings produce `APPROVE`. Do not
+include generic reviewability, profile checks, prior-art, external-contract, UI, accessibility,
+localization, size, architecture, test-plan, risk-assessment, or rollback sections.
 
 ## Scope boundary
 
@@ -395,6 +453,21 @@ against the project's configured unit-test coverage threshold:
 - do not require new coverage, including a test for the removed gate constant or identifier;
 - running an existing scoped test is validation, not a test implementation task.
 
+Do not convert the review contract's internal artifact fields into author-facing PR-description
+requirements. The reviewer must record what validation evidence was available and what was not run
+inside the review artifact, but a graduation-only PR does not require a generic test plan, exact
+build/test transcript, risk assessment, or per-Flight-family rollback/recovery section in its PR
+description. Absence of those sections is not a finding. The default recovery for an incorrect
+graduation is reverting the graduation PR; do not require that ordinary fact to be restated for
+each retired gate or family.
+
+Require author-supplied PR-description content only where this reference explicitly says so: an
+exception that selects the non-default KS/Flight branch, or an actual coverage-threshold failure
+and its chosen resolution. Graduation authorization may also be grounded in the linked work item,
+rollout evidence, and source history as specified above. Do not demand that closed review-thread
+comments be copied into the PR description unless they are the only location of required
+authorization evidence and that evidence is otherwise unavailable to future reviewers.
+
 When the existing coverage command actually fails after graduation cleanup:
 
 1. **Preferred:** update the unit-test coverage threshold to reflect the reduced reachable code and
@@ -421,6 +494,11 @@ runtime entry point, retains a value-discarded gate invocation, changes coverage
 without an actual coverage failure and required PR-description evidence, leaves a fixed-return
 wrapper or any transitive consumer unsimplified, or mixes unrelated behavior into the graduation
 edit.
+
+Do not raise a finding merely because a graduation-only PR description omits generic test results,
+a risk assessment, rollback/recovery prose, or per-family shipping details. These are not required
+graduation fields. Keep reviewer-owned evidence gaps in the review artifact unless they prevent
+proof of graduation authorization or surviving behavior.
 
 A redundant unkeyed Fragment left after removing a gate condition is not reachable retired
 behavior. When removal is proven reconciliation-safe, report only a **Minor** suggestion prefixed

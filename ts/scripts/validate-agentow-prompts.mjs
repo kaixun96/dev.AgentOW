@@ -46,7 +46,19 @@ const commonReviewIssueSnippets = [
 ];
 
 const graduationReviewSnippets = [
-  "this is the only code-review policy reference to apply",
+  "this is the only review policy and artifact contract to apply",
+  "Do not",
+  "read or apply the general `docs/review-contract.md`",
+  "Graduation-only report contract",
+  "`tools/validate-graduation-review-report.mjs`",
+  '"reviewMode": "graduation-only"',
+  '"authorizationEvidence"',
+  '"directionEvidence"',
+  '"callSitesChecked"',
+  '"cleanupEvidence"',
+  "`changedFiles` must exactly match Git",
+  "Do not",
+  "include generic reviewability, profile checks, prior-art, external-contract",
   "Do not apply graduation rules merely because a changed file mentions a gate",
   "Do not turn a graduation-only review into an opportunity to polish nearby logic",
   "Graduation-only PRs have no PR-size or split limit",
@@ -133,6 +145,16 @@ const graduationReviewSnippets = [
   "preserve tests for the surviving branch unchanged",
   "do not create any unit, integration, automation, or manual test task for graduation",
   "running an existing scoped test is validation, not a test implementation task",
+  "Do not convert the review contract's internal artifact fields into author-facing PR-description",
+  "does not require a generic test plan",
+  "per-Flight-family rollback/recovery section",
+  "Absence of those sections is not a finding",
+  "default recovery for an incorrect",
+  "Require author-supplied PR-description content only where this reference explicitly says so",
+  "Do not demand that closed review-thread",
+  "Do not raise a finding merely because a graduation-only PR description omits generic test results",
+  "These are not required",
+  "graduation fields. Keep reviewer-owned evidence gaps",
   "Preferred:** update the unit-test coverage threshold",
   "Recommend a separate follow-up PR",
   "Allowed alternative:** the developer may instead add the minimum meaningful tests",
@@ -246,6 +268,19 @@ const sizeRegressionSnippets = [
 ];
 
 const checks = [
+  ...mirroredSnippetChecks(
+    "skills/ow-review/SKILL.md",
+    "copilot/skills/ow-review/SKILL.md",
+    [
+      "Before reading any review contract, inspect the immutable diff and classify it",
+      "`reviewPolicy=graduation-only`",
+      "Do not read",
+      "`docs/review-contract.md`, profiles, review-miss documents",
+      "Skip this step when `reviewPolicy=graduation-only`",
+      "validate-graduation-review-report.mjs",
+      "use only the graduation reference's review procedure",
+    ],
+  ),
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
@@ -281,7 +316,13 @@ const checks = [
       "require `POC_SAFE_TO_DEMO` before continuing",
       "`ow-pr-update` with its existing `prId`",
       "Do not require `visualValidation.scenarios` or a BEFORE path",
-      "does not run or show the requested result is not useful"
+      "does not run or show the requested result is not useful",
+      "classify the immutable Git diff before reading any review contract",
+      "`reviewPolicy=graduation-only`",
+      "do not read the general",
+      "For `reviewPolicy=graduation-only`, omit `reviewLedgerPath`",
+      "return without entering generic review passes",
+      "validate-graduation-review-report.mjs",
     ]
   },
   {
@@ -552,12 +593,14 @@ const checks = [
       "Repository instruction compliance does not automatically imply `Important`",
       "Compliant code receives no finding",
       "do not equate reading every line with reliable exhaustive review",
-      "`graduation-only` to `preReview.profiles`",
-      "PR-size, churn, file-count",
-      "the change as `reviewable`",
-      "emit no split boundaries or",
-      "A mixed graduation/feature PR does not receive",
+      "before reading any review contract",
+      "Do not read",
+      "`docs/review-contract.md` or continue into any subsequent generic review pass",
+      "validate-graduation-review-report.mjs",
+      "return immediately",
+      "A mixed graduation/feature PR is not graduation-only",
       "explicit no-size-limit/no-split exemption",
+      "graduation reference alone controls policy, evidence",
       "`preliminary-non-exhaustive` completeness claim",
       "git diff --no-renames",
       "common-review-issues.md",
@@ -607,12 +650,14 @@ const checks = [
       "Repository instruction compliance does not automatically imply `Important`",
       "Compliant code receives no finding",
       "reading all files does not prove the review is reliable or exhaustive",
-      "`graduation-only` to `preReview.profiles`",
-      "PR-size, churn, file-count",
-      "the change as `reviewable`",
-      "emit no split boundaries or",
-      "A mixed graduation/feature PR does not receive",
+      "Before reading any review contract",
+      "Do not read",
+      "`docs/review-contract.md` or continue into any subsequent generic review pass",
+      "validate-graduation-review-report.mjs",
+      "return immediately",
+      "A mixed graduation/feature PR is not graduation-only",
       "explicit no-size-limit/no-split exemption",
+      "graduation reference alone controls policy, evidence",
       "`preliminary-non-exhaustive`",
       "git diff --no-renames",
       "common-review-issues.md",
@@ -677,6 +722,13 @@ const checks = [
     file: "agents/ow-orchestrator.md",
     snippets: [
       "validate-review-report.mjs",
+      "Before reading any review contract, inspect the immutable Git diff",
+      "`reviewPolicy=graduation-only`",
+      "Do not read the general",
+      "Only for `reviewPolicy=general`, resolve the branch's review ledger",
+      "For `reviewPolicy=graduation-only`, omit `contextLinkPath`",
+      "return without generic review passes",
+      "validate-graduation-review-report.mjs",
       "Missing artifacts, stale diff identity, incomplete coverage",
       "Critical or Important issues",
       "AUTO mode, and batch execution do not bypass the review gate.",
@@ -1060,7 +1112,8 @@ const mirroredChecks = [
   ["skills/ow-review/references/graduation.md", "copilot/skills/ow-review/references/graduation.md"],
   ["skills/ow-review/references/shared-utility-reuse.md", "copilot/skills/ow-review/references/shared-utility-reuse.md"],
   ["skills/ow-review/references/ux-architecture-and-bundle-boundaries.md", "copilot/skills/ow-review/references/ux-architecture-and-bundle-boundaries.md"],
-  ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"]
+  ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"],
+  ["tools/validate-graduation-review-report.mjs", "copilot/tools/validate-graduation-review-report.mjs"]
 ];
 
 let failures = 0;
