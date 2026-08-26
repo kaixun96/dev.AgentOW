@@ -21,8 +21,8 @@
     {
       "name": "agentow-copilot",
       "source": "./copilot",
-      "description": "Copilot CLI port of agentOW. Main-session implementer plus stateless research, verify, and review subagents.",
-      "version": "0.1.30",
+      "description": "Copilot CLI port of agentOW. Includes an isolated reproduce-first Accessibility remediation mode.",
+      "version": "0.1.31",
       "author": {
         "name": "kaixun"
       },
