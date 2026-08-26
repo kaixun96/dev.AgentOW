@@ -40,9 +40,11 @@ For a graduation-only change, read only that graduation reference. Do not read
 `docs/review-contract.md` or continue into any subsequent generic review pass in this file. Follow
 the reference's review steps and minimal report schema, write `review.md` plus `review.json`, then
 validate the JSON with `tools/validate-graduation-review-report.mjs` using the Git-generated changed
-file list, expected HEAD, and diff digest. Submit the normal NDJSON completion record pointing to
-those artifacts and return immediately. The graduation reference alone controls policy, evidence,
-severity, verdict, and author-facing comments.
+and deleted-file lists, caller-owned gate inventory, expected merge base, expected HEAD, and diff
+digest. Consume `review-gates.txt` and `review-deleted-files.txt` as immutable inputs; do not create
+or modify them. Validation must pass `--expected-head`, `--expected-merge-base`,
+`--expected-diff-digest`, `--changed-files`, `--deleted-files`, and `--expected-gates`. Submit the
+normal NDJSON completion record pointing to those artifacts and return immediately. The graduation reference alone controls policy, evidence, severity, verdict, and author-facing comments.
 
 For every other change, read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before reviewing. It is
 normative. An unsupported APPROVE is a failed review. Continue with the generic routing and passes

@@ -507,6 +507,10 @@ read only `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/graduation.md`. Do 
 including every mixed graduation/feature change, set `reviewPolicy=general` and read
 `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`.
 
+For `graduation-only`, write every independently classified gate identifier, one per line, to
+`{sessionDir}/review-gates.txt` before reviewer dispatch. The reviewer must not create or modify this
+inventory. Also generate `{sessionDir}/review-deleted-files.txt` from Git with `--diff-filter=D`.
+
 Only for `reviewPolicy=general`, resolve the branch's review ledger so a finding already
 dispositioned on this branch is never raised again:
 
@@ -527,6 +531,8 @@ SendMessage to ow-review-agent:
   reportFile: <reportFile>
   branch: <branch>
   reviewPolicy: <graduation-only or general>
+  gateInventoryPath: <sessionDir>/review-gates.txt               # graduation-only
+  deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
   contextLinkPath: <contextLinkPath>
   contextDocuments: <latest routed document paths>
   reviewLedgerPath: <resolved $reviewLedgerPath>
@@ -550,11 +556,15 @@ only with:
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
 git diff --no-renames --name-only "$mergeBase"...HEAD > {sessionDir}/review-changed-files.txt
+git diff --no-renames --diff-filter=D --name-only "$mergeBase"...HEAD > {sessionDir}/review-deleted-files.txt
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
   {sessionDir}/review.json \
   --expected-head "$(git rev-parse HEAD)" \
+  --expected-merge-base "$mergeBase" \
   --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
-  --changed-files {sessionDir}/review-changed-files.txt
+  --changed-files {sessionDir}/review-changed-files.txt \
+  --deleted-files {sessionDir}/review-deleted-files.txt \
+  --expected-gates {sessionDir}/review-gates.txt
 ```
 
 For `reviewPolicy=general`, validate with:

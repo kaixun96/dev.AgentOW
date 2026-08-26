@@ -94,6 +94,7 @@ echo "[$(date +%H:%M:%S)] 🔎 Review target — branch <branch> vs <baseRef>" >
 mergeBase=$(git -C "$reviewRoot" merge-base "$baseRef" HEAD)
 reviewedHead=$(git -C "$reviewRoot" rev-parse HEAD)
 git -C "$reviewRoot" diff --no-renames --name-only "$mergeBase"...HEAD > "$sessionDir/review-changed-files.txt"
+git -C "$reviewRoot" diff --no-renames --diff-filter=D --name-only "$mergeBase"...HEAD > "$sessionDir/review-deleted-files.txt"
 git -C "$reviewRoot" diff --no-renames --numstat "$mergeBase"...HEAD > "$sessionDir/review-numstat.txt"
 diffDigest=$(git -C "$reviewRoot" diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)
 ```
@@ -107,6 +108,10 @@ substantive change retires a Flight, KS, Experiment, Feature, or Rollout gate, s
 `docs/review-contract.md`, profiles, review-miss documents, or other review references. Otherwise,
 including every mixed graduation/feature change, set `reviewPolicy=general` and read
 `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`.
+
+For `graduation-only`, record every gate identifier established during this independent
+classification, one per line, in `$sessionDir/review-gates.txt` before dispatch. The reviewer must
+not create or modify this inventory.
 
 ## Step 4: Resolve the review ledger for general review
 
@@ -145,6 +150,8 @@ reportWriterCommand: node ${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs report <sess
 progressLog: <sessionDir>/progress.log
 artifactPath: <sessionDir>/review.md
 artifactJsonPath: <sessionDir>/review.json
+gateInventoryPath: <sessionDir>/review-gates.txt             # graduation-only
+deletedFilesPath: <sessionDir>/review-deleted-files.txt       # graduation-only
 reviewLedgerPath: <resolved reviewLedgerPath>
 prDescriptionPath: <sessionDir>/pr-description.md   # PR mode only
 contextDocuments:
@@ -167,8 +174,11 @@ When `reviewPolicy=graduation-only`:
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
   "$sessionDir/review.json" \
   --expected-head "$reviewedHead" \
+  --expected-merge-base "$mergeBase" \
   --expected-diff-digest "$diffDigest" \
-  --changed-files "$sessionDir/review-changed-files.txt"
+  --changed-files "$sessionDir/review-changed-files.txt" \
+  --deleted-files "$sessionDir/review-deleted-files.txt" \
+  --expected-gates "$sessionDir/review-gates.txt"
 ```
 
 Otherwise:

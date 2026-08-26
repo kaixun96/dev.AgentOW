@@ -19,7 +19,7 @@ Write `review.json` with this minimal schema and validate it with
   "mergeBase": "<40-character lowercase SHA>",
   "diffDigest": "<64-character lowercase SHA-256>",
   "summary": "<specific graduation conclusion>",
-  "authorizationEvidence": ["<PR description, work item, rollout evidence, or source-history citation>"],
+  "authorizationEvidence": ["<path:line, artifact:..., or command:... evidence>"],
   "gates": [
     {
       "name": "<retired gate identifier>",
@@ -35,6 +35,7 @@ Write `review.json` with this minimal schema and validate it with
     {
       "path": "<every Git-changed path>",
       "reviewedWholeFile": true,
+      "reviewedVersion": "head|merge-base",
       "graduationDisposition": "<specific result>"
     }
   ],
@@ -45,12 +46,14 @@ Write `review.json` with this minimal schema and validate it with
   "findings": [
     {
       "id": "<stable id>",
+      "gateName": "<retired gate identifier>",
       "severity": "Critical|Important|Minor",
       "path": "<changed path>",
       "line": 1,
       "description": "<specific defect or Nit: suggestion>",
       "suggestedFix": "<concrete correction>",
-      "evidence": ["<path:line or authorization citation>"]
+      "evidence": ["<path:line, artifact:..., or bounded command:rg ... => no matches>"],
+      "classSweepEvidence": ["<required for Critical or Important; same evidence grammar>"]
     }
   ],
   "counts": { "critical": 0, "important": 0, "minor": 0 },
@@ -58,8 +61,26 @@ Write `review.json` with this minimal schema and validate it with
 }
 ```
 
-The report is reviewer-owned. `changedFiles` must exactly match Git and every retired gate must have
-direction, call-site, and cleanup evidence. Critical or Important findings produce
+Before dispatch, the caller must write every independently classified retired gate identifier to a
+newline-delimited `review-gates.txt`, write Git-deleted paths to `review-deleted-files.txt`, and pass
+both files plus the expected merge base to the dedicated validator. Reported gate names must exactly
+match that inventory. `changedFiles` must exactly match Git; a surviving file uses
+`reviewedVersion: "head"`, while a deleted file uses `reviewedVersion: "merge-base"` and must be read
+from the merge-base version before its disposition is recorded. Every retired gate must have
+direction, call-site, and cleanup evidence.
+
+Every evidence string in this report uses one of these forms: `path:line`, `artifact:<specific
+source and fact>`, or `command:<bounded command and result>`. A no-match cleanup or class-sweep
+claim must use the stricter form `command:rg <query> <repo-relative-scope> => no matches`; repository
+root `.` and parent/absolute scopes are invalid. Critical or Important findings must include
+`classSweepEvidence` using bounded `command:rg <query> <repo-relative-scope> => no matches` or
+`command:rg <query> <repo-relative-scope> => <N> matches; all accounted` entries across all changed
+files and relevant gate-reference sites. Generic test/build commands are not class-sweep evidence.
+Minor findings may omit that field. Every finding's `gateName` must match the
+independent gate inventory. The gates marked `disposition: "finding"` must exactly equal the gates
+referenced by findings; all other gates use `disposition: "complete"`.
+
+The report is reviewer-owned. Critical or Important findings produce
 `REQUEST_CHANGES`; Minor-only findings produce `COMMENT`; zero findings produce `APPROVE`. Do not
 include generic reviewability, profile checks, prior-art, external-contract, UI, accessibility,
 localization, size, architecture, test-plan, risk-assessment, or rollback sections.
@@ -118,6 +139,8 @@ readiness from the code change alone.
 ## 2. Prove the surviving behavior
 
 Read the merge-base implementation and construct the gate truth table before judging the diff.
+When a changed file is deleted, read its merge-base contents and verify that every removed symbol,
+resource, test, registration, and export was gate-only or obsolete under the proven permanent state.
 Account for negation, wrapper names, aliases, early returns, nested ternaries, and compound
 predicates.
 
@@ -438,6 +461,11 @@ Do not delete, rewrite, shorten, or otherwise polish comments merely because the
 Preserve unrelated public contracts and adjacent code. Cleanup should be transitive only where the
 graduation made code obsolete; do not refactor or polish surviving code unless simplification is
 required to remove the retired condition.
+
+Review security and privacy only when graduation itself changes which permanent branch reaches a
+trust boundary, permission or validation check, destructive write, network request, telemetry sink,
+or error/cleanup path. Report only defects caused by branch selection or graduation cleanup; do not
+import generic security policy or raise pre-existing gaps.
 
 ## 4. Review tests and evidence
 

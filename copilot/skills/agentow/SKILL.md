@@ -650,6 +650,10 @@ including every mixed graduation/feature change, set `reviewPolicy=general` and 
 `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`. Either selected review policy is a hard evidence
 gate in interactive, AUTO, and batch execution.
 
+For `graduation-only`, write every independently classified gate identifier, one per line, to
+`<sessionDir>/review-gates.txt` before reviewer dispatch. The reviewer must not create or modify this
+inventory. Also generate `<sessionDir>/review-deleted-files.txt` from Git with `--diff-filter=D`.
+
 The remaining Step 7 procedure applies only to STANDARD profile.
 
 Only when `reviewPolicy=general`, resolve the branch's review ledger first, so a finding already
@@ -672,6 +676,8 @@ Dispatch `@agentow-copilot:reviewer` with:
 ```yaml
 branch: <branch>
 reviewPolicy: <graduation-only or general>
+gateInventoryPath: <sessionDir>/review-gates.txt               # graduation-only
+deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
 changedFiles: <changed files>
 sessionDir: /workspaces/odsp-web/.aero/<session>
 reportFile: /workspaces/odsp-web/.aero/<session>/report.json
@@ -704,11 +710,15 @@ digest, and changed-file list. When `reviewPolicy=graduation-only`, validate onl
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
 git diff --no-renames --name-only "$mergeBase"...HEAD > <sessionDir>/review-changed-files.txt
+git diff --no-renames --diff-filter=D --name-only "$mergeBase"...HEAD > <sessionDir>/review-deleted-files.txt
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
   <sessionDir>/review.json \
   --expected-head "$(git rev-parse HEAD)" \
+  --expected-merge-base "$mergeBase" \
   --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
-  --changed-files <sessionDir>/review-changed-files.txt
+  --changed-files <sessionDir>/review-changed-files.txt \
+  --deleted-files <sessionDir>/review-deleted-files.txt \
+  --expected-gates <sessionDir>/review-gates.txt
 ```
 
 When `reviewPolicy=general`, validate with:

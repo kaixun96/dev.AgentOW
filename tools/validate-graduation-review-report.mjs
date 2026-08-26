@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import path from "node:path";
 
 const HASH_40 = /^[0-9a-f]{40}$/;
 const HASH_64 = /^[0-9a-f]{64}$/;
@@ -15,6 +16,46 @@ const readLines = (filePath) =>
   fs.readFileSync(filePath, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).sort();
 const sameStrings = (left, right) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
+const boundedNoMatchSearch = (value) => {
+  if (!nonEmpty(value) || !value.trim().startsWith("command:")) return false;
+  const command = value.trim().slice("command:".length);
+  if (/[`;$|&<()\n]/.test(command)) return false;
+  const match = /^rg (?:--glob [A-Za-z0-9_./*?{},[\]-]+ )?([A-Za-z0-9_.*?/-]+) ([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*) => (?:no matches|0 matches)$/i.exec(command);
+  if (!match) return false;
+  const query = match[1];
+  const searchPath = match[2];
+  const normalizedPath = path.posix.normalize(searchPath);
+  return !query.startsWith("-") &&
+    !path.posix.isAbsolute(searchPath) &&
+    !searchPath.startsWith("-") &&
+    normalizedPath !== "." &&
+    normalizedPath !== ".." &&
+    !normalizedPath.startsWith("../");
+};
+const boundedClassSweepSearch = (value) => {
+  if (!nonEmpty(value) || !value.trim().startsWith("command:")) return false;
+  const command = value.trim().slice("command:".length);
+  if (/[`$|&<()\n]/.test(command)) return false;
+  const match = /^rg (?:--glob [A-Za-z0-9_./*?{},[\]-]+ )?([A-Za-z0-9_.*?/-]+) ([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*) => (?:(?:no|0) matches|\d+ matches; all accounted)$/i.exec(command);
+  if (!match || match[1].startsWith("-")) return false;
+  const searchPath = match[2];
+  const normalizedPath = path.posix.normalize(searchPath);
+  return !path.posix.isAbsolute(searchPath) &&
+    !searchPath.startsWith("-") &&
+    normalizedPath !== "." &&
+    normalizedPath !== ".." &&
+    !normalizedPath.startsWith("../");
+};
+const evidenceReference = (value) => {
+  if (!nonEmpty(value)) return false;
+  const evidence = value.trim();
+  if (/^[^:\n]+:\d+(?::\d+)?$/.test(evidence) || /^artifact:.+/.test(evidence)) return true;
+  if (!evidence.startsWith("command:")) return false;
+  return /=> (?:no matches|0 matches)$/i.test(evidence)
+    ? boundedNoMatchSearch(evidence)
+    : /^command:[^`;$|&<()\n]+ => .+$/.test(evidence);
+};
+const evidenceReferences = (value) => nonEmptyStrings(value) && value.every(evidenceReference);
 
 function parseOptions(args) {
   const options = new Map();
@@ -37,12 +78,23 @@ export function validateGraduationReview(report, options = new Map()) {
   if (!HASH_40.test(report.mergeBase ?? "")) errors.push("mergeBase must be a lowercase 40-character SHA");
   if (!HASH_64.test(report.diffDigest ?? "")) errors.push("diffDigest must be a lowercase 64-character SHA-256");
   if (!nonEmpty(report.summary)) errors.push("summary is required");
-  if (!nonEmptyStrings(report.authorizationEvidence)) errors.push("authorizationEvidence is required");
+  if (!evidenceReferences(report.authorizationEvidence)) errors.push("authorizationEvidence must contain valid evidence references");
 
   const expectedHead = options.get("--expected-head");
-  if (expectedHead && report.reviewedHead !== expectedHead) errors.push("reviewedHead does not match current HEAD");
+  if (!expectedHead || report.reviewedHead !== expectedHead) errors.push("reviewedHead does not match current HEAD");
+  const expectedMergeBase = options.get("--expected-merge-base");
+  if (!expectedMergeBase || report.mergeBase !== expectedMergeBase) errors.push("mergeBase does not match the expected merge base");
   const expectedDigest = options.get("--expected-diff-digest");
-  if (expectedDigest && report.diffDigest !== expectedDigest) errors.push("diffDigest does not match current diff");
+  if (!expectedDigest || report.diffDigest !== expectedDigest) errors.push("diffDigest does not match current diff");
+
+  const expectedGatesPath = options.get("--expected-gates");
+  let expectedGates = [];
+  if (!expectedGatesPath || !fs.existsSync(expectedGatesPath)) {
+    errors.push("--expected-gates must reference the independent gate inventory");
+  } else {
+    expectedGates = readLines(expectedGatesPath);
+    if (expectedGates.length === 0) errors.push("gate inventory must not be empty");
+  }
 
   if (!Array.isArray(report.gates) || report.gates.length === 0) {
     errors.push("gates must contain every retired gate");
@@ -54,16 +106,22 @@ export function validateGraduationReview(report, options = new Map()) {
         !nonEmpty(gate.name) ||
         !GATE_TYPES.has(gate.type) ||
         !nonEmpty(gate.permanentState) ||
-        !nonEmptyStrings(gate.directionEvidence) ||
-        !nonEmptyStrings(gate.callSitesChecked) ||
-        !nonEmptyStrings(gate.cleanupEvidence) ||
+        !evidenceReferences(gate.directionEvidence) ||
+        !evidenceReferences(gate.callSitesChecked) ||
+        !evidenceReferences(gate.cleanupEvidence) ||
         !["complete", "finding"].includes(gate.disposition)
       ) {
         errors.push("every gate requires type, permanent state, direction, call-site, cleanup evidence, and disposition");
         continue;
       }
+      if (gate.disposition === "complete" && !gate.cleanupEvidence.some(boundedNoMatchSearch)) {
+        errors.push(`complete gate ${gate.name} requires a bounded no-match cleanup search`);
+      }
       if (gateNames.has(gate.name)) errors.push(`duplicate gate: ${gate.name}`);
       gateNames.add(gate.name);
+    }
+    if (expectedGates.length > 0 && !sameStrings([...gateNames].sort(), expectedGates)) {
+      errors.push("reported gates must exactly match the independent gate inventory");
     }
   }
 
@@ -76,13 +134,27 @@ export function validateGraduationReview(report, options = new Map()) {
     if (expectedFiles.length === 0) errors.push("Git changed-file list must not be empty");
   }
 
+  const deletedFilesPath = options.get("--deleted-files");
+  let deletedFiles = [];
+  if (!deletedFilesPath || !fs.existsSync(deletedFilesPath)) {
+    errors.push("--deleted-files must reference a Git-generated deleted-file list");
+  } else {
+    deletedFiles = readLines(deletedFilesPath);
+    if (new Set(deletedFiles).size !== deletedFiles.length) errors.push("deleted-file list contains duplicate paths");
+    if (expectedFiles.length > 0 && deletedFiles.some((file) => !expectedFiles.includes(file))) {
+      errors.push("deleted files must be a subset of Git changed files");
+    }
+  }
+  const deletedFileSet = new Set(deletedFiles);
+
   if (!Array.isArray(report.changedFiles) || report.changedFiles.length === 0) {
     errors.push("changedFiles is required");
   } else {
     const paths = [];
     for (const entry of report.changedFiles) {
-      if (!isObject(entry) || !nonEmpty(entry.path) || entry.reviewedWholeFile !== true || !nonEmpty(entry.graduationDisposition)) {
-        errors.push("every changed file requires whole-file review and graduationDisposition");
+      const expectedVersion = deletedFileSet.has(entry?.path) ? "merge-base" : "head";
+      if (!isObject(entry) || !nonEmpty(entry.path) || entry.reviewedWholeFile !== true || entry.reviewedVersion !== expectedVersion || !nonEmpty(entry.graduationDisposition)) {
+        errors.push("every changed file requires whole-file review, correct reviewedVersion, and graduationDisposition");
         continue;
       }
       paths.push(entry.path);
@@ -106,28 +178,33 @@ export function validateGraduationReview(report, options = new Map()) {
     if (
       !isObject(finding) ||
       !nonEmpty(finding.id) ||
+      !expectedGates.includes(finding.gateName) ||
       !SEVERITIES.has(finding.severity) ||
       !expectedFiles.includes(finding.path) ||
       !Number.isInteger(finding.line) ||
       finding.line < 1 ||
       !nonEmpty(finding.description) ||
       !nonEmpty(finding.suggestedFix) ||
-      !nonEmptyStrings(finding.evidence)
+      !evidenceReferences(finding.evidence)
     ) {
-      errors.push("every finding requires valid severity, changed path, line, description, fix, and evidence");
+      errors.push("every finding requires a valid gate, severity, changed path, line, description, fix, and evidence");
       continue;
     }
     if (finding.severity === "Minor" && !finding.description.startsWith("Nit:")) {
       errors.push("Minor finding descriptions must start with Nit:");
+    }
+    if (["Critical", "Important"].includes(finding.severity) &&
+      (!nonEmptyStrings(finding.classSweepEvidence) || !finding.classSweepEvidence.every(boundedClassSweepSearch))) {
+      errors.push(`blocking finding ${finding.id} requires bounded rg classSweepEvidence with explicit accounting`);
     }
     if (findingIds.has(finding.id)) errors.push(`duplicate finding id: ${finding.id}`);
     findingIds.add(finding.id);
   }
 
   const counts = {
-    critical: findings.filter((finding) => finding.severity === "Critical").length,
-    important: findings.filter((finding) => finding.severity === "Important").length,
-    minor: findings.filter((finding) => finding.severity === "Minor").length,
+    critical: findings.filter((finding) => finding?.severity === "Critical").length,
+    important: findings.filter((finding) => finding?.severity === "Important").length,
+    minor: findings.filter((finding) => finding?.severity === "Minor").length,
   };
   if (!isObject(report.counts) || Object.keys(counts).some((key) => report.counts[key] !== counts[key])) {
     errors.push("counts must match findings");
@@ -141,8 +218,13 @@ export function validateGraduationReview(report, options = new Map()) {
   if (!VERDICTS.has(report.verdict) || report.verdict !== expectedVerdict) {
     errors.push("verdict must match finding severities");
   }
-  if (report.gates?.some((gate) => gate.disposition === "finding") && findings.length === 0) {
-    errors.push("gate disposition finding requires a finding");
+  const dispositionFindingGates = (report.gates ?? [])
+    .filter((gate) => gate?.disposition === "finding")
+    .map((gate) => gate?.name)
+    .sort();
+  const findingGates = [...new Set(findings.map((finding) => finding?.gateName).filter(nonEmpty))].sort();
+  if (!sameStrings(dispositionFindingGates, findingGates)) {
+    errors.push("gate finding dispositions must exactly match gates referenced by findings");
   }
 
   return errors;
@@ -151,7 +233,7 @@ export function validateGraduationReview(report, options = new Map()) {
 function main() {
   const [reportPath, ...args] = process.argv.slice(2);
   if (!reportPath) {
-    console.error("usage: validate-graduation-review-report.mjs <review.json> --changed-files PATH [--expected-head SHA] [--expected-diff-digest SHA256]");
+    console.error("usage: validate-graduation-review-report.mjs <review.json> --changed-files PATH --deleted-files PATH --expected-gates PATH --expected-merge-base SHA --expected-head SHA --expected-diff-digest SHA256");
     process.exit(2);
   }
 
