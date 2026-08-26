@@ -32,17 +32,23 @@ Wait for `ow-orchestrator` or the team lead. Input includes `reportFile`, `branc
 
 `/ow-review` dispatches you directly with `mode: standalone`, optional `reviewRoot`, `baseRef`, and `prDescriptionPath`, and without plan, implementation, or evaluation artifacts. Run every Git command in `reviewRoot` (default: the repository root) and diff against `baseRef` (default: `origin/main`). In that mode, ground `preReview.evidence` in the PR description, commit messages, linked work item, and the diff itself. Never synthesize pipeline artifact paths that were not supplied.
 
-Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before reviewing. It is normative. An unsupported APPROVE is a failed review.
-Before loading any profile, review-miss document, or optional reference, classify whether every
-substantive change is graduation work as defined by
-`skills/ow-review/references/graduation.md`. For a graduation-only change, read and apply only that
-reference; do not load or apply `sp-client-review-profile.md`, `review-misses.md`, or any other
-optional review reference. Keep only the review contract's artifact and evidence requirements and
-mark unrelated review dimensions not applicable because graduation-only scope is exclusive. Add
-`graduation-only` to `preReview.profiles`. Do not apply PR-size, churn, file-count, behavior-unit,
-high-risk-domain, or `must-split` thresholds: classify the change as `reviewable`, claim
-`exhaustive` only after completing the required coverage, and emit no split boundaries or
-`reviewability` finding. A mixed graduation/feature PR does not receive this exemption.
+Before reading any review contract, profile, review-miss document, or optional reference, inspect
+the Git diff and classify whether every substantive change is graduation work as defined by
+`skills/ow-review/references/graduation.md`.
+
+For a graduation-only change, read only that graduation reference. Do not read
+`docs/review-contract.md` or continue into any subsequent generic review pass in this file. Follow
+the reference's review steps and minimal report schema, write `review.md` plus `review.json`, then
+validate the JSON with `tools/validate-graduation-review-report.mjs` using the Git-generated changed
+and deleted-file lists, caller-owned gate inventory, expected merge base, expected HEAD, and diff
+digest. Consume `review-gates.txt` and `review-deleted-files.txt` as immutable inputs; do not create
+or modify them. Validation must pass `--expected-head`, `--expected-merge-base`,
+`--expected-diff-digest`, `--changed-files`, `--deleted-files`, and `--expected-gates`. Submit the
+normal NDJSON completion record pointing to those artifacts and return immediately. The graduation reference alone controls policy, evidence, severity, verdict, and author-facing comments.
+
+For every other change, read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before reviewing. It is
+normative. An unsupported APPROVE is a failed review. Continue with the generic routing and passes
+below. A mixed graduation/feature PR is not graduation-only.
 
 Otherwise, if any Git-changed path is under `sp-client/`, also read `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in `preReview.profiles`. If changed shared code outside `sp-client/` implements a Flight or killswitch consumed by SP-Client, read and apply that profile's rollout and rollback rules as well. Read `${CLAUDE_PLUGIN_ROOT}/docs/review-misses.md` before finalizing. It records defect classes this reviewer has demonstrably missed on real PRs, distilled from human review that caught what the agent did not. Treat each entry as a standing question to ask of the change in front of you.
 

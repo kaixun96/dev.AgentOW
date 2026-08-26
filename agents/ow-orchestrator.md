@@ -500,7 +500,19 @@ echo "[$(date +%H:%M:%S)] ⚠️  3+ consecutive cycles blame spec, not code —
 
 Only after the evaluator result and artifacts are final, send this for both evaluator PASS and the separately validated complete external fixture-gap path. A fixture gap changes the final status to `success-with-blockers`; it never bypasses review.
 
-Resolve the branch's review ledger first, so a finding already dispositioned on this branch is never raised again:
+Before reading any review contract, inspect the immutable Git diff. If every substantive change
+retires a Flight, KS, Experiment, Feature, or Rollout gate, set `reviewPolicy=graduation-only` and
+read only `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/graduation.md`. Do not read the general
+`docs/review-contract.md`, profiles, review-miss documents, or other review references. Otherwise,
+including every mixed graduation/feature change, set `reviewPolicy=general` and read
+`${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`.
+
+For `graduation-only`, write every independently classified gate identifier, one per line, to
+`{sessionDir}/review-gates.txt` before reviewer dispatch. The reviewer must not create or modify this
+inventory. Also generate `{sessionDir}/review-deleted-files.txt` from Git with `--diff-filter=D`.
+
+Only for `reviewPolicy=general`, resolve the branch's review ledger so a finding already
+dispositioned on this branch is never raised again:
 
 ```bash
 ledgerSlug=$(printf '%s' "<branch>" | tr '/' '-')
@@ -518,6 +530,9 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" parse \
 SendMessage to ow-review-agent:
   reportFile: <reportFile>
   branch: <branch>
+  reviewPolicy: <graduation-only or general>
+  gateInventoryPath: <sessionDir>/review-gates.txt               # graduation-only
+  deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
   contextLinkPath: <contextLinkPath>
   contextDocuments: <latest routed document paths>
   reviewLedgerPath: <resolved $reviewLedgerPath>
@@ -529,7 +544,30 @@ SendMessage to ow-review-agent:
     - <visionFindingsPath when UI verification ran>
 ```
 
-Wait for the reviewer response, then read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`, recompute Git scope, and validate:
+For `reviewPolicy=graduation-only`, omit `contextLinkPath`, `contextDocuments`, `reviewLedgerPath`,
+`planPath`, `implementationEvidencePath`, and `evaluationArtifactPaths`. Pass the immutable diff
+identity, changed-file/session/report paths, PR-description authorization evidence when available,
+and review artifact paths only. Require the reviewer to use only `graduation.md`, produce its minimal
+report, and return without generic review passes.
+
+Wait for the reviewer response and recompute Git scope. For `reviewPolicy=graduation-only`, validate
+only with:
+
+```bash
+mergeBase=$(git merge-base origin/main HEAD)
+git diff --no-renames --name-only "$mergeBase"...HEAD > {sessionDir}/review-changed-files.txt
+git diff --no-renames --diff-filter=D --name-only "$mergeBase"...HEAD > {sessionDir}/review-deleted-files.txt
+node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
+  {sessionDir}/review.json \
+  --expected-head "$(git rev-parse HEAD)" \
+  --expected-merge-base "$mergeBase" \
+  --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
+  --changed-files {sessionDir}/review-changed-files.txt \
+  --deleted-files {sessionDir}/review-deleted-files.txt \
+  --expected-gates {sessionDir}/review-gates.txt
+```
+
+For `reviewPolicy=general`, validate with:
 
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
@@ -832,7 +870,7 @@ The codespace may have additional MCP plugins installed. Leverage them when avai
 - **Read is restricted to session files only:** `report.json`, `progress.log`, plan files under `{planDir}`, and evaluation reports. Never Read source code (`.ts`, `.tsx`, `.js`, `.json` under `/workspaces/odsp-web/sp-client/`, `/workspaces/odsp-web/odsp-next/`, etc.).
 - **NEVER** build, test, or run rush commands yourself.
 - **ONLY** use: `ow-status`, `ow-session-list`, `Read` (session files only), `Bash` (for mkdir/echo/cat/tail on session files).
-- Review validation is an explicit read-only Bash exception: `git merge-base`, `git rev-parse`, `git diff --name-only`, `git diff --numstat`, `git diff`, `sha256sum`, `cut`, `node .../validate-review-report.mjs`, and `node .../review-ledger.mjs` are allowed only for the mandatory review gate and its ledger.
+- Review validation is an explicit read-only Bash exception: `git merge-base`, `git rev-parse`, `git diff --name-only`, `git diff --numstat`, `git diff`, `sha256sum`, `cut`, `node .../validate-review-report.mjs`, `node .../validate-graduation-review-report.mjs`, and `node .../review-ledger.mjs` are allowed only for the mandatory review gate and its ledger.
 - Context repository operations are the only exception to the session-only Bash rule. They must follow `docs/context-maintenance.md`, the snapshotted manifest, allowed targets, and compare-and-swap base checks.
 - Always read `reportFile` after each agent completes to get structured output.
 - Parse NDJSON by reading the last line of the report file.

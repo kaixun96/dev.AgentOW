@@ -9,8 +9,6 @@ Review an existing change with the same evidence gate the pipeline uses, without
 
 This command inspects and reports only. Never edit product code, never create or publish a PR, and never mark unreviewed code as approved. PR-comment policy: do not post comments when reviewing your own PR; when reviewing another author's PR, post actionable comments on that PR.
 
-Read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before dispatching. It is normative.
-
 ## Step 1: Resolve the target
 
 | User input | Mode | Reviewed change |
@@ -96,15 +94,29 @@ echo "[$(date +%H:%M:%S)] 🔎 Review target — branch <branch> vs <baseRef>" >
 mergeBase=$(git -C "$reviewRoot" merge-base "$baseRef" HEAD)
 reviewedHead=$(git -C "$reviewRoot" rev-parse HEAD)
 git -C "$reviewRoot" diff --no-renames --name-only "$mergeBase"...HEAD > "$sessionDir/review-changed-files.txt"
+git -C "$reviewRoot" diff --no-renames --diff-filter=D --name-only "$mergeBase"...HEAD > "$sessionDir/review-deleted-files.txt"
 git -C "$reviewRoot" diff --no-renames --numstat "$mergeBase"...HEAD > "$sessionDir/review-numstat.txt"
 diffDigest=$(git -C "$reviewRoot" diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)
 ```
 
 An empty changed-file list is a stop condition, not an APPROVE.
 
-## Step 4: Resolve the review ledger
+Before reading any review contract, inspect the immutable diff and classify it. If every
+substantive change retires a Flight, KS, Experiment, Feature, or Rollout gate, set
+`reviewPolicy=graduation-only` and read only
+`${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/graduation.md`. Do not read
+`docs/review-contract.md`, profiles, review-miss documents, or other review references. Otherwise,
+including every mixed graduation/feature change, set `reviewPolicy=general` and read
+`${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`.
 
-A finding already accepted on this branch must never be re-raised:
+For `graduation-only`, record every gate identifier established during this independent
+classification, one per line, in `$sessionDir/review-gates.txt` before dispatch. The reviewer must
+not create or modify this inventory.
+
+## Step 4: Resolve the review ledger for general review
+
+Skip this step when `reviewPolicy=graduation-only`. For general review, a finding already accepted
+on this branch must never be re-raised:
 
 ```bash
 ledgerSlug=$(printf '%s' "<branch>" | tr '/' '-')
@@ -128,6 +140,7 @@ Dispatch `@agentow-copilot:reviewer` with:
 
 ```yaml
 mode: standalone
+reviewPolicy: <graduation-only or general>
 branch: <PR source branch or current branch>
 reviewRoot: <reviewRoot>
 baseRef: <baseRef>
@@ -137,17 +150,38 @@ reportWriterCommand: node ${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs report <sess
 progressLog: <sessionDir>/progress.log
 artifactPath: <sessionDir>/review.md
 artifactJsonPath: <sessionDir>/review.json
+gateInventoryPath: <sessionDir>/review-gates.txt             # graduation-only
+deletedFilesPath: <sessionDir>/review-deleted-files.txt       # graduation-only
 reviewLedgerPath: <resolved reviewLedgerPath>
 prDescriptionPath: <sessionDir>/pr-description.md   # PR mode only
 contextDocuments:
   - <every routed feature/domain context document, when a context library is linked>
 ```
 
-State explicitly that this is a standalone, adversarial review with no plan, implementation, or evaluation artifacts. Require the reviewer to apply the contract's adversarial challenge protocol: form falsifiable failure hypotheses for every high-risk file or behavior unit, test the strongest counterexamples and negative/fallback paths, and complete a final dissent pass before `APPROVE`. The reviewer must ground `preReview.evidence` in the PR description, commit messages, linked work item, and the diff itself, and must never synthesize pipeline artifact paths. Strictness never permits unsupported findings or inflated severity. `rolloutProtection.reviewContext` is `existing-pr` in PR mode and `pre-pr` in branch mode.
+For graduation-only, instruct the reviewer to use only the graduation reference's review procedure
+and minimal report contract, then return without generic review passes. For general review, state
+explicitly that this is a standalone, adversarial review with no plan, implementation, or evaluation
+artifacts. Require the reviewer to apply the general contract's challenge protocol and evidence
+requirements. Strictness never permits unsupported findings or inflated severity.
 
 Do not dispatch planner or evaluator, and do not start the `agentow` pipeline from this command.
 
 ## Step 6: Validate before showing anything
+
+When `reviewPolicy=graduation-only`:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
+  "$sessionDir/review.json" \
+  --expected-head "$reviewedHead" \
+  --expected-merge-base "$mergeBase" \
+  --expected-diff-digest "$diffDigest" \
+  --changed-files "$sessionDir/review-changed-files.txt" \
+  --deleted-files "$sessionDir/review-deleted-files.txt" \
+  --expected-gates "$sessionDir/review-gates.txt"
+```
+
+Otherwise:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
