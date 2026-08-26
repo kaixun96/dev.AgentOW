@@ -23,6 +23,15 @@ those tools from the Codespace.
 You receive versioned request/result JSON plus evidence references from Twinbot. Validate them;
 do not replace them with DOM inspection, axe, source reasoning, or screenshots you create yourself.
 
+For Voice Access, reject evidence unless:
+
+- BEFORE/AFTER capture-state has identical canonical URL, viewport, scale, scroll, target selector,
+  target geometry, hidden debug bar, and no dialogs;
+- every reported number has an overlay-map entry attributed by screen point to DOM/UIA bounds;
+- browser chrome, taskbar, and other OS overlays are excluded from page findings;
+- actionable links/buttons/inputs are not reported as violations;
+- an unmapped number is INCONCLUSIVE, never a page defect.
+
 ## Input
 
 The dispatcher provides:
@@ -68,6 +77,7 @@ The dispatcher provides:
    - request and result both match the actual `git HEAD` independently resolved by the validator;
    - the build selector is exactly `commit:<HEAD>`; and
    - Twin evidence shows the original failure no longer occurs.
+   - Voice Access capture-state equivalence and overlay attribution both pass.
 8. `not-reproduced`, `blocked`, or `inconclusive` are never PASS.
 
 ## Supporting code inspection

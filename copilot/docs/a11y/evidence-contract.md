@@ -118,6 +118,8 @@ Use the narrowest applicable type:
 - `narrator-etl`
 - `voice-access-result`
 - `voice-access-audio`
+- `capture-state`
+- `overlay-map`
 - `contrast-measurement`
 - `zoom-reflow`
 
@@ -127,11 +129,26 @@ The validator rejects unknown evidence types and enforces:
 - NVDA includes `nvda-transcript`;
 - Narrator includes `narrator-etl`;
 - Voice Access includes both `voice-access-result` and `voice-access-audio`;
+- Voice Access also includes `capture-state` and `overlay-map`;
 - Keyboard includes `keyboard-focus`;
 - Windows UI Automation includes `ui-automation`;
 - every test step links the required evidence for its declared assistive technology.
 
 Each artifact has a stable URI and SHA-256. Paths may remain on a private Twin evidence store; the
+
+### Voice Access capture-state
+
+Voice Access results include structured `captureState` with canonical URL, viewport,
+deviceScaleFactor, scrollX/Y, target selector/rect, `debugBar: "hidden"`, empty dialogs, and whether
+browser chrome/taskbar are included. Verify compares BEFORE/AFTER exactly, allowing at most 2px
+target-rect drift. A mismatch is invalid evidence.
+
+### Voice Access overlay-map
+
+Every number used by a finding includes screen point, surface (`page`, `browser-chrome`,
+`os-taskbar`, `other-os`), DOM/UIA selector/role/name/bounds, and actionable boolean. Only mapped
+non-actionable `page` overlays can establish reproduction. Links and OS/taskbar numbers are valid
+targets or out of product scope. Unmapped overlays are inconclusive. Paths may remain on a private Twin evidence store; the
 PR receives only reviewer-safe attachments. Never attach credentials, cookies, browser profiles,
 raw tokens, private user data, or unrelated screen content.
 

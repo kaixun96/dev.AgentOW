@@ -77,6 +77,10 @@ The request must name required evidence types. Examples:
 - Keyboard/focus defect: screenshot + focus sequence + OS-input log.
 - Contrast/reflow defect: screenshot + measurement or viewport evidence.
 
+Voice Access also requires `capture-state` and `overlay-map`: hide the debug bar, clear dialogs,
+match viewport/scroll/target geometry, and attribute each number to page DOM/UIA, browser chrome, or
+OS surfaces. Never infer ownership from visual proximity; unmapped numbers are inconclusive.
+
 ## Step 2: Twin reproduction gate
 
 Write `a11y/reproduce/evaluator-request.json`.

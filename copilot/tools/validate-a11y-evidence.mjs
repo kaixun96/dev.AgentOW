@@ -21,6 +21,8 @@ const EVIDENCE_TYPES = new Set([
   "narrator-etl",
   "voice-access-result",
   "voice-access-audio",
+  "capture-state",
+  "overlay-map",
   "contrast-measurement",
   "zoom-reflow",
 ]);
@@ -28,7 +30,10 @@ const EVIDENCE_TYPES = new Set([
 const REQUIRED_AT_EVIDENCE = new Map([
   ["nvda", ["nvda-transcript"]],
   ["narrator", ["narrator-etl"]],
-  ["voice access", ["voice-access-result", "voice-access-audio"]],
+  [
+    "voice access",
+    ["voice-access-result", "voice-access-audio", "capture-state", "overlay-map"],
+  ],
   ["keyboard", ["keyboard-focus"]],
   ["windows ui automation", ["ui-automation"]],
 ]);
@@ -62,6 +67,131 @@ function sha(value, label) {
     fail(`${label} must be a lowercase SHA-256 digest`);
   }
   return value;
+}
+
+function finiteNumber(value, label) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      fail(`${label} must be a finite number`);
+    }
+    return value;
+  }
+
+function validateCaptureState(state, request, label) {
+    object(state, label);
+    if (state.canonicalUrl !== request.target.url) {
+      fail(`${label}.canonicalUrl does not match request target.url`);
+    }
+    const viewport = object(state.viewport, `${label}.viewport`);
+    if (
+      viewport.width !== request.target.viewport.width ||
+      viewport.height !== request.target.viewport.height
+    ) {
+      fail(`${label}.viewport does not match request viewport`);
+    }
+    finiteNumber(state.deviceScaleFactor, `${label}.deviceScaleFactor`);
+    finiteNumber(state.scrollX, `${label}.scrollX`);
+    finiteNumber(state.scrollY, `${label}.scrollY`);
+    string(state.targetSelector, `${label}.targetSelector`);
+    const rect = object(state.targetRect, `${label}.targetRect`);
+    for (const key of ["x", "y", "width", "height"]) {
+      finiteNumber(rect[key], `${label}.targetRect.${key}`);
+    }
+    if (state.debugBar !== "hidden") fail(`${label}.debugBar must be hidden`);
+    if (array(state.dialogs, `${label}.dialogs`).length !== 0) {
+      fail(`${label}.dialogs must be empty`);
+    }
+    if (typeof state.browserChromeIncluded !== "boolean") {
+      fail(`${label}.browserChromeIncluded must be boolean`);
+    }
+    if (typeof state.taskbarIncluded !== "boolean") {
+      fail(`${label}.taskbarIncluded must be boolean`);
+    }
+    return state;
+  }
+
+function validateOverlayMap(entries, reportedLabels, label) {
+    const expected = array(reportedLabels, "result.reportedOverlayLabels");
+    const expectedSet = new Set();
+    for (const value of expected) {
+      if (!Number.isInteger(value) || value <= 0 || expectedSet.has(value)) {
+        fail("result.reportedOverlayLabels must contain unique positive integers");
+      }
+      expectedSet.add(value);
+    }
+    const seen = new Set();
+    const mapped = array(entries, label).map((entry, index) => {
+      object(entry, `${label}[${index}]`);
+      if (!["page", "browser-chrome", "os-taskbar", "other-os"].includes(entry.surface)) {
+        fail(`${label}[${index}].surface is invalid`);
+      }
+      if (!Number.isInteger(entry.label) || entry.label <= 0 || seen.has(entry.label)) {
+        fail(`${label}[${index}].label must be a unique positive integer`);
+      }
+      seen.add(entry.label);
+      const point = object(entry.screenPoint, `${label}[${index}].screenPoint`);
+      finiteNumber(point.x, `${label}[${index}].screenPoint.x`);
+      finiteNumber(point.y, `${label}[${index}].screenPoint.y`);
+      if (typeof entry.actionable !== "boolean") {
+        fail(`${label}[${index}].actionable must be boolean`);
+      }
+      if (entry.surface === "page") {
+        string(entry.selector, `${label}[${index}].selector`);
+        string(entry.role, `${label}[${index}].role`);
+        string(entry.name, `${label}[${index}].name`);
+        const rect = object(entry.domRect, `${label}[${index}].domRect`);
+        for (const key of ["x", "y", "width", "height"]) {
+          finiteNumber(rect[key], `${label}[${index}].domRect.${key}`);
+        }
+        if (
+          rect.width <= 0 ||
+          rect.height <= 0 ||
+          point.x < rect.x ||
+          point.x > rect.x + rect.width ||
+          point.y < rect.y ||
+          point.y > rect.y + rect.height
+        ) {
+          fail(`${label}[${index}] screenPoint is outside domRect`);
+        }
+        const actionableRoles = new Set([
+          "link", "button", "textbox", "searchbox", "checkbox", "radio", "combobox", "menuitem",
+          "tab", "slider", "spinbutton", "switch", "option", "treeitem",
+        ]);
+        if (actionableRoles.has(entry.role.trim().toLowerCase()) && !entry.actionable) {
+          fail(`${label}[${index}] actionable role contradicts actionable=false`);
+        }
+        }
+        return entry;
+    });
+    if (
+        expectedSet.size !== seen.size ||
+        [...expectedSet].some((value) => !seen.has(value))
+    ) {
+        fail("overlay-map labels do not match complete reported overlay labels");
+    }
+    return mapped;
+  }
+
+function compareCaptureStates(before, after) {
+    for (const key of [
+      "canonicalUrl",
+      "deviceScaleFactor",
+      "scrollX",
+      "scrollY",
+      "targetSelector",
+      "debugBar",
+      "browserChromeIncluded",
+      "taskbarIncluded",
+    ]) {
+      if (before[key] !== after[key]) fail(`capture-state mismatch: ${key}`);
+    }
+    if (JSON.stringify(before.viewport) !== JSON.stringify(after.viewport)) {
+      fail("capture-state mismatch: viewport");
+    }
+    for (const key of ["x", "y", "width", "height"]) {
+      if (Math.abs(before.targetRect[key] - after.targetRect[key]) > 2) {
+        fail(`capture-state mismatch: targetRect.${key}`);
+      }
+    }
 }
 
 function load(path, label) {
@@ -251,6 +381,27 @@ export function validateA11yEvidence(
     fail("result testedBuild does not match request target.build");
   }
 
+  let captureState;
+  let overlayMap;
+  if (atName === "voice access") {
+    captureState = validateCaptureState(result.captureState, request, "result.captureState");
+    overlayMap = validateOverlayMap(
+      result.overlayMap,
+      result.reportedOverlayLabels,
+      "result.overlayMap",
+    );
+    if (outcome === "reproduced") {
+      if (!overlayMap.some((entry) => entry.surface === "page" && !entry.actionable)) {
+        fail("Voice Access reproduced outcome requires a mapped non-actionable page overlay");
+      }
+    }
+    if (phase === "verify" && outcome === "pass") {
+      if (overlayMap.some((entry) => entry.surface === "page" && !entry.actionable)) {
+        fail("Voice Access verify pass contains a non-actionable page overlay");
+      }
+    }
+  }
+
   const stepResults = array(result.stepResults, "result.stepResults");
   if (stepResults.length !== steps.length) {
     fail("result.stepResults must have exactly one entry per request step");
@@ -329,6 +480,16 @@ export function validateA11yEvidence(
     }
     if (baselineSummary.scenarioHash !== scenarioHash) {
       fail("verify scenario does not match reproduced baseline scenario");
+    }
+    if (atName === "voice access") {
+      compareCaptureStates(
+        validateCaptureState(
+          baseline.result.captureState,
+          baseline.request,
+          "baseline.result.captureState",
+        ),
+        captureState,
+      );
     }
     const actualBaselineSha = digest(baseline.resultBytes);
     const baselineDigest = sha(
