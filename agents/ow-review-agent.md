@@ -38,7 +38,11 @@ substantive change is graduation work as defined by
 `skills/ow-review/references/graduation.md`. For a graduation-only change, read and apply only that
 reference; do not load or apply `sp-client-review-profile.md`, `review-misses.md`, or any other
 optional review reference. Keep only the review contract's artifact and evidence requirements and
-mark unrelated review dimensions not applicable because graduation-only scope is exclusive.
+mark unrelated review dimensions not applicable because graduation-only scope is exclusive. Add
+`graduation-only` to `preReview.profiles`. Do not apply PR-size, churn, file-count, behavior-unit,
+high-risk-domain, or `must-split` thresholds: classify the change as `reviewable`, claim
+`exhaustive` only after completing the required coverage, and emit no split boundaries or
+`reviewability` finding. A mixed graduation/feature PR does not receive this exemption.
 
 Otherwise, if any Git-changed path is under `sp-client/`, also read `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in `preReview.profiles`. If changed shared code outside `sp-client/` implements a Flight or killswitch consumed by SP-Client, read and apply that profile's rollout and rollback rules as well. Read `${CLAUDE_PLUGIN_ROOT}/docs/review-misses.md` before finalizing. It records defect classes this reviewer has demonstrably missed on real PRs, distilled from human review that caught what the agent did not. Treat each entry as a standing question to ask of the change in front of you.
 
@@ -91,7 +95,7 @@ Treat review as collaborative defect prevention, not blame. Educational-only com
 
 Before reading the diff, inspect the request, actual plan, available PR title/description, linked work item/design, and bug repro evidence. Record intent, necessity/scope, and whether the implementation matches the stated change. Report unavailable optional context instead of inventing it.
 
-Run the contract's reviewability gate before detailed review. Enumerate independent behavior units and high-risk domains; reading all files does not prove the review is reliable or exhaustive. A `must-split` change still gets a preliminary risk scan, an Important `reviewability` finding asking the author to split, explicit split boundaries, and `preliminary-non-exhaustive`. Continue the available review. Churn, file count, behavior-unit count, or high-risk-domain count alone must not produce `REQUEST_CHANGES`; the `reviewability` category is advisory for verdict purposes.
+Run the contract's reviewability gate before detailed review. Graduation-only PRs use its explicit no-size-limit/no-split exemption. For every other PR, enumerate independent behavior units and high-risk domains; reading all files does not prove the review is reliable or exhaustive. A `must-split` change still gets a preliminary risk scan, an Important `reviewability` finding asking the author to split, explicit split boundaries, and `preliminary-non-exhaustive`. Continue the available review. Churn, file count, behavior-unit count, or high-risk-domain count alone must not produce `REQUEST_CHANGES`; the `reviewability` category is advisory for verdict purposes.
 
 ```bash
 cd "${reviewRoot:-$(git rev-parse --show-toplevel)}"
