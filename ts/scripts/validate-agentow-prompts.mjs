@@ -53,14 +53,30 @@ const graduationReviewSnippets = [
   "`tools/validate-graduation-review-report.mjs`",
   '"reviewMode": "graduation-only"',
   '"authorizationEvidence"',
+  '"ruleResults"',
+  '"ruleId": "<exact id from review-rule-inventory.json>"',
   '"directionEvidence"',
   '"callSitesChecked"',
   '"cleanupEvidence"',
+  '"ruleChecks"',
+  '"rule": "permanent-branch|fixed-carriers|fixed-inputs|obsolete-control-flow|discarded-evaluations|transitive-gates|stale-artifacts|runtime-entry-points|coverage-and-tests|scope-purity|minor-cleanup"',
+  '"status": "clear|finding|suggestion|not-applicable"',
+  "exactly one `ruleChecks` entry for each of these classes",
+  "An omitted rule",
+  "class is an incomplete review and cannot produce `APPROVE`",
   '"reviewedVersion": "head|merge-base"',
   '"classSweepEvidence"',
   '"gateName": "<retired gate identifier>"',
+  '"residualCandidates"',
+  '"kind": "fixed-return-helper|retained-export|fixed-parameter|fixed-conditional"',
+  '"independentSemanticEvidence"',
+  '"externalCallerEvidence"',
   "review-gates.txt",
   "review-deleted-files.txt",
+  "review-residual-candidates.jsonl",
+  "graduation-review-rule-registry.json",
+  "every non-example prose, list, and",
+  "ruleResults` must exactly cover every inventory ID",
   "Reported gate names must exactly",
   "command:rg <query> <repo-relative-scope> => no matches",
   "deleted file uses `reviewedVersion: \"merge-base\"`",
@@ -92,6 +108,11 @@ const graduationReviewSnippets = [
   "remove the parameter from the",
   "not replace the argument with `true`/`false`",
   "external callers cannot be ruled out, preserve the parameter",
+  "isDashboardPersonalizationEnabled: true",
+  "emit a non-blocking **Minor** suggestion immediately",
+  "does not require the",
+  "reviewer to perform a repository-wide caller scan",
+  "Upgrade it to **Important** only when available source evidence already proves",
   "values that are not gate booleans but exist only to share the same expression across",
   "local temporary with exactly one",
   "This includes JSX elements",
@@ -109,6 +130,8 @@ const graduationReviewSnippets = [
   "property-read pseudo-side effects keep obsolete DOM work and the ref chain alive",
   "remove containerDivRef from locals, props, parameters, and callers",
   "Fixed-return wrappers require symbol closure",
+  "export function isSchedulingEnabledForCoAuth(): boolean { return true; }",
+  "possibility of unknown callers is not evidence",
   "changed by graduation to return a fixed",
   "Find every symbol reference across the repository",
   "Substitute the fixed return literal at every call site and simplify mechanically",
@@ -461,14 +484,43 @@ const checks = [
       "use only the graduation reference's review procedure",
       "review-gates.txt",
       "review-deleted-files.txt",
+      "review-residual-candidates.jsonl",
+      "helper/wrapper name, GUID/ID",
+      "export/import, alias, fixed parameter, and",
+      "downstream call chain",
+      "fixed-return-helper",
       "--expected-head",
       "--expected-merge-base",
       "--expected-diff-digest",
       "--changed-files",
       "--deleted-files",
       "--expected-gates",
+      "--residual-candidates",
+      "--rule-inventory",
+      "--rule-registry",
+      "every graduation rule ID",
+      "build-review-rule-inventory.mjs",
+      "graduation-review-rule-registry.json",
+      "review-rule-registry.json",
+      "--registry",
+      "review-rule-inventory.json",
+      "ruleInventoryPath",
+      "--rule-inventory",
+      "--rule-registry",
     ],
   ),
+  {
+    file: "tools/build-review-rule-inventory.mjs",
+    snippets: [
+      "extractRules",
+      "review-rule:",
+      "textDigest",
+      "duplicate review rule id",
+      "cannot be combined with --reference",
+      "reviewedHead, mergeBase, and diffDigest",
+      "reference must be a readable repo-relative path",
+    ],
+  },
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
@@ -742,6 +794,21 @@ const checks = [
       "splitBoundaries",
       "--diff-numstat",
       "validate-review-report.mjs",
+      '"ruleResults"',
+      "build-review-rule-inventory.mjs",
+      "review-rule-registry.json",
+      "canonical registry covers every general-review metric",
+      "wording cannot silently suppress",
+      "Every current or carried finding must also be linked",
+      "missing,",
+      "extra, or duplicate IDs fail validation",
+      "future registered references automatically changes",
+      "required inventory without adding a scenario-specific validator check",
+      '"ruleChecks"',
+      '"rule": "intent-and-scope|reference-routing|profile-routing|changed-file-coverage|consumer-and-test-coverage|adversarial-pass|size-audit|prior-art|external-contracts|ledger-reconciliation|finding-class-sweep|verdict-reconciliation"',
+      "exactly one",
+      "or a placeholder such as `N/A`, is an incomplete review",
+      "cannot produce `APPROVE`",
       "Test observable contracts and regression risk, not every changed file or function",
       "A trivial Flight/KS constant or pass-through wrapper does not need its own unit test",
       "nearest stable consumer rather than testing a trivial gate wrapper"
@@ -806,6 +873,15 @@ const checks = [
       "explicit no-size-limit/no-split exemption",
       "reference alone controls policy, evidence",
       "caller-owned gate inventory",
+      "Account for every immutable",
+      "residual candidate in the report",
+      "Complete every per-gate `ruleChecks` class with concrete evidence",
+      "an omitted class forbids `APPROVE`",
+      "review-residual-candidates.jsonl",
+      "gate/Flight name, helper/wrapper name, GUID/ID",
+      "export/import, alias, fixed parameter, and",
+      "downstream call chain",
+      "--residual-candidates",
       "expected merge base",
       "accessibility-relevant styles: color/contrast",
       "style/token-only changes proven limited to decorative spacing, radii, or shadows",
@@ -826,6 +902,11 @@ const checks = [
       "ux-architecture-and-bundle-boundaries.md",
       "size-regression.md",
       "PR's official size-audit report",
+      "complete every `preReview.ruleChecks` class",
+      "An omitted, duplicated, placeholder, or unsupported rule check",
+      "Consume `ruleInventoryPath` as an immutable caller-owned input",
+      "exactly one `ruleResults` entry for every inventoried",
+      "Do not collapse multiple source rules into one broad dimension conclusion",
       "physical-direction CSS",
       "screen-reader or other assistive text",
       "Reference routing",
@@ -957,6 +1038,18 @@ const checks = [
       "--changed-files",
       "--deleted-files",
       "--expected-gates",
+      "--residual-candidates",
+      "review-residual-candidates.jsonl",
+      "build-review-rule-inventory.mjs",
+      "review-rule-registry.json",
+      "--registry",
+      "review-rule-inventory.json",
+      "ruleInventoryPath",
+      "--rule-inventory",
+      "--rule-registry",
+      "helper/wrapper name, GUID/ID",
+      "export/import, alias, fixed parameter, and",
+      "downstream call chain",
       "Missing artifacts, stale diff identity, incomplete coverage",
       "Critical or Important issues",
       "AUTO mode, and batch execution do not bypass the review gate.",
@@ -1337,11 +1430,22 @@ const mirroredChecks = [
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
   ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
+  ["skills/ow-review/references/accessibility.md", "copilot/skills/ow-review/references/accessibility.md"],
+  ["skills/ow-review/references/common-review-issues.md", "copilot/skills/ow-review/references/common-review-issues.md"],
   ["skills/ow-review/references/graduation.md", "copilot/skills/ow-review/references/graduation.md"],
+  ["skills/ow-review/references/localization-and-formatting.md", "copilot/skills/ow-review/references/localization-and-formatting.md"],
   ["skills/ow-review/references/shared-utility-reuse.md", "copilot/skills/ow-review/references/shared-utility-reuse.md"],
+  ["skills/ow-review/references/sharepoint-design-system-and-ux-components.md", "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md"],
+  ["skills/ow-review/references/size-regression.md", "copilot/skills/ow-review/references/size-regression.md"],
   ["skills/ow-review/references/ux-architecture-and-bundle-boundaries.md", "copilot/skills/ow-review/references/ux-architecture-and-bundle-boundaries.md"],
   ["tools/agentow-bootstrap.mjs", "copilot/tools/agentow-bootstrap.mjs"],
-  ["tools/validate-graduation-review-report.mjs", "copilot/tools/validate-graduation-review-report.mjs"]
+  ["tools/validate-graduation-review-report.mjs", "copilot/tools/validate-graduation-review-report.mjs"],
+  ["tools/validate-review-report.mjs", "copilot/tools/validate-review-report.mjs"],
+  ["tools/review-ledger.mjs", "copilot/tools/review-ledger.mjs"]
+];
+
+const platformMirroredChecks = [
+  ["skills/ow-review/references/sharepoint-theme-and-detheme.md", "copilot/skills/ow-review/references/sharepoint-theme-and-detheme.md"],
 ];
 
 let failures = 0;
@@ -1385,6 +1489,21 @@ for (const [sourceFile, mirrorFile] of mirroredChecks) {
   const mirrorUrl = new URL(mirrorFile, repoRootUrl);
   if (!fs.existsSync(mirrorUrl) || fs.readFileSync(mirrorUrl, "utf8") !== source) {
     console.error(`Generated Copilot mirror is stale: ${mirrorFile}`);
+    failures++;
+  }
+}
+
+const normalizePlatformMirror = (content) => content
+  .replaceAll("\r\n", "\n")
+  .replace(/Claude\s+plugin/g, "platform plugin")
+  .replace(/Copilot\s+plugin/g, "platform plugin")
+  .trimEnd();
+
+for (const [sourceFile, mirrorFile] of platformMirroredChecks) {
+  const source = normalizePlatformMirror(fs.readFileSync(new URL(sourceFile, repoRootUrl), "utf8"));
+  const mirrorUrl = new URL(mirrorFile, repoRootUrl);
+  if (!fs.existsSync(mirrorUrl) || normalizePlatformMirror(fs.readFileSync(mirrorUrl, "utf8")) !== source) {
+    console.error(`Platform-aware Copilot mirror is stale: ${mirrorFile}`);
     failures++;
   }
 }

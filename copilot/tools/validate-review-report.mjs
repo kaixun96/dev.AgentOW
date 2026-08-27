@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
   acceptedFingerprints,
@@ -28,8 +29,24 @@ const DIMENSIONS = [
 ];
 const SEVERITIES = new Set(["Critical", "Important", "Minor"]);
 const VERDICTS = new Set(["APPROVE", "COMMENT", "REQUEST_CHANGES"]);
+const REQUIRED_RULE_CHECKS = [
+  "intent-and-scope",
+  "reference-routing",
+  "profile-routing",
+  "changed-file-coverage",
+  "consumer-and-test-coverage",
+  "adversarial-pass",
+  "size-audit",
+  "prior-art",
+  "external-contracts",
+  "ledger-reconciliation",
+  "finding-class-sweep",
+  "verdict-reconciliation",
+];
+const RULE_CHECK_STATUSES = new Set(["clear", "finding", "not-applicable"]);
 const HASH_40 = /^[0-9a-f]{40}$/;
 const HASH_64 = /^[0-9a-f]{64}$/;
+const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const SP_CLIENT_PROFILE_CHECKS = [
   "spClientRolloutTrace",
   "spClientUiPrimitivesTokens",
@@ -1026,11 +1043,111 @@ function validate(report, options) {
   ) {
     errors.push("preReview requires grounded intent, evidence, necessity/scope, and intent-match analysis");
   }
+  const ruleChecks = report.preReview?.ruleChecks;
+  if (!Array.isArray(ruleChecks)) {
+    errors.push("preReview.ruleChecks is required");
+  } else {
+    const checkedRules = [];
+    for (const check of ruleChecks) {
+      if (
+        !isObject(check) ||
+        !REQUIRED_RULE_CHECKS.includes(check.rule) ||
+        !RULE_CHECK_STATUSES.has(check.status) ||
+        !Array.isArray(check.evidence) ||
+        check.evidence.length === 0 ||
+        !check.evidence.every(evidenceReference) ||
+        !specific(check.conclusion)
+      ) {
+        errors.push("every preReview rule check requires a known rule, status, evidence, and specific conclusion");
+        continue;
+      }
+      checkedRules.push(check.rule);
+    }
+    if (!sameStrings([...checkedRules].sort(), [...REQUIRED_RULE_CHECKS].sort())) {
+      errors.push("preReview.ruleChecks must exactly cover every required general-review rule class");
+    }
+  }
 
   const expectedHead = options.get("--expected-head");
-  if (expectedHead && report.reviewedHead !== expectedHead) errors.push("reviewedHead does not match current HEAD");
+  if (!expectedHead || report.reviewedHead !== expectedHead) errors.push("reviewedHead does not match caller-owned HEAD");
+  const expectedMergeBase = options.get("--expected-merge-base");
+  if (!expectedMergeBase || report.mergeBase !== expectedMergeBase) errors.push("mergeBase does not match the caller-owned merge base");
   const expectedDigest = options.get("--expected-diff-digest");
-  if (expectedDigest && report.diffDigest !== expectedDigest) errors.push("diffDigest does not match the current diff");
+  if (!expectedDigest || report.diffDigest !== expectedDigest) errors.push("diffDigest does not match the caller-owned diff");
+  const ruleInventoryPath = options.get("--rule-inventory");
+  const ruleRegistryPath = options.get("--rule-registry");
+  let expectedRuleIds = [];
+  if (!ruleInventoryPath || !fs.existsSync(ruleInventoryPath) || !ruleRegistryPath || !fs.existsSync(ruleRegistryPath)) {
+    errors.push("--rule-inventory and --rule-registry must reference caller-owned review inputs");
+  } else {
+    try {
+      const inventory = JSON.parse(fs.readFileSync(ruleInventoryPath, "utf8"));
+      const registryContent = fs.readFileSync(ruleRegistryPath, "utf8");
+      const registry = JSON.parse(registryContent);
+      const rules = Array.isArray(inventory.rules) ? inventory.rules : [];
+      const references = Array.isArray(inventory.references) ? inventory.references : [];
+      expectedRuleIds = rules.map((rule) => rule?.id);
+      const registryReferences = Array.isArray(registry.references) ? registry.references : [];
+      const referencePaths = references.map((reference) => reference?.path);
+      const referenceIds = references.map((reference) => reference?.id);
+      const registryRoot = path.dirname(path.resolve(ruleRegistryPath));
+      const sourcesMatch = references.every((reference) => {
+        if (!isObject(reference) || !nonEmpty(reference.path) || !HASH_64.test(reference.sourceDigest ?? "")) return false;
+        const sourcePath = path.resolve(registryRoot, reference.path);
+        const relativePath = path.relative(registryRoot, sourcePath);
+        return !relativePath.startsWith("..") && fs.existsSync(sourcePath) && digest(fs.readFileSync(sourcePath, "utf8")) === reference.sourceDigest;
+      });
+      if (
+        inventory.schemaVersion !== 1 ||
+        registry.schemaVersion !== 1 ||
+        inventory.registryDigest !== digest(registryContent) ||
+        inventory.reviewedHead !== report.reviewedHead ||
+        inventory.mergeBase !== report.mergeBase ||
+        inventory.diffDigest !== report.diffDigest ||
+        references.length === 0 ||
+        !sameStrings([...referencePaths].sort(), [...registryReferences].sort()) ||
+        new Set(referencePaths).size !== referencePaths.length ||
+        new Set(referenceIds).size !== referenceIds.length ||
+        !sourcesMatch ||
+        rules.length === 0 ||
+        !expectedRuleIds.every(nonEmpty) ||
+        new Set(expectedRuleIds).size !== expectedRuleIds.length ||
+        rules.some((rule) => !referenceIds.includes(rule?.referenceId) || !referencePaths.includes(rule?.path))
+      ) {
+        errors.push("rule inventory must exactly match the canonical registry, source files, and reviewed diff identity");
+      }
+    } catch {
+      errors.push("--rule-inventory and --rule-registry must contain valid readable inputs");
+    }
+  }
+
+  const reportedRuleIds = [];
+  if (!Array.isArray(report.ruleResults)) {
+    errors.push("ruleResults must account for the caller-owned review rule inventory");
+  } else {
+    for (const result of report.ruleResults) {
+      if (
+        !isObject(result) ||
+        !nonEmpty(result.ruleId) ||
+        !["satisfied", "not-applicable", "finding", "carried"].includes(result.disposition) ||
+        !Array.isArray(result.evidence) ||
+        result.evidence.length === 0 ||
+        !result.evidence.every(evidenceReference) ||
+        !specific(result.conclusion) ||
+        (result.disposition === "finding" &&
+          (!Array.isArray(result.findingIds) || result.findingIds.length === 0 || !result.findingIds.every(nonEmpty))) ||
+        (result.disposition === "carried" &&
+          (!Array.isArray(result.carriedFingerprints) || result.carriedFingerprints.length === 0 || !result.carriedFingerprints.every(nonEmpty)))
+      ) {
+        errors.push("every rule result requires an expected rule, disposition, evidence, conclusion, and applicable linkage");
+        continue;
+      }
+      reportedRuleIds.push(result.ruleId);
+    }
+    if (!sameStrings([...reportedRuleIds].sort(), [...expectedRuleIds].sort())) {
+      errors.push("ruleResults must exactly match every caller-owned review rule id");
+    }
+  }
 
   if (!Array.isArray(report.riskMap) || report.riskMap.length === 0) {
     errors.push("riskMap must contain every changed file");
@@ -1361,6 +1478,30 @@ function validate(report, options) {
     }
     actualCounts[finding.severity.toLowerCase()]++;
   }
+  const findingIds = new Set((report.findings ?? []).map((finding) => finding?.id).filter(nonEmpty));
+  const acceptedFingerprintsInReport = new Set((report.previouslyAccepted ?? []).map((entry) => entry?.fingerprint).filter(nonEmpty));
+  const linkedFindingIds = new Set();
+  const linkedCarriedFingerprints = new Set();
+  for (const result of report.ruleResults ?? []) {
+    if (result?.disposition === "finding") {
+      result.findingIds.forEach((id) => linkedFindingIds.add(id));
+      if (result.findingIds.some((id) => !findingIds.has(id))) {
+        errors.push(`rule result ${result.ruleId} references an unknown finding`);
+      }
+    }
+    if (result?.disposition === "carried") {
+      result.carriedFingerprints.forEach((fingerprint) => linkedCarriedFingerprints.add(fingerprint));
+      if (result.carriedFingerprints.some((fingerprint) => !acceptedFingerprintsInReport.has(fingerprint))) {
+        errors.push(`rule result ${result.ruleId} references an unknown carried finding`);
+      }
+    }
+  }
+  if ([...findingIds].some((id) => !linkedFindingIds.has(id))) {
+    errors.push("every finding must be linked from at least one inventoried rule result");
+  }
+  if ([...acceptedFingerprintsInReport].some((fingerprint) => !linkedCarriedFingerprints.has(fingerprint))) {
+    errors.push("every carried finding must be linked from at least one inventoried rule result");
+  }
 
   const counts = report.counts;
   if (
@@ -1396,7 +1537,7 @@ function validate(report, options) {
 
 const { reportPath, options } = parseArgs(process.argv);
 if (!reportPath) {
-  console.error("usage: validate-review-report.mjs <review.json> [--expected-head SHA] [--expected-diff-digest SHA256] [--changed-files PATH] [--diff-numstat PATH]");
+  console.error("usage: validate-review-report.mjs <review.json> --expected-head SHA --expected-merge-base SHA --expected-diff-digest SHA256 --rule-inventory PATH --rule-registry PATH [--changed-files PATH] [--diff-numstat PATH]");
   process.exit(2);
 }
 

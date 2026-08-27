@@ -2,18 +2,38 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 const HASH_40 = /^[0-9a-f]{40}$/;
 const HASH_64 = /^[0-9a-f]{64}$/;
 const VERDICTS = new Set(["APPROVE", "REQUEST_CHANGES", "COMMENT"]);
 const SEVERITIES = new Set(["Critical", "Important", "Minor"]);
 const GATE_TYPES = new Set(["Flight", "KS", "Experiment", "Feature", "Rollout"]);
+const RESIDUAL_KINDS = new Set(["fixed-return-helper", "retained-export", "fixed-parameter", "fixed-conditional"]);
+const REQUIRED_RULE_CHECKS = [
+  "permanent-branch",
+  "fixed-carriers",
+  "fixed-inputs",
+  "obsolete-control-flow",
+  "discarded-evaluations",
+  "transitive-gates",
+  "stale-artifacts",
+  "runtime-entry-points",
+  "coverage-and-tests",
+  "scope-purity",
+  "minor-cleanup",
+];
+const RULE_CHECK_STATUSES = new Set(["clear", "finding", "suggestion", "not-applicable"]);
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const nonEmpty = (value) => typeof value === "string" && value.trim().length > 0;
+const specific = (value) => nonEmpty(value) && value.trim().length >= 24;
+const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const nonEmptyStrings = (value) => Array.isArray(value) && value.length > 0 && value.every(nonEmpty);
 const readLines = (filePath) =>
   fs.readFileSync(filePath, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).sort();
+const readJsonLines = (filePath) =>
+  fs.readFileSync(filePath, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => JSON.parse(line));
 const sameStrings = (left, right) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 const boundedNoMatchSearch = (value) => {
@@ -57,6 +77,73 @@ const evidenceReference = (value) => {
 };
 const evidenceReferences = (value) => nonEmptyStrings(value) && value.every(evidenceReference);
 
+function validateRuleInventory(report, options, errors) {
+  const inventoryPath = options.get("--rule-inventory");
+  const registryPath = options.get("--rule-registry");
+  let expectedRuleIds = [];
+  if (!inventoryPath || !fs.existsSync(inventoryPath) || !registryPath || !fs.existsSync(registryPath)) {
+    errors.push("--rule-inventory and --rule-registry must reference caller-owned graduation inputs");
+  } else {
+    try {
+      const inventory = JSON.parse(fs.readFileSync(inventoryPath, "utf8"));
+      const registryContent = fs.readFileSync(registryPath, "utf8");
+      const registry = JSON.parse(registryContent);
+      const rules = Array.isArray(inventory.rules) ? inventory.rules : [];
+      const references = Array.isArray(inventory.references) ? inventory.references : [];
+      expectedRuleIds = rules.map((rule) => rule?.id);
+      const registryReferences = Array.isArray(registry.references) ? registry.references : [];
+      const referencePaths = references.map((reference) => reference?.path);
+      const referenceIds = references.map((reference) => reference?.id);
+      const registryRoot = path.dirname(path.resolve(registryPath));
+      const sourcesMatch = references.every((reference) => {
+        if (!isObject(reference) || !nonEmpty(reference.path) || !HASH_64.test(reference.sourceDigest ?? "")) return false;
+        const sourcePath = path.resolve(registryRoot, reference.path);
+        const relativePath = path.relative(registryRoot, sourcePath);
+        return !relativePath.startsWith("..") && fs.existsSync(sourcePath) && digest(fs.readFileSync(sourcePath, "utf8")) === reference.sourceDigest;
+      });
+      if (
+        inventory.schemaVersion !== 1 || registry.schemaVersion !== 1 ||
+        inventory.registryDigest !== digest(registryContent) ||
+        inventory.reviewedHead !== report.reviewedHead || inventory.mergeBase !== report.mergeBase ||
+        inventory.diffDigest !== report.diffDigest || references.length === 0 || rules.length === 0 ||
+        !sameStrings([...referencePaths].sort(), [...registryReferences].sort()) ||
+        new Set(referencePaths).size !== referencePaths.length || new Set(referenceIds).size !== referenceIds.length ||
+        !sourcesMatch || !expectedRuleIds.every(nonEmpty) || new Set(expectedRuleIds).size !== expectedRuleIds.length ||
+        rules.some((rule) => !referenceIds.includes(rule?.referenceId) || !referencePaths.includes(rule?.path))
+      ) {
+        errors.push("graduation rule inventory must exactly match its registry, source, and reviewed diff identity");
+      }
+    } catch {
+      errors.push("graduation rule inventory and registry must contain valid readable inputs");
+    }
+  }
+
+  const reportedRuleIds = [];
+  const linkedFindingIds = new Set();
+  if (!Array.isArray(report.ruleResults)) {
+    errors.push("ruleResults must account for every graduation reference rule");
+  } else {
+    for (const result of report.ruleResults) {
+      if (
+        !isObject(result) || !nonEmpty(result.ruleId) ||
+        !["satisfied", "not-applicable", "finding"].includes(result.disposition) ||
+        !evidenceReferences(result.evidence) || !specific(result.conclusion) ||
+        (result.disposition === "finding" && !nonEmptyStrings(result.findingIds)) ||
+        (result.disposition !== "finding" && result.findingIds !== undefined)
+      ) {
+        errors.push("every graduation rule result requires an expected rule, disposition, evidence, conclusion, and applicable linkage");
+        continue;
+      }
+      reportedRuleIds.push(result.ruleId);
+      if (result.disposition === "finding") result.findingIds.forEach((id) => linkedFindingIds.add(id));
+    }
+    if (!sameStrings([...reportedRuleIds].sort(), [...expectedRuleIds].sort())) {
+      errors.push("ruleResults must exactly match every caller-owned graduation rule id");
+    }
+  }
+  return linkedFindingIds;
+}
+
 function parseOptions(args) {
   const options = new Map();
   for (let index = 0; index < args.length; index += 2) {
@@ -86,6 +173,7 @@ export function validateGraduationReview(report, options = new Map()) {
   if (!expectedMergeBase || report.mergeBase !== expectedMergeBase) errors.push("mergeBase does not match the expected merge base");
   const expectedDigest = options.get("--expected-diff-digest");
   if (!expectedDigest || report.diffDigest !== expectedDigest) errors.push("diffDigest does not match current diff");
+  const linkedRuleFindingIds = validateRuleInventory(report, options, errors);
 
   const expectedGatesPath = options.get("--expected-gates");
   let expectedGates = [];
@@ -117,6 +205,29 @@ export function validateGraduationReview(report, options = new Map()) {
       if (gate.disposition === "complete" && !gate.cleanupEvidence.some(boundedNoMatchSearch)) {
         errors.push(`complete gate ${gate.name} requires a bounded no-match cleanup search`);
       }
+      if (!Array.isArray(gate.ruleChecks)) {
+        errors.push(`gate ${gate.name} requires explicit ruleChecks`);
+      } else {
+        const checkedRules = [];
+        for (const check of gate.ruleChecks) {
+          if (
+            !isObject(check) ||
+            !REQUIRED_RULE_CHECKS.includes(check.rule) ||
+            !RULE_CHECK_STATUSES.has(check.status) ||
+            !evidenceReferences(check.evidence) ||
+            (["finding", "suggestion"].includes(check.status) &&
+              (!nonEmptyStrings(check.findingIds) || new Set(check.findingIds).size !== check.findingIds.length)) ||
+            (["clear", "not-applicable"].includes(check.status) && check.findingIds !== undefined)
+          ) {
+            errors.push(`gate ${gate.name} has an invalid rule check`);
+            continue;
+          }
+          checkedRules.push(check.rule);
+        }
+        if (!sameStrings([...checkedRules].sort(), [...REQUIRED_RULE_CHECKS].sort())) {
+          errors.push(`gate ${gate.name} ruleChecks must exactly cover every required rule class`);
+        }
+      }
       if (gateNames.has(gate.name)) errors.push(`duplicate gate: ${gate.name}`);
       gateNames.add(gate.name);
     }
@@ -146,6 +257,36 @@ export function validateGraduationReview(report, options = new Map()) {
     }
   }
   const deletedFileSet = new Set(deletedFiles);
+
+  const residualCandidatesPath = options.get("--residual-candidates");
+  let expectedResidualCandidates = [];
+  if (!residualCandidatesPath || !fs.existsSync(residualCandidatesPath)) {
+    errors.push("--residual-candidates must reference the independent residual inventory");
+  } else {
+    try {
+      expectedResidualCandidates = readJsonLines(residualCandidatesPath);
+      const expectedResidualIds = new Set();
+      for (const candidate of expectedResidualCandidates) {
+        if (
+          !isObject(candidate) ||
+          !nonEmpty(candidate.id) ||
+          !expectedGates.includes(candidate.gateName) ||
+          !RESIDUAL_KINDS.has(candidate.kind) ||
+          !nonEmpty(candidate.symbol) ||
+          !expectedFiles.includes(candidate.path) ||
+          !Number.isInteger(candidate.line) ||
+          candidate.line < 1
+        ) {
+          errors.push("independent residual inventory contains an invalid candidate");
+          continue;
+        }
+        if (expectedResidualIds.has(candidate.id)) errors.push(`duplicate residual candidate: ${candidate.id}`);
+        expectedResidualIds.add(candidate.id);
+      }
+    } catch {
+      errors.push("--residual-candidates must contain valid NDJSON");
+    }
+  }
 
   if (!Array.isArray(report.changedFiles) || report.changedFiles.length === 0) {
     errors.push("changedFiles is required");
@@ -200,6 +341,63 @@ export function validateGraduationReview(report, options = new Map()) {
     if (findingIds.has(finding.id)) errors.push(`duplicate finding id: ${finding.id}`);
     findingIds.add(finding.id);
   }
+  if ([...findingIds].some((id) => !linkedRuleFindingIds.has(id)) || [...linkedRuleFindingIds].some((id) => !findingIds.has(id))) {
+    errors.push("graduation ruleResults must account for every finding exactly by id");
+  }
+
+  const ruleCheckFindingIds = [];
+  for (const gate of Array.isArray(report.gates) ? report.gates : []) {
+    for (const check of Array.isArray(gate?.ruleChecks) ? gate.ruleChecks : []) {
+      if (!["finding", "suggestion"].includes(check?.status) || !Array.isArray(check.findingIds)) continue;
+      ruleCheckFindingIds.push(...check.findingIds);
+      const expectedSeverities = check.status === "finding" ? ["Critical", "Important"] : ["Minor"];
+      if (check.findingIds.some((id) => {
+        const finding = findings.find((entry) => entry?.id === id);
+        return !finding || finding.gateName !== gate.name || !expectedSeverities.includes(finding.severity);
+      })) {
+        errors.push(`gate ${gate.name} ${check.rule} rule check must reference matching ${check.status} findings`);
+      }
+    }
+  }
+  if (!sameStrings(ruleCheckFindingIds.filter(nonEmpty).sort(), [...findingIds].sort())) {
+    errors.push("ruleChecks must account for every finding exactly by id");
+  }
+
+  const expectedResidualById = new Map(expectedResidualCandidates.map((candidate) => [candidate?.id, candidate]));
+  if (!Array.isArray(report.residualCandidates)) {
+    errors.push("residualCandidates must account for the independent residual inventory");
+  } else {
+    const reportedResidualIds = new Set();
+    for (const candidate of report.residualCandidates) {
+      const expected = expectedResidualById.get(candidate?.id);
+      if (
+        !isObject(candidate) ||
+        !expected ||
+        candidate.gateName !== expected.gateName ||
+        candidate.kind !== expected.kind ||
+        candidate.symbol !== expected.symbol ||
+        candidate.path !== expected.path ||
+        candidate.line !== expected.line ||
+        !["finding", "independent-contract"].includes(candidate.disposition)
+      ) {
+        errors.push("every residual candidate must exactly match the independent inventory and have a disposition");
+        continue;
+      }
+      if (candidate.disposition === "finding") {
+        const finding = findings.find((entry) => entry?.id === candidate.findingId);
+        if (!finding || finding.gateName !== candidate.gateName || !["Critical", "Important"].includes(finding.severity)) {
+          errors.push(`residual candidate ${candidate.id} must reference a blocking finding for the same gate`);
+        }
+      } else if (!evidenceReferences(candidate.independentSemanticEvidence) || !evidenceReferences(candidate.externalCallerEvidence)) {
+        errors.push(`residual candidate ${candidate.id} requires independent semantic and external caller evidence`);
+      }
+      if (reportedResidualIds.has(candidate.id)) errors.push(`duplicate reported residual candidate: ${candidate.id}`);
+      reportedResidualIds.add(candidate.id);
+    }
+    if (!sameStrings([...reportedResidualIds].sort(), [...expectedResidualById.keys()].filter(nonEmpty).sort())) {
+      errors.push("residualCandidates must exactly match the independent residual inventory");
+    }
+  }
 
   const counts = {
     critical: findings.filter((finding) => finding?.severity === "Critical").length,
@@ -233,7 +431,7 @@ export function validateGraduationReview(report, options = new Map()) {
 function main() {
   const [reportPath, ...args] = process.argv.slice(2);
   if (!reportPath) {
-    console.error("usage: validate-graduation-review-report.mjs <review.json> --changed-files PATH --deleted-files PATH --expected-gates PATH --expected-merge-base SHA --expected-head SHA --expected-diff-digest SHA256");
+    console.error("usage: validate-graduation-review-report.mjs <review.json> --changed-files PATH --deleted-files PATH --expected-gates PATH --residual-candidates PATH --expected-merge-base SHA --expected-head SHA --expected-diff-digest SHA256 --rule-inventory PATH --rule-registry PATH");
     process.exit(2);
   }
 

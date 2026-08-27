@@ -193,6 +193,14 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
     "necessityAndScope": "<why the change is necessary and appropriately scoped>",
     "intentMatch": "<whether implementation matches the stated intent>",
     "profiles": ["global", "sp-client when any changed path is under sp-client/"],
+    "ruleChecks": [
+      {
+        "rule": "intent-and-scope|reference-routing|profile-routing|changed-file-coverage|consumer-and-test-coverage|adversarial-pass|size-audit|prior-art|external-contracts|ledger-reconciliation|finding-class-sweep|verdict-reconciliation",
+        "status": "clear|finding|not-applicable",
+        "evidence": ["<path:line, artifact:..., or command:...>"],
+        "conclusion": "<specific result for this rule class>"
+      }
+    ],
     "rolloutProtection": {
       "runtimePaths": ["sp-client/src/example.ts"],
       "reviewContext": "existing-pr|pre-pr",
@@ -304,6 +312,16 @@ The reviewer writes both a concise `review.md` and a machine-readable `review.js
       }
     ]
   },
+  "ruleResults": [
+    {
+      "ruleId": "<exact id from review-rule-inventory.json>",
+      "disposition": "satisfied|not-applicable|finding|carried",
+      "evidence": ["<path:line, artifact:..., or command:...>"],
+      "conclusion": "<specific result for this exact rule>",
+      "findingIds": ["<required for finding>"],
+      "carriedFingerprints": ["<required for carried>" ]
+    }
+  ],
   "findings": [
     {
       "id": "<finding ID>",
@@ -332,6 +350,45 @@ Every behavior unit path must be Git-changed, and their union must cover every c
 `must-split` is a scope warning, not a review rejection. It applies equally to churn thresholds, file-count thresholds, independent behavior-unit count, and high-risk-domain count. The reviewer continues the available risk scan and leaves the Important split recommendation; only separate product defects can block the PR.
 
 The complete set of dimension keys is enforced by `tools/validate-review-report.mjs`.
+
+Before reviewer dispatch, the caller loads `review-rule-registry.json` and runs
+`tools/build-review-rule-inventory.mjs` to freeze every non-example prose, list, and table block,
+reference source digest, registry digest, and diff identity in `review-rule-inventory.json`. The
+canonical registry covers every general-review metric; callers cannot narrow it based on their own
+routing decision. The validator re-reads the registry and source files. Missing, changed, or extra
+references fail validation.
+
+The caller passes the immutable inventory to the reviewer and validator. `ruleResults` must contain
+exactly every inventoried rule ID: missing, extra, or duplicate IDs fail validation. Each result
+needs concrete evidence and a specific conclusion; `finding` links current finding IDs and
+`carried` links accepted ledger fingerprints. Every current or carried finding must also be linked
+back from at least one rule result. Adding or changing prose in accessibility, localization,
+design, size/LOC, shared-utility, profile, or future registered references automatically changes
+the required inventory without adding a scenario-specific validator check. Descriptive blocks may
+be marked `not-applicable`; they are intentionally inventoried so wording cannot silently suppress
+a normative rule.
+
+`preReview.ruleChecks` is a separate workflow-accounting manifest. It must contain exactly one
+entry for every rule class in the schema; coverage dimensions do not substitute for it. Populate
+each entry from the corresponding structured evidence already gathered by the review:
+
+- `intent-and-scope`: request evidence, necessity, scope, and intent match.
+- `reference-routing`: every reference trigger in the reviewer routing table was evaluated and each
+  applicable reference was applied.
+- `profile-routing`: global and path/consumer-specific profiles were selected correctly.
+- `changed-file-coverage`: Git changed files exactly match risk and whole-file coverage.
+- `consumer-and-test-coverage`: direct consumers and relevant tests were inspected per changed file.
+- `adversarial-pass`: risk units and falsifiable second-pass hypotheses were completed.
+- `size-audit`: the official size report was located and assessed, or its absence was disclosed.
+- `prior-art`: every applicable cross-cutting candidate has a prior-art disposition.
+- `external-contracts`: every relied-on external semantic contract is verified or specifically
+  inapplicable.
+- `ledger-reconciliation`: accepted findings were matched and carried without re-reporting.
+- `finding-class-sweep`: every blocking defect class was swept and all instances accounted for.
+- `verdict-reconciliation`: findings, counts, reviewability exception, and verdict agree.
+
+Every entry requires concrete evidence and a specific conclusion. An omitted or duplicated class,
+or a placeholder such as `N/A`, is an incomplete review and cannot produce `APPROVE`.
 
 `preReview.profiles` records the applied standards. It always includes `global`; when any changed file is under `sp-client/`, it must also include `sp-client` and the reviewer must read `docs/sp-client-review-profile.md`.
 
