@@ -22,7 +22,7 @@
       "name": "agentow-copilot",
       "source": "./copilot",
       "description": "Copilot CLI port of agentOW. Includes an isolated reproduce-first Accessibility remediation mode.",
-      "version": "0.1.36",
+      "version": "0.1.37",
       "author": {
         "name": "kaixun"
       },
