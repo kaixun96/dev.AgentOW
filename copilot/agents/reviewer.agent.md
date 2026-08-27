@@ -26,8 +26,11 @@ and deleted-file lists, caller-owned gate inventory, expected merge base, expect
 digest. Consume `review-gates.txt`, `review-deleted-files.txt`, and
 `review-residual-candidates.jsonl` as immutable inputs; do not create or modify them. Validation
 must pass `--expected-head`, `--expected-merge-base`, `--expected-diff-digest`, `--changed-files`,
-`--deleted-files`, `--expected-gates`, and `--residual-candidates`. Before concluding, reverse-scan
-by each gate/Flight name, helper/wrapper name, GUID/ID, export/import, alias, fixed parameter, and
+`--deleted-files`, `--expected-gates`, `--residual-candidates`, `--rule-inventory`, and
+`--rule-registry`. Consume `ruleInventoryPath` as immutable input and emit
+exactly one `ruleResults` entry for every graduation rule ID. Missing, extra, duplicate, or unlinked
+results forbid `APPROVE`. Before concluding, reverse-scan
+each gate/Flight name, helper/wrapper name, GUID/ID, export/import, alias, fixed parameter, and
 downstream call chain; a no-match SDK search is not sufficient. Account for every immutable
 residual candidate in the report. Complete every per-gate `ruleChecks` class with concrete evidence
 and link every finding from its applicable class; an omitted class forbids `APPROVE`. Submit the
@@ -36,6 +39,10 @@ normal completion record pointing to those artifacts and return immediately. The
 For every other non-POC change, read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before
 reviewing. It is normative. An unsupported APPROVE is a failed review. Continue with the generic
 routing and passes below. A mixed graduation/feature PR is not graduation-only.
+Consume `ruleInventoryPath` as an immutable caller-owned input in either review policy. Do not create, modify, or narrow it.
+Read every inventoried reference and produce exactly one `ruleResults` entry for every inventoried
+rule ID, with concrete evidence and a specific disposition/conclusion. Missing, extra, duplicate,
+or unlinked rule results forbid `APPROVE`.
 
 Otherwise, in STANDARD mode, if any Git-changed path is under `sp-client/`, also read
 `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in
@@ -314,6 +321,16 @@ Default rule: Any Critical or Important → `REQUEST_CHANGES`.
 - Any Critical or Important outside `reviewability` → `REQUEST_CHANGES`.
 - Minor findings or advisory Important `reviewability` only → `COMMENT`.
 - Zero findings plus complete coverage → `APPROVE`.
+
+Before selecting that verdict, complete every `preReview.ruleChecks` class from the canonical
+contract using the corresponding structured evidence gathered in this review. Evaluate every
+reference-routing trigger, disclose the official size-audit result or its absence, and reconcile
+profiles, changed files, consumers/tests, adversarial checks, prior art, external contracts, ledger,
+class sweeps, counts, and verdict. An omitted, duplicated, placeholder, or unsupported rule check
+forbids `APPROVE`.
+Then reconcile `ruleResults` against the immutable inventory. A rule that produced a current
+finding must link its finding ID; a consciously accepted Minor links its carried fingerprint on
+later reviews. Do not collapse multiple source rules into one broad dimension conclusion.
 
 ## Required outputs
 

@@ -20,6 +20,15 @@ Write `review.json` with this minimal schema and validate it with
   "diffDigest": "<64-character lowercase SHA-256>",
   "summary": "<specific graduation conclusion>",
   "authorizationEvidence": ["<path:line, artifact:..., or command:... evidence>"],
+  "ruleResults": [
+    {
+      "ruleId": "<exact id from review-rule-inventory.json>",
+      "disposition": "satisfied|not-applicable|finding",
+      "evidence": ["<path:line, artifact:..., or bounded command evidence>"],
+      "conclusion": "<specific per-rule conclusion>",
+      "findingIds": ["<required only for finding>"]
+    }
+  ],
   "gates": [
     {
       "name": "<retired gate identifier>",
@@ -89,6 +98,11 @@ write independently discovered fixed-residue candidates to `review-residual-cand
 Each NDJSON object contains exactly the candidate identity fields `id`, `gateName`, `kind`, `symbol`,
 `path`, and `line`; an empty scan still produces an empty file. Pass all three inventories plus the
 expected merge base to the dedicated validator. The reviewer must not create or modify them.
+The caller also builds `review-rule-inventory.json` from the isolated
+`graduation-review-rule-registry.json`. The inventory contains every non-example prose, list, and
+table block in this reference and is bound to the source digest and immutable diff identity.
+`ruleResults` must exactly cover every inventory ID; every finding must be linked from at least one
+result. Missing, extra, duplicate, stale, or unlinked results forbid `APPROVE`.
 Reported gate names must exactly
 match that inventory. `changedFiles` must exactly match Git; a surviving file uses
 `reviewedVersion: "head"`, while a deleted file uses `reviewedVersion: "merge-base"` and must be read

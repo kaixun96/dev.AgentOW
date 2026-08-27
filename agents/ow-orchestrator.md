@@ -517,6 +517,18 @@ one NDJSON identity object (`id`, `gateName`, `kind`, `symbol`, `path`, `line`) 
 `{sessionDir}/review-residual-candidates.jsonl`; create an empty file when no candidate exists. The
 reviewer must not create or modify this caller-owned inventory.
 
+Also run `tools/build-review-rule-inventory.mjs` with the immutable diff identity and
+`--registry ${CLAUDE_PLUGIN_ROOT}/graduation-review-rule-registry.json`, writing
+`{sessionDir}/review-rule-inventory.json`. This registry contains only `graduation.md` and preserves
+graduation-only isolation while requiring exact accounting for every rule in that reference.
+
+For `reviewPolicy=general`, run `tools/build-review-rule-inventory.mjs` with the current HEAD,
+merge base, diff digest, `${CLAUDE_PLUGIN_ROOT}` as `--repo`, and
+`--registry ${CLAUDE_PLUGIN_ROOT}/review-rule-registry.json`. The canonical registry includes every
+general-review metric; applicability is reported per rule rather than by omitting references. Write
+`{sessionDir}/review-rule-inventory.json` and freeze it before dispatch. The reviewer must not create,
+edit, or narrow it.
+
 Only for `reviewPolicy=general`, resolve the branch's review ledger so a finding already
 dispositioned on this branch is never raised again:
 
@@ -540,6 +552,7 @@ SendMessage to ow-review-agent:
   gateInventoryPath: <sessionDir>/review-gates.txt               # graduation-only
   deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
   residualCandidatesPath: <sessionDir>/review-residual-candidates.jsonl # graduation-only
+  ruleInventoryPath: <sessionDir>/review-rule-inventory.json             # both policies
   contextLinkPath: <contextLinkPath>
   contextDocuments: <latest routed document paths>
   reviewLedgerPath: <resolved $reviewLedgerPath>
@@ -569,6 +582,8 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
   --expected-head "$(git rev-parse HEAD)" \
   --expected-merge-base "$mergeBase" \
   --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
+  --rule-inventory {sessionDir}/review-rule-inventory.json \
+  --rule-registry "${CLAUDE_PLUGIN_ROOT}/graduation-review-rule-registry.json" \
   --changed-files {sessionDir}/review-changed-files.txt \
   --deleted-files {sessionDir}/review-deleted-files.txt \
   --expected-gates {sessionDir}/review-gates.txt \
@@ -584,7 +599,10 @@ git diff --no-renames --numstat "$mergeBase"...HEAD > {sessionDir}/review-numsta
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   {sessionDir}/review.json \
   --expected-head "$(git rev-parse HEAD)" \
+  --expected-merge-base "$mergeBase" \
   --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
+  --rule-inventory {sessionDir}/review-rule-inventory.json \
+  --rule-registry "${CLAUDE_PLUGIN_ROOT}/review-rule-registry.json" \
   --changed-files {sessionDir}/review-changed-files.txt \
   --diff-numstat {sessionDir}/review-numstat.txt \
   --ledger "$reviewLedgerPath" \

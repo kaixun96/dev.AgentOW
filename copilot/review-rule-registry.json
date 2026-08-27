@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "references": [
+    "docs/review-contract.md",
+    "docs/review-misses.md",
+    "docs/sp-client-review-profile.md",
+    "skills/ow-review/references/accessibility.md",
+    "skills/ow-review/references/common-review-issues.md",
+    "skills/ow-review/references/localization-and-formatting.md",
+    "skills/ow-review/references/shared-utility-reuse.md",
+    "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    "skills/ow-review/references/sharepoint-theme-and-detheme.md",
+    "skills/ow-review/references/size-regression.md",
+    "skills/ow-review/references/ux-architecture-and-bundle-boundaries.md"
+  ]
+}

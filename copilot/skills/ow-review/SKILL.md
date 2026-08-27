@@ -118,6 +118,37 @@ Write every surviving `fixed-return-helper`, `retained-export`, `fixed-parameter
 `path`, `line`) to `$sessionDir/review-residual-candidates.jsonl`; create an empty file when no
 candidate exists. This caller-owned inventory is immutable after dispatch.
 
+Also freeze every non-example content block from the isolated graduation reference:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/build-review-rule-inventory.mjs" \
+  --repo "${CLAUDE_PLUGIN_ROOT}" \
+  --expected-head "$reviewedHead" \
+  --expected-merge-base "$mergeBase" \
+  --expected-diff-digest "$diffDigest" \
+  --registry "${CLAUDE_PLUGIN_ROOT}/graduation-review-rule-registry.json" \
+  --out "$sessionDir/review-rule-inventory.json"
+```
+
+The reviewer must emit exactly one `ruleResults` entry for every graduation rule ID; missing,
+extra, duplicate, or unlinked results forbid `APPROVE`.
+
+For `general`, freeze every non-example content block from every canonical general-review reference.
+The registry is caller-owned and exhaustive; applicability is decided per rule in the report, never
+by omitting a metric or reference before dispatch:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/build-review-rule-inventory.mjs" \
+  --repo "${CLAUDE_PLUGIN_ROOT}" \
+  --expected-head "$reviewedHead" \
+  --expected-merge-base "$mergeBase" \
+  --expected-diff-digest "$diffDigest" \
+  --registry "${CLAUDE_PLUGIN_ROOT}/review-rule-registry.json" \
+  --out "$sessionDir/review-rule-inventory.json"
+```
+
+Do not let the reviewer create, edit, or narrow this caller-owned inventory.
+
 ## Step 4: Resolve the review ledger for general review
 
 Skip this step when `reviewPolicy=graduation-only`. For general review, a finding already accepted
@@ -158,6 +189,7 @@ artifactJsonPath: <sessionDir>/review.json
 gateInventoryPath: <sessionDir>/review-gates.txt             # graduation-only
 deletedFilesPath: <sessionDir>/review-deleted-files.txt       # graduation-only
 residualCandidatesPath: <sessionDir>/review-residual-candidates.jsonl # graduation-only
+ruleInventoryPath: <sessionDir>/review-rule-inventory.json           # general and graduation-only
 reviewLedgerPath: <resolved reviewLedgerPath>
 prDescriptionPath: <sessionDir>/pr-description.md   # PR mode only
 contextDocuments:
@@ -182,6 +214,8 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
   --expected-head "$reviewedHead" \
   --expected-merge-base "$mergeBase" \
   --expected-diff-digest "$diffDigest" \
+  --rule-inventory "$sessionDir/review-rule-inventory.json" \
+  --rule-registry "${CLAUDE_PLUGIN_ROOT}/graduation-review-rule-registry.json" \
   --changed-files "$sessionDir/review-changed-files.txt" \
   --deleted-files "$sessionDir/review-deleted-files.txt" \
   --expected-gates "$sessionDir/review-gates.txt" \
@@ -194,7 +228,10 @@ Otherwise:
 node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   "$sessionDir/review.json" \
   --expected-head "$reviewedHead" \
+  --expected-merge-base "$mergeBase" \
   --expected-diff-digest "$diffDigest" \
+  --rule-inventory "$sessionDir/review-rule-inventory.json" \
+  --rule-registry "${CLAUDE_PLUGIN_ROOT}/review-rule-registry.json" \
   --changed-files "$sessionDir/review-changed-files.txt" \
   --diff-numstat "$sessionDir/review-numstat.txt" \
   --ledger "$reviewLedgerPath" \

@@ -1,14 +1,32 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { validateGraduationReview } from "../../tools/validate-graduation-review-report.mjs";
+import { buildInventory } from "../../tools/build-review-rule-inventory.mjs";
+import { validateGraduationReview as validateGraduationReviewRaw } from "../../tools/validate-graduation-review-report.mjs";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentow-graduation-review-"));
 const changedFilesPath = path.join(tempDir, "changed-files.txt");
 const deletedFilesPath = path.join(tempDir, "deleted-files.txt");
 const expectedGatesPath = path.join(tempDir, "expected-gates.txt");
 const residualCandidatesPath = path.join(tempDir, "residual-candidates.jsonl");
+const ruleRegistryPath = path.join(tempDir, "graduation-review-rule-registry.json");
+const ruleInventoryPath = path.join(tempDir, "graduation-review-rule-inventory.json");
+const graduationReferencePath = path.join(tempDir, "skills/ow-review/references/graduation.md");
+fs.mkdirSync(path.dirname(graduationReferencePath), { recursive: true });
+fs.writeFileSync(graduationReferencePath, "Preserve the permanent branch.\n\nRemove obsolete gate artifacts.\n");
+const registryContent = `${JSON.stringify({ schemaVersion: 1, references: ["skills/ow-review/references/graduation.md"] }, null, 2)}\n`;
+fs.writeFileSync(ruleRegistryPath, registryContent);
+const ruleInventory = buildInventory({
+  repoRoot: tempDir,
+  references: ["skills/ow-review/references/graduation.md"],
+  reviewedHead: "a".repeat(40),
+  mergeBase: "c".repeat(40),
+  diffDigest: "b".repeat(64),
+});
+ruleInventory.registryDigest = crypto.createHash("sha256").update(registryContent).digest("hex");
+fs.writeFileSync(ruleInventoryPath, JSON.stringify(ruleInventory));
 fs.writeFileSync(changedFilesPath, "src/consumer.tsx\nsrc/flights.ts\n");
 fs.writeFileSync(deletedFilesPath, "src/flights.ts\n");
 fs.writeFileSync(expectedGatesPath, "EditFlight\n");
@@ -22,6 +40,8 @@ const options = new Map([
   ["--expected-head", "a".repeat(40)],
   ["--expected-merge-base", "c".repeat(40)],
   ["--expected-diff-digest", "b".repeat(64)],
+  ["--rule-inventory", ruleInventoryPath],
+  ["--rule-registry", ruleRegistryPath],
 ]);
 
 const makeReport = () => ({
@@ -32,6 +52,12 @@ const makeReport = () => ({
   diffDigest: "b".repeat(64),
   summary: "The permanent enabled branch is preserved and retired artifacts are removed",
   authorizationEvidence: ["artifact:pr-description.md rollout reached 100 percent"],
+  ruleResults: ruleInventory.rules.map((rule) => ({
+    ruleId: rule.id,
+    disposition: "satisfied",
+    evidence: ["src/consumer.tsx:20"],
+    conclusion: "The graduation change satisfies this documented rule with concrete source evidence",
+  })),
   gates: [
     {
       name: "EditFlight",
@@ -80,7 +106,29 @@ const makeReport = () => ({
   verdict: "APPROVE",
 });
 
+function validateGraduationReview(report, validationOptions) {
+  const linkedFindingIds = (report.gates ?? []).flatMap((gate) =>
+    (gate?.ruleChecks ?? []).flatMap((check) => check?.findingIds ?? []));
+  if (linkedFindingIds.length > 0 && Array.isArray(report.ruleResults) && report.ruleResults.length > 0) {
+    report.ruleResults[0] = {
+      ...report.ruleResults[0],
+      disposition: "finding",
+      findingIds: [...new Set(linkedFindingIds)],
+    };
+  }
+  return validateGraduationReviewRaw(report, validationOptions);
+}
+
 assert.deepEqual(validateGraduationReview(makeReport(), options), [], "valid graduation report passes");
+
+const missingUniversalRule = makeReport();
+missingUniversalRule.ruleResults.pop();
+assert.ok(validateGraduationReview(missingUniversalRule, options).length > 0, "every graduation reference rule must be reported");
+
+const originalGraduationReference = fs.readFileSync(graduationReferencePath, "utf8");
+fs.writeFileSync(graduationReferencePath, `${originalGraduationReference}\nChanged after inventory creation.\n`);
+assert.ok(validateGraduationReview(makeReport(), options).length > 0, "stale graduation rule sources are rejected");
+fs.writeFileSync(graduationReferencePath, originalGraduationReference);
 
 const fixedHelperCandidatesPath = path.join(tempDir, "fixed-helper-candidates.jsonl");
 fs.writeFileSync(fixedHelperCandidatesPath, `${JSON.stringify({

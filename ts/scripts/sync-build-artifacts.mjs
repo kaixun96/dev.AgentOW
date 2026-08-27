@@ -18,6 +18,8 @@ const copilotMirrorFileSets = [
   },
 ];
 const copilotMirrorFiles = [
+  ["review-rule-registry.json", "copilot/review-rule-registry.json"],
+  ["graduation-review-rule-registry.json", "copilot/graduation-review-rule-registry.json"],
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
   ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
