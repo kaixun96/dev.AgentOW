@@ -40,6 +40,19 @@ const makeReport = () => ({
       directionEvidence: ["src/flights.ts:10"],
       callSitesChecked: ["src/consumer.tsx:20"],
       cleanupEvidence: ["command:rg EditFlight src => no matches"],
+      ruleChecks: [
+        "permanent-branch",
+        "fixed-carriers",
+        "fixed-inputs",
+        "obsolete-control-flow",
+        "discarded-evaluations",
+        "transitive-gates",
+        "stale-artifacts",
+        "runtime-entry-points",
+        "coverage-and-tests",
+        "scope-purity",
+        "minor-cleanup",
+      ].map((rule) => ({ rule, status: "clear", evidence: ["src/consumer.tsx:20"] })),
       disposition: "complete",
     },
   ],
@@ -104,6 +117,8 @@ assert.ok(
 
 const reportedFixedHelper = makeReport();
 reportedFixedHelper.gates[0].disposition = "finding";
+reportedFixedHelper.gates[0].ruleChecks.find((check) => check.rule === "fixed-carriers").status = "finding";
+reportedFixedHelper.gates[0].ruleChecks.find((check) => check.rule === "fixed-carriers").findingIds = ["G-FIXED-HELPER"];
 reportedFixedHelper.residualCandidates.push({
   id: "R-SCHEDULING-HELPER",
   gateName: "EditFlight",
@@ -186,6 +201,8 @@ assert.ok(validateGraduationReview(genericContractReport, options).length > 0, "
 
 const minorReport = makeReport();
 minorReport.gates[0].disposition = "finding";
+minorReport.gates[0].ruleChecks.find((check) => check.rule === "minor-cleanup").status = "suggestion";
+minorReport.gates[0].ruleChecks.find((check) => check.rule === "minor-cleanup").findingIds = ["G-MINOR"];
 minorReport.findings.push({
   id: "G-MINOR",
   gateName: "EditFlight",
@@ -202,6 +219,8 @@ assert.deepEqual(validateGraduationReview(minorReport, options), [], "Minor-only
 
 const fixedOptionSuggestion = makeReport();
 fixedOptionSuggestion.gates[0].disposition = "finding";
+fixedOptionSuggestion.gates[0].ruleChecks.find((check) => check.rule === "fixed-inputs").status = "suggestion";
+fixedOptionSuggestion.gates[0].ruleChecks.find((check) => check.rule === "fixed-inputs").findingIds = ["G-FIXED-OPTION"];
 fixedOptionSuggestion.findings.push({
   id: "G-FIXED-OPTION",
   gateName: "EditFlight",
@@ -222,6 +241,8 @@ assert.deepEqual(
 
 const blockingReport = makeReport();
 blockingReport.gates[0].disposition = "finding";
+blockingReport.gates[0].ruleChecks.find((check) => check.rule === "permanent-branch").status = "finding";
+blockingReport.gates[0].ruleChecks.find((check) => check.rule === "permanent-branch").findingIds = ["G-DIRECTION"];
 blockingReport.findings.push({
   id: "G-DIRECTION",
   gateName: "EditFlight",
@@ -236,6 +257,23 @@ blockingReport.findings.push({
 blockingReport.counts.important = 1;
 blockingReport.verdict = "REQUEST_CHANGES";
 assert.deepEqual(validateGraduationReview(blockingReport, options), [], "Important graduation finding blocks");
+
+const missingRuleCheck = makeReport();
+missingRuleCheck.gates[0].ruleChecks.pop();
+assert.ok(validateGraduationReview(missingRuleCheck, options).length > 0, "every mandatory rule class must be reported");
+
+const unlinkedFinding = structuredClone(blockingReport);
+delete unlinkedFinding.gates[0].ruleChecks.find((check) => check.rule === "permanent-branch").findingIds;
+assert.ok(validateGraduationReview(unlinkedFinding, options).length > 0, "every finding must be linked from its rule check");
+
+const duplicateFindingLink = structuredClone(blockingReport);
+duplicateFindingLink.gates[0].ruleChecks.find((check) => check.rule === "fixed-carriers").status = "finding";
+duplicateFindingLink.gates[0].ruleChecks.find((check) => check.rule === "fixed-carriers").findingIds = ["G-DIRECTION"];
+assert.ok(validateGraduationReview(duplicateFindingLink, options).length > 0, "one finding cannot satisfy multiple rule classes");
+
+const clearRuleWithFinding = makeReport();
+clearRuleWithFinding.gates[0].ruleChecks[0].findingIds = ["G-NOT-PRESENT"];
+assert.ok(validateGraduationReview(clearRuleWithFinding, options).length > 0, "clear checks cannot hide finding references");
 
 const findingWithCompleteGate = structuredClone(blockingReport);
 findingWithCompleteGate.gates[0].disposition = "complete";

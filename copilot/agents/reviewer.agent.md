@@ -29,7 +29,8 @@ must pass `--expected-head`, `--expected-merge-base`, `--expected-diff-digest`, 
 `--deleted-files`, `--expected-gates`, and `--residual-candidates`. Before concluding, reverse-scan
 by each gate/Flight name, helper/wrapper name, GUID/ID, export/import, alias, fixed parameter, and
 downstream call chain; a no-match SDK search is not sufficient. Account for every immutable
-residual candidate in the report. Submit the
+residual candidate in the report. Complete every per-gate `ruleChecks` class with concrete evidence
+and link every finding from its applicable class; an omitted class forbids `APPROVE`. Submit the
 normal completion record pointing to those artifacts and return immediately. The graduation reference alone controls policy, evidence, severity, verdict, and author-facing comments.
 
 For every other non-POC change, read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before

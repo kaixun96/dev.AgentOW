@@ -9,6 +9,20 @@ const VERDICTS = new Set(["APPROVE", "REQUEST_CHANGES", "COMMENT"]);
 const SEVERITIES = new Set(["Critical", "Important", "Minor"]);
 const GATE_TYPES = new Set(["Flight", "KS", "Experiment", "Feature", "Rollout"]);
 const RESIDUAL_KINDS = new Set(["fixed-return-helper", "retained-export", "fixed-parameter", "fixed-conditional"]);
+const REQUIRED_RULE_CHECKS = [
+  "permanent-branch",
+  "fixed-carriers",
+  "fixed-inputs",
+  "obsolete-control-flow",
+  "discarded-evaluations",
+  "transitive-gates",
+  "stale-artifacts",
+  "runtime-entry-points",
+  "coverage-and-tests",
+  "scope-purity",
+  "minor-cleanup",
+];
+const RULE_CHECK_STATUSES = new Set(["clear", "finding", "suggestion", "not-applicable"]);
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const nonEmpty = (value) => typeof value === "string" && value.trim().length > 0;
@@ -119,6 +133,29 @@ export function validateGraduationReview(report, options = new Map()) {
       }
       if (gate.disposition === "complete" && !gate.cleanupEvidence.some(boundedNoMatchSearch)) {
         errors.push(`complete gate ${gate.name} requires a bounded no-match cleanup search`);
+      }
+      if (!Array.isArray(gate.ruleChecks)) {
+        errors.push(`gate ${gate.name} requires explicit ruleChecks`);
+      } else {
+        const checkedRules = [];
+        for (const check of gate.ruleChecks) {
+          if (
+            !isObject(check) ||
+            !REQUIRED_RULE_CHECKS.includes(check.rule) ||
+            !RULE_CHECK_STATUSES.has(check.status) ||
+            !evidenceReferences(check.evidence) ||
+            (["finding", "suggestion"].includes(check.status) &&
+              (!nonEmptyStrings(check.findingIds) || new Set(check.findingIds).size !== check.findingIds.length)) ||
+            (["clear", "not-applicable"].includes(check.status) && check.findingIds !== undefined)
+          ) {
+            errors.push(`gate ${gate.name} has an invalid rule check`);
+            continue;
+          }
+          checkedRules.push(check.rule);
+        }
+        if (!sameStrings([...checkedRules].sort(), [...REQUIRED_RULE_CHECKS].sort())) {
+          errors.push(`gate ${gate.name} ruleChecks must exactly cover every required rule class`);
+        }
       }
       if (gateNames.has(gate.name)) errors.push(`duplicate gate: ${gate.name}`);
       gateNames.add(gate.name);
@@ -232,6 +269,24 @@ export function validateGraduationReview(report, options = new Map()) {
     }
     if (findingIds.has(finding.id)) errors.push(`duplicate finding id: ${finding.id}`);
     findingIds.add(finding.id);
+  }
+
+  const ruleCheckFindingIds = [];
+  for (const gate of Array.isArray(report.gates) ? report.gates : []) {
+    for (const check of Array.isArray(gate?.ruleChecks) ? gate.ruleChecks : []) {
+      if (!["finding", "suggestion"].includes(check?.status) || !Array.isArray(check.findingIds)) continue;
+      ruleCheckFindingIds.push(...check.findingIds);
+      const expectedSeverities = check.status === "finding" ? ["Critical", "Important"] : ["Minor"];
+      if (check.findingIds.some((id) => {
+        const finding = findings.find((entry) => entry?.id === id);
+        return !finding || finding.gateName !== gate.name || !expectedSeverities.includes(finding.severity);
+      })) {
+        errors.push(`gate ${gate.name} ${check.rule} rule check must reference matching ${check.status} findings`);
+      }
+    }
+  }
+  if (!sameStrings(ruleCheckFindingIds.filter(nonEmpty).sort(), [...findingIds].sort())) {
+    errors.push("ruleChecks must account for every finding exactly by id");
   }
 
   const expectedResidualById = new Map(expectedResidualCandidates.map((candidate) => [candidate?.id, candidate]));

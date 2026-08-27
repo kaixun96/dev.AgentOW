@@ -28,6 +28,14 @@ Write `review.json` with this minimal schema and validate it with
       "directionEvidence": ["<source or rollout citation>"],
       "callSitesChecked": ["<path:line>"],
       "cleanupEvidence": ["<path:line or bounded no-match search evidence>"],
+      "ruleChecks": [
+        {
+          "rule": "permanent-branch|fixed-carriers|fixed-inputs|obsolete-control-flow|discarded-evaluations|transitive-gates|stale-artifacts|runtime-entry-points|coverage-and-tests|scope-purity|minor-cleanup",
+          "status": "clear|finding|suggestion|not-applicable",
+          "evidence": ["<path:line, artifact:..., or bounded command evidence>"],
+          "findingIds": ["<required for finding or suggestion>"]
+        }
+      ],
       "disposition": "complete|finding"
     }
   ],
@@ -86,6 +94,27 @@ match that inventory. `changedFiles` must exactly match Git; a surviving file us
 `reviewedVersion: "head"`, while a deleted file uses `reviewedVersion: "merge-base"` and must be read
 from the merge-base version before its disposition is recorded. Every retired gate must have
 direction, call-site, and cleanup evidence.
+
+Every gate must also contain exactly one `ruleChecks` entry for each of these classes:
+
+- `permanent-branch`: authorization, permanent direction, and surviving branch correctness.
+- `fixed-carriers`: fixed helpers, wrappers, exports, aliases, and transitive carriers.
+- `fixed-inputs`: gate-derived parameters, options, properties, defaults, and literals.
+- `obsolete-control-flow`: conditionals, switches, ternaries, and branch-only structure.
+- `discarded-evaluations`: value-discarded gate calls, property/DOM reads, and supply chains.
+- `transitive-gates`: nested Flight/KS/experiment calls made irrelevant by graduation.
+- `stale-artifacts`: IDs/GUIDs, registrations, imports, mocks, tests, refs, props, and resources.
+- `runtime-entry-points`: every reachable runtime consumer and entry point is included in the sweep.
+- `coverage-and-tests`: threshold or test changes follow actual-failure and PR-evidence requirements.
+- `scope-purity`: the diff contains no unrelated behavior hidden inside graduation-only scope.
+- `minor-cleanup`: fixed options needing author confirmation, redundant Fragments, undefined props,
+  and safe single-consumer style consolidation.
+
+Use `clear` only with concrete evidence that the class was checked, and `not-applicable` only with
+evidence explaining why the class cannot occur for that gate. `finding` must reference one or more
+Critical/Important finding IDs; `suggestion` must reference one or more Minor finding IDs. Every
+finding must be referenced by the applicable rule check before choosing a verdict. An omitted rule
+class is an incomplete review and cannot produce `APPROVE`.
 
 Every evidence string in this report uses one of these forms: `path:line`, `artifact:<specific
 source and fact>`, or `command:<bounded command and result>`. A no-match cleanup or class-sweep
