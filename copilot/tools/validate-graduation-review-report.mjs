@@ -8,12 +8,15 @@ const HASH_64 = /^[0-9a-f]{64}$/;
 const VERDICTS = new Set(["APPROVE", "REQUEST_CHANGES", "COMMENT"]);
 const SEVERITIES = new Set(["Critical", "Important", "Minor"]);
 const GATE_TYPES = new Set(["Flight", "KS", "Experiment", "Feature", "Rollout"]);
+const RESIDUAL_KINDS = new Set(["fixed-return-helper", "retained-export", "fixed-parameter", "fixed-conditional"]);
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const nonEmpty = (value) => typeof value === "string" && value.trim().length > 0;
 const nonEmptyStrings = (value) => Array.isArray(value) && value.length > 0 && value.every(nonEmpty);
 const readLines = (filePath) =>
   fs.readFileSync(filePath, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).sort();
+const readJsonLines = (filePath) =>
+  fs.readFileSync(filePath, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => JSON.parse(line));
 const sameStrings = (left, right) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 const boundedNoMatchSearch = (value) => {
@@ -147,6 +150,36 @@ export function validateGraduationReview(report, options = new Map()) {
   }
   const deletedFileSet = new Set(deletedFiles);
 
+  const residualCandidatesPath = options.get("--residual-candidates");
+  let expectedResidualCandidates = [];
+  if (!residualCandidatesPath || !fs.existsSync(residualCandidatesPath)) {
+    errors.push("--residual-candidates must reference the independent residual inventory");
+  } else {
+    try {
+      expectedResidualCandidates = readJsonLines(residualCandidatesPath);
+      const expectedResidualIds = new Set();
+      for (const candidate of expectedResidualCandidates) {
+        if (
+          !isObject(candidate) ||
+          !nonEmpty(candidate.id) ||
+          !expectedGates.includes(candidate.gateName) ||
+          !RESIDUAL_KINDS.has(candidate.kind) ||
+          !nonEmpty(candidate.symbol) ||
+          !expectedFiles.includes(candidate.path) ||
+          !Number.isInteger(candidate.line) ||
+          candidate.line < 1
+        ) {
+          errors.push("independent residual inventory contains an invalid candidate");
+          continue;
+        }
+        if (expectedResidualIds.has(candidate.id)) errors.push(`duplicate residual candidate: ${candidate.id}`);
+        expectedResidualIds.add(candidate.id);
+      }
+    } catch {
+      errors.push("--residual-candidates must contain valid NDJSON");
+    }
+  }
+
   if (!Array.isArray(report.changedFiles) || report.changedFiles.length === 0) {
     errors.push("changedFiles is required");
   } else {
@@ -201,6 +234,42 @@ export function validateGraduationReview(report, options = new Map()) {
     findingIds.add(finding.id);
   }
 
+  const expectedResidualById = new Map(expectedResidualCandidates.map((candidate) => [candidate?.id, candidate]));
+  if (!Array.isArray(report.residualCandidates)) {
+    errors.push("residualCandidates must account for the independent residual inventory");
+  } else {
+    const reportedResidualIds = new Set();
+    for (const candidate of report.residualCandidates) {
+      const expected = expectedResidualById.get(candidate?.id);
+      if (
+        !isObject(candidate) ||
+        !expected ||
+        candidate.gateName !== expected.gateName ||
+        candidate.kind !== expected.kind ||
+        candidate.symbol !== expected.symbol ||
+        candidate.path !== expected.path ||
+        candidate.line !== expected.line ||
+        !["finding", "independent-contract"].includes(candidate.disposition)
+      ) {
+        errors.push("every residual candidate must exactly match the independent inventory and have a disposition");
+        continue;
+      }
+      if (candidate.disposition === "finding") {
+        const finding = findings.find((entry) => entry?.id === candidate.findingId);
+        if (!finding || finding.gateName !== candidate.gateName || !["Critical", "Important"].includes(finding.severity)) {
+          errors.push(`residual candidate ${candidate.id} must reference a blocking finding for the same gate`);
+        }
+      } else if (!evidenceReferences(candidate.independentSemanticEvidence) || !evidenceReferences(candidate.externalCallerEvidence)) {
+        errors.push(`residual candidate ${candidate.id} requires independent semantic and external caller evidence`);
+      }
+      if (reportedResidualIds.has(candidate.id)) errors.push(`duplicate reported residual candidate: ${candidate.id}`);
+      reportedResidualIds.add(candidate.id);
+    }
+    if (!sameStrings([...reportedResidualIds].sort(), [...expectedResidualById.keys()].filter(nonEmpty).sort())) {
+      errors.push("residualCandidates must exactly match the independent residual inventory");
+    }
+  }
+
   const counts = {
     critical: findings.filter((finding) => finding?.severity === "Critical").length,
     important: findings.filter((finding) => finding?.severity === "Important").length,
@@ -233,7 +302,7 @@ export function validateGraduationReview(report, options = new Map()) {
 function main() {
   const [reportPath, ...args] = process.argv.slice(2);
   if (!reportPath) {
-    console.error("usage: validate-graduation-review-report.mjs <review.json> --changed-files PATH --deleted-files PATH --expected-gates PATH --expected-merge-base SHA --expected-head SHA --expected-diff-digest SHA256");
+    console.error("usage: validate-graduation-review-report.mjs <review.json> --changed-files PATH --deleted-files PATH --expected-gates PATH --residual-candidates PATH --expected-merge-base SHA --expected-head SHA --expected-diff-digest SHA256");
     process.exit(2);
   }
 

@@ -510,6 +510,12 @@ including every mixed graduation/feature change, set `reviewPolicy=general` and 
 For `graduation-only`, write every independently classified gate identifier, one per line, to
 `{sessionDir}/review-gates.txt` before reviewer dispatch. The reviewer must not create or modify this
 inventory. Also generate `{sessionDir}/review-deleted-files.txt` from Git with `--diff-filter=D`.
+Reverse-scan merge-base and HEAD by each gate/Flight name, helper/wrapper name, GUID/ID,
+export/import, alias, fixed parameter, and downstream call chain. Write every surviving
+`fixed-return-helper`, `retained-export`, `fixed-parameter`, and `fixed-conditional` candidate as
+one NDJSON identity object (`id`, `gateName`, `kind`, `symbol`, `path`, `line`) to
+`{sessionDir}/review-residual-candidates.jsonl`; create an empty file when no candidate exists. The
+reviewer must not create or modify this caller-owned inventory.
 
 Only for `reviewPolicy=general`, resolve the branch's review ledger so a finding already
 dispositioned on this branch is never raised again:
@@ -533,6 +539,7 @@ SendMessage to ow-review-agent:
   reviewPolicy: <graduation-only or general>
   gateInventoryPath: <sessionDir>/review-gates.txt               # graduation-only
   deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
+  residualCandidatesPath: <sessionDir>/review-residual-candidates.jsonl # graduation-only
   contextLinkPath: <contextLinkPath>
   contextDocuments: <latest routed document paths>
   reviewLedgerPath: <resolved $reviewLedgerPath>
@@ -564,7 +571,8 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
   --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
   --changed-files {sessionDir}/review-changed-files.txt \
   --deleted-files {sessionDir}/review-deleted-files.txt \
-  --expected-gates {sessionDir}/review-gates.txt
+  --expected-gates {sessionDir}/review-gates.txt \
+  --residual-candidates {sessionDir}/review-residual-candidates.jsonl
 ```
 
 For `reviewPolicy=general`, validate with:

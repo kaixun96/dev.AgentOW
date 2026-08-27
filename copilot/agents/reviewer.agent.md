@@ -23,9 +23,13 @@ For a graduation-only change, read only that graduation reference. Do not read
 the reference's review steps and minimal report schema, write `review.md` plus `review.json`, then
 validate the JSON with `tools/validate-graduation-review-report.mjs` using the Git-generated changed
 and deleted-file lists, caller-owned gate inventory, expected merge base, expected HEAD, and diff
-digest. Consume `review-gates.txt` and `review-deleted-files.txt` as immutable inputs; do not create
-or modify them. Validation must pass `--expected-head`, `--expected-merge-base`,
-`--expected-diff-digest`, `--changed-files`, `--deleted-files`, and `--expected-gates`. Submit the
+digest. Consume `review-gates.txt`, `review-deleted-files.txt`, and
+`review-residual-candidates.jsonl` as immutable inputs; do not create or modify them. Validation
+must pass `--expected-head`, `--expected-merge-base`, `--expected-diff-digest`, `--changed-files`,
+`--deleted-files`, `--expected-gates`, and `--residual-candidates`. Before concluding, reverse-scan
+by each gate/Flight name, helper/wrapper name, GUID/ID, export/import, alias, fixed parameter, and
+downstream call chain; a no-match SDK search is not sufficient. Account for every immutable
+residual candidate in the report. Submit the
 normal completion record pointing to those artifacts and return immediately. The graduation reference alone controls policy, evidence, severity, verdict, and author-facing comments.
 
 For every other non-POC change, read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before

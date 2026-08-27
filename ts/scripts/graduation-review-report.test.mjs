@@ -8,14 +8,17 @@ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentow-graduation-review
 const changedFilesPath = path.join(tempDir, "changed-files.txt");
 const deletedFilesPath = path.join(tempDir, "deleted-files.txt");
 const expectedGatesPath = path.join(tempDir, "expected-gates.txt");
+const residualCandidatesPath = path.join(tempDir, "residual-candidates.jsonl");
 fs.writeFileSync(changedFilesPath, "src/consumer.tsx\nsrc/flights.ts\n");
 fs.writeFileSync(deletedFilesPath, "src/flights.ts\n");
 fs.writeFileSync(expectedGatesPath, "EditFlight\n");
+fs.writeFileSync(residualCandidatesPath, "");
 
 const options = new Map([
   ["--changed-files", changedFilesPath],
   ["--deleted-files", deletedFilesPath],
   ["--expected-gates", expectedGatesPath],
+  ["--residual-candidates", residualCandidatesPath],
   ["--expected-head", "a".repeat(40)],
   ["--expected-merge-base", "c".repeat(40)],
   ["--expected-diff-digest", "b".repeat(64)],
@@ -58,12 +61,77 @@ const makeReport = () => ({
     commandsRun: ["rushx test: passed"],
     notRun: [],
   },
+  residualCandidates: [],
   findings: [],
   counts: { critical: 0, important: 0, minor: 0 },
   verdict: "APPROVE",
 });
 
 assert.deepEqual(validateGraduationReview(makeReport(), options), [], "valid graduation report passes");
+
+const fixedHelperCandidatesPath = path.join(tempDir, "fixed-helper-candidates.jsonl");
+fs.writeFileSync(fixedHelperCandidatesPath, `${JSON.stringify({
+  id: "R-SCHEDULING-HELPER",
+  gateName: "EditFlight",
+  kind: "fixed-return-helper",
+  symbol: "isSchedulingEnabledForCoAuth",
+  path: "src/consumer.tsx",
+  line: 103,
+})}\n`);
+const fixedHelperOptions = new Map(options);
+fixedHelperOptions.set("--residual-candidates", fixedHelperCandidatesPath);
+const missedFixedHelper = makeReport();
+assert.ok(
+  validateGraduationReview(missedFixedHelper, fixedHelperOptions).length > 0,
+  "exported fixed-return gate helper cannot be approved without a finding",
+);
+
+const unsupportedFixedHelperExemption = makeReport();
+unsupportedFixedHelperExemption.residualCandidates.push({
+  id: "R-SCHEDULING-HELPER",
+  gateName: "EditFlight",
+  kind: "fixed-return-helper",
+  symbol: "isSchedulingEnabledForCoAuth",
+  path: "src/consumer.tsx",
+  line: 103,
+  disposition: "independent-contract",
+  independentSemanticEvidence: ["src/consumer.tsx:103"],
+});
+assert.ok(
+  validateGraduationReview(unsupportedFixedHelperExemption, fixedHelperOptions).length > 0,
+  "fixed helper exemption requires independent semantic and external caller evidence",
+);
+
+const reportedFixedHelper = makeReport();
+reportedFixedHelper.gates[0].disposition = "finding";
+reportedFixedHelper.residualCandidates.push({
+  id: "R-SCHEDULING-HELPER",
+  gateName: "EditFlight",
+  kind: "fixed-return-helper",
+  symbol: "isSchedulingEnabledForCoAuth",
+  path: "src/consumer.tsx",
+  line: 103,
+  disposition: "finding",
+  findingId: "G-FIXED-HELPER",
+});
+reportedFixedHelper.findings.push({
+  id: "G-FIXED-HELPER",
+  gateName: "EditFlight",
+  severity: "Important",
+  path: "src/consumer.tsx",
+  line: 103,
+  description: "The exported gate helper still returns the graduated literal true",
+  suggestedFix: "Substitute true at every caller, simplify each branch, and delete the helper and export",
+  evidence: ["src/consumer.tsx:103"],
+  classSweepEvidence: ["command:rg isSchedulingEnabledForCoAuth src => 2 matches; all accounted"],
+});
+reportedFixedHelper.counts.important = 1;
+reportedFixedHelper.verdict = "REQUEST_CHANGES";
+assert.deepEqual(
+  validateGraduationReview(reportedFixedHelper, fixedHelperOptions),
+  [],
+  "exported fixed-return gate helper produces a blocking finding",
+);
 
 const staleMergeBase = makeReport();
 staleMergeBase.mergeBase = "d".repeat(40);
@@ -131,6 +199,26 @@ minorReport.findings.push({
 minorReport.counts.minor = 1;
 minorReport.verdict = "COMMENT";
 assert.deepEqual(validateGraduationReview(minorReport, options), [], "Minor-only graduation report comments");
+
+const fixedOptionSuggestion = makeReport();
+fixedOptionSuggestion.gates[0].disposition = "finding";
+fixedOptionSuggestion.findings.push({
+  id: "G-FIXED-OPTION",
+  gateName: "EditFlight",
+  severity: "Minor",
+  path: "src/consumer.tsx",
+  line: 21,
+  description: "Nit: Check whether isDashboardPersonalizationEnabled has any other callers or independent meaning",
+  suggestedFix: "If not, remove the option and fold the enabled behavior into startFRETimer",
+  evidence: ["src/consumer.tsx:21"],
+});
+fixedOptionSuggestion.counts.minor = 1;
+fixedOptionSuggestion.verdict = "COMMENT";
+assert.deepEqual(
+  validateGraduationReview(fixedOptionSuggestion, options),
+  [],
+  "visible fixed option permits a Minor suggestion without residual inventory or a class sweep",
+);
 
 const blockingReport = makeReport();
 blockingReport.gates[0].disposition = "finding";

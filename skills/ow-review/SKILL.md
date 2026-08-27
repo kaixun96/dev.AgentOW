@@ -109,7 +109,12 @@ including every mixed graduation/feature change, set `reviewPolicy=general` and 
 
 For `graduation-only`, record every gate identifier established during this independent
 classification, one per line, in `$sessionDir/review-gates.txt` before dispatch. The reviewer must
-not create or modify this inventory.
+not create or modify this inventory. Reverse-scan merge-base and HEAD by each gate/Flight name,
+helper/wrapper name, GUID/ID, export/import, alias, fixed parameter, and downstream call chain.
+Write every surviving `fixed-return-helper`, `retained-export`, `fixed-parameter`, and
+`fixed-conditional` candidate as one NDJSON identity object (`id`, `gateName`, `kind`, `symbol`,
+`path`, `line`) to `$sessionDir/review-residual-candidates.jsonl`; create an empty file when no
+candidate exists. This caller-owned inventory is immutable after dispatch.
 
 ## Step 4: Resolve the review ledger for general review
 
@@ -151,6 +156,7 @@ artifactPath: <sessionDir>/review.md
 artifactJsonPath: <sessionDir>/review.json
 gateInventoryPath: <sessionDir>/review-gates.txt             # graduation-only
 deletedFilesPath: <sessionDir>/review-deleted-files.txt       # graduation-only
+residualCandidatesPath: <sessionDir>/review-residual-candidates.jsonl # graduation-only
 reviewLedgerPath: <resolved reviewLedgerPath>
 prDescriptionPath: <sessionDir>/pr-description.md   # PR mode only
 contextDocuments:
@@ -175,7 +181,8 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-graduation-review-report.mjs" \
   --expected-diff-digest "$diffDigest" \
   --changed-files "$sessionDir/review-changed-files.txt" \
   --deleted-files "$sessionDir/review-deleted-files.txt" \
-  --expected-gates "$sessionDir/review-gates.txt"
+  --expected-gates "$sessionDir/review-gates.txt" \
+  --residual-candidates "$sessionDir/review-residual-candidates.jsonl"
 ```
 
 Otherwise:
