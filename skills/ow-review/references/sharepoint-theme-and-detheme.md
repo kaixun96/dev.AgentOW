@@ -4,7 +4,7 @@ Use this reference when a change affects a rendered SharePoint surface's theme p
 background, color tokens, primary actions, tabs, links, or other styling that depends on
 whether the experience is SharePoint-owned, customer-content-focused, inline, or overlaid.
 
-Read `skills/detheme/SKILL.md` from this Claude plugin with this reference. That skill is the
+Read `skills/detheme/SKILL.md` from this plugin with this reference. That skill is the
 normative implementation and remediation guide; this reference defines how to review the result
 and what evidence to require.
 
@@ -75,7 +75,7 @@ UX, report it only as a Nit for the author rather than blocking the change.
 
 ## Required fix guidance
 
-Every Detheme finding must tell the author to apply `skills/detheme/SKILL.md` from this Claude
+Every Detheme finding must tell the author to apply `skills/detheme/SKILL.md` from this
 plugin and name the exact applicable remediation:
 surface reclassification; `NeutralThemeProvider` plus only the required
 `enabledCustomStyleHooks`; reuse of an ancestor provider whose hooks already cover the child;

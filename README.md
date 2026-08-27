@@ -292,6 +292,14 @@ External contributions go through pull requests:
 2. Push your changes to a feature branch
 3. Open a PR against `kaixun96/dev.AgentOW:main`
 
+Agent, skill, lifecycle, permission, or delivery changes must also satisfy the
+[harness contract](docs/harness-contract.md):
+
+```bash
+cd ts
+npm run validate-harness-contract
+```
+
 ---
 
 ## Repository

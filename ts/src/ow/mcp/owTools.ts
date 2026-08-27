@@ -375,7 +375,6 @@ export function registerOwTools(
       title: z.string().describe("PR title (keep under 70 chars)"),
       description: z.string().describe("PR body in markdown"),
       targetBranch: z.string().optional().describe("Target branch (default: main)"),
-      draft: z.boolean().optional().describe("Create as draft (default: true)"),
       workItems: z.string().optional().describe("Space-separated work item IDs to link"),
     },
   }, async (input, extras) => {
@@ -383,7 +382,6 @@ export function registerOwTools(
       title: input.title,
       description: input.description,
       targetBranch: input.targetBranch,
-      draft: input.draft,
       workItems: input.workItems,
     }, extras.signal);
     return successResultWithDebug(logger, "ow-pr-create", result);
@@ -396,14 +394,12 @@ export function registerOwTools(
       prId: z.number().describe("Pull request ID to update"),
       title: z.string().describe("Replacement PR title"),
       description: z.string().describe("Replacement PR body in markdown"),
-      draft: z.boolean().optional().describe("Keep as draft (default: true)"),
     },
   }, async (input, extras) => {
     const result = await pr.updatePr({
       prId: input.prId,
       title: input.title,
       description: input.description,
-      draft: input.draft,
     }, extras.signal);
     return successResultWithDebug(logger, "ow-pr-update", result);
   });

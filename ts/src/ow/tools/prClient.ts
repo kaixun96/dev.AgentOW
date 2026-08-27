@@ -9,7 +9,6 @@ export interface PrCreateInput {
   title: string;
   description: string;
   targetBranch?: string;
-  draft?: boolean;
   workItems?: string;
 }
 
@@ -24,7 +23,6 @@ export interface PrUpdateInput {
   prId: number;
   title: string;
   description: string;
-  draft?: boolean;
 }
 
 export interface PrUpdateResult {
@@ -101,7 +99,7 @@ export class PrClient {
     //  which az CLI then passes verbatim to ADO and the markdown renderer treats
     //  the whole body as one line. Using `@<file>` keeps real newlines.)
     const target = input.targetBranch ?? "main";
-    const draft = input.draft ?? true;
+    const draft = true;
 
     const descFile = path.join(os.tmpdir(), `ow-pr-desc-${Date.now()}.md`);
     fs.writeFileSync(descFile, input.description, "utf8");
@@ -157,7 +155,7 @@ export class PrClient {
   }
 
   async updatePr(input: PrUpdateInput, signal?: AbortSignal): Promise<PrUpdateResult> {
-    const draft = input.draft ?? true;
+    const draft = true;
     const descFile = path.join(os.tmpdir(), `ow-pr-desc-${Date.now()}.md`);
     fs.writeFileSync(descFile, input.description, "utf8");
     const azArgs = [
