@@ -143,6 +143,9 @@ export function loadLedger(file) {
   }
   const ledger = readJson(file);
   if (!Array.isArray(ledger.entries)) fail(`${file} has no entries array`);
+  if (ledger.entries.some((entry) => entry?.disposition === "accepted" && entry?.severity !== "Minor")) {
+    fail(`${file} contains an accepted entry that is not a Minor finding`);
+  }
   return ledger;
 }
 
@@ -204,6 +207,10 @@ function acceptCommand(options) {
       errors.push(`no finding with id ${id}`);
       continue;
     }
+    if (finding.severity !== "Minor") {
+      errors.push(`${id} is ${finding.severity ?? "missing severity"}; only Minor findings may be accepted`);
+      continue;
+    }
     if (finding.fingerprint === null) {
       errors.push(`${id} cites ${finding.path}:${finding.line}, which does not resolve to source`);
       continue;
@@ -262,6 +269,7 @@ export function renderBlock(ledger) {
       fingerprint: entry.fingerprint,
       path: entry.path,
       anchor: entry.anchor,
+      severity: entry.severity,
       disposition: "accepted",
       reason: entry.reason,
     })),

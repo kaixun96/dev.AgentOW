@@ -41,14 +41,26 @@ For a graduation-only change, read only that graduation reference. Do not read
 the reference's review steps and minimal report schema, write `review.md` plus `review.json`, then
 validate the JSON with `tools/validate-graduation-review-report.mjs` using the Git-generated changed
 and deleted-file lists, caller-owned gate inventory, expected merge base, expected HEAD, and diff
-digest. Consume `review-gates.txt` and `review-deleted-files.txt` as immutable inputs; do not create
-or modify them. Validation must pass `--expected-head`, `--expected-merge-base`,
-`--expected-diff-digest`, `--changed-files`, `--deleted-files`, and `--expected-gates`. Submit the
+digest. Consume `review-gates.txt`, `review-deleted-files.txt`, and
+`review-residual-candidates.jsonl` as immutable inputs; do not create or modify them. Validation
+must pass `--expected-head`, `--expected-merge-base`, `--expected-diff-digest`, `--changed-files`,
+`--deleted-files`, `--expected-gates`, `--residual-candidates`, `--rule-inventory`, and
+`--rule-registry`. Consume `ruleInventoryPath` as immutable input and emit
+exactly one `ruleResults` entry for every graduation rule ID. Missing, extra, duplicate, or unlinked
+results forbid `APPROVE`. Before concluding, reverse-scan
+each gate/Flight name, helper/wrapper name, GUID/ID, export/import, alias, fixed parameter, and
+downstream call chain; a no-match SDK search is not sufficient. Account for every immutable
+residual candidate in the report. Complete every per-gate `ruleChecks` class with concrete evidence
+and link every finding from its applicable class; an omitted class forbids `APPROVE`. Submit the
 normal NDJSON completion record pointing to those artifacts and return immediately. The graduation reference alone controls policy, evidence, severity, verdict, and author-facing comments.
 
 For every other change, read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before reviewing. It is
 normative. An unsupported APPROVE is a failed review. Continue with the generic routing and passes
 below. A mixed graduation/feature PR is not graduation-only.
+Consume `ruleInventoryPath` as an immutable caller-owned input in either review policy. Do not create, modify, or narrow it.
+Read every inventoried reference and produce exactly one `ruleResults` entry for every inventoried
+rule ID, with concrete evidence and a specific disposition/conclusion. Missing, extra, duplicate,
+or unlinked rule results forbid `APPROVE`.
 
 Otherwise, if any Git-changed path is under `sp-client/`, also read `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in `preReview.profiles`. If changed shared code outside `sp-client/` implements a Flight or killswitch consumed by SP-Client, read and apply that profile's rollout and rollback rules as well. Read `${CLAUDE_PLUGIN_ROOT}/docs/review-misses.md` before finalizing. It records defect classes this reviewer has demonstrably missed on real PRs, distilled from human review that caught what the agent did not. Treat each entry as a standing question to ask of the change in front of you.
 
@@ -268,6 +280,16 @@ Default rule: Critical or Important present → `REQUEST_CHANGES`.
 - Critical or Important outside `reviewability` present → `REQUEST_CHANGES`.
 - Minor findings or advisory Important `reviewability` only → `COMMENT`.
 - Zero findings plus complete coverage → `APPROVE`.
+
+Before selecting that verdict, complete every `preReview.ruleChecks` class from the canonical
+contract using the corresponding structured evidence gathered in this review. Evaluate every
+reference-routing trigger, disclose the official size-audit result or its absence, and reconcile
+profiles, changed files, consumers/tests, adversarial checks, prior art, external contracts, ledger,
+class sweeps, counts, and verdict. An omitted, duplicated, placeholder, or unsupported rule check
+forbids `APPROVE`.
+Then reconcile `ruleResults` against the immutable inventory. A rule that produced a current
+finding must link its finding ID; a consciously accepted Minor links its carried fingerprint on
+later reviews. Do not collapse multiple source rules into one broad dimension conclusion.
 
 ## Required artifacts
 

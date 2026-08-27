@@ -20,6 +20,15 @@ Write `review.json` with this minimal schema and validate it with
   "diffDigest": "<64-character lowercase SHA-256>",
   "summary": "<specific graduation conclusion>",
   "authorizationEvidence": ["<path:line, artifact:..., or command:... evidence>"],
+  "ruleResults": [
+    {
+      "ruleId": "<exact id from review-rule-inventory.json>",
+      "disposition": "satisfied|not-applicable|finding",
+      "evidence": ["<path:line, artifact:..., or bounded command evidence>"],
+      "conclusion": "<specific per-rule conclusion>",
+      "findingIds": ["<required only for finding>"]
+    }
+  ],
   "gates": [
     {
       "name": "<retired gate identifier>",
@@ -28,6 +37,14 @@ Write `review.json` with this minimal schema and validate it with
       "directionEvidence": ["<source or rollout citation>"],
       "callSitesChecked": ["<path:line>"],
       "cleanupEvidence": ["<path:line or bounded no-match search evidence>"],
+      "ruleChecks": [
+        {
+          "rule": "permanent-branch|fixed-carriers|fixed-inputs|obsolete-control-flow|discarded-evaluations|transitive-gates|stale-artifacts|runtime-entry-points|coverage-and-tests|scope-purity|minor-cleanup",
+          "status": "clear|finding|suggestion|not-applicable",
+          "evidence": ["<path:line, artifact:..., or bounded command evidence>"],
+          "findingIds": ["<required for finding or suggestion>"]
+        }
+      ],
       "disposition": "complete|finding"
     }
   ],
@@ -43,6 +60,20 @@ Write `review.json` with this minimal schema and validate it with
     "commandsRun": ["<command and result>"],
     "notRun": ["<check and reason>"]
   },
+  "residualCandidates": [
+    {
+      "id": "<caller-owned stable candidate id>",
+      "gateName": "<retired gate identifier>",
+      "kind": "fixed-return-helper|retained-export|fixed-parameter|fixed-conditional",
+      "symbol": "<helper, export, parameter, or conditional carrier>",
+      "path": "<changed path>",
+      "line": 1,
+      "disposition": "finding|independent-contract",
+      "findingId": "<required for finding>",
+      "independentSemanticEvidence": ["<required for independent-contract>"],
+      "externalCallerEvidence": ["<required for independent-contract>"]
+    }
+  ],
   "findings": [
     {
       "id": "<stable id>",
@@ -62,12 +93,42 @@ Write `review.json` with this minimal schema and validate it with
 ```
 
 Before dispatch, the caller must write every independently classified retired gate identifier to a
-newline-delimited `review-gates.txt`, write Git-deleted paths to `review-deleted-files.txt`, and pass
-both files plus the expected merge base to the dedicated validator. Reported gate names must exactly
+newline-delimited `review-gates.txt`, write Git-deleted paths to `review-deleted-files.txt`, and
+write independently discovered fixed-residue candidates to `review-residual-candidates.jsonl`.
+Each NDJSON object contains exactly the candidate identity fields `id`, `gateName`, `kind`, `symbol`,
+`path`, and `line`; an empty scan still produces an empty file. Pass all three inventories plus the
+expected merge base to the dedicated validator. The reviewer must not create or modify them.
+The caller also builds `review-rule-inventory.json` from the isolated
+`graduation-review-rule-registry.json`. The inventory contains every non-example prose, list, and
+table block in this reference and is bound to the source digest and immutable diff identity.
+`ruleResults` must exactly cover every inventory ID; every finding must be linked from at least one
+result. Missing, extra, duplicate, stale, or unlinked results forbid `APPROVE`.
+Reported gate names must exactly
 match that inventory. `changedFiles` must exactly match Git; a surviving file uses
 `reviewedVersion: "head"`, while a deleted file uses `reviewedVersion: "merge-base"` and must be read
 from the merge-base version before its disposition is recorded. Every retired gate must have
 direction, call-site, and cleanup evidence.
+
+Every gate must also contain exactly one `ruleChecks` entry for each of these classes:
+
+- `permanent-branch`: authorization, permanent direction, and surviving branch correctness.
+- `fixed-carriers`: fixed helpers, wrappers, exports, aliases, and transitive carriers.
+- `fixed-inputs`: gate-derived parameters, options, properties, defaults, and literals.
+- `obsolete-control-flow`: conditionals, switches, ternaries, and branch-only structure.
+- `discarded-evaluations`: value-discarded gate calls, property/DOM reads, and supply chains.
+- `transitive-gates`: nested Flight/KS/experiment calls made irrelevant by graduation.
+- `stale-artifacts`: IDs/GUIDs, registrations, imports, mocks, tests, refs, props, and resources.
+- `runtime-entry-points`: every reachable runtime consumer and entry point is included in the sweep.
+- `coverage-and-tests`: threshold or test changes follow actual-failure and PR-evidence requirements.
+- `scope-purity`: the diff contains no unrelated behavior hidden inside graduation-only scope.
+- `minor-cleanup`: fixed options needing author confirmation, redundant Fragments, undefined props,
+  and safe single-consumer style consolidation.
+
+Use `clear` only with concrete evidence that the class was checked, and `not-applicable` only with
+evidence explaining why the class cannot occur for that gate. `finding` must reference one or more
+Critical/Important finding IDs; `suggestion` must reference one or more Minor finding IDs. Every
+finding must be referenced by the applicable rule check before choosing a verdict. An omitted rule
+class is an incomplete review and cannot produce `APPROVE`.
 
 Every evidence string in this report uses one of these forms: `path:line`, `artifact:<specific
 source and fact>`, or `command:<bounded command and result>`. A no-match cleanup or class-sweep
@@ -79,6 +140,13 @@ files and relevant gate-reference sites. Generic test/build commands are not cla
 Minor findings may omit that field. Every finding's `gateName` must match the
 independent gate inventory. The gates marked `disposition: "finding"` must exactly equal the gates
 referenced by findings; all other gates use `disposition: "complete"`.
+
+`residualCandidates` must exactly match the immutable JSONL inventory. A candidate with
+`disposition: "finding"` must reference a Critical or Important finding for the same gate. A
+candidate may use `independent-contract` only when both `independentSemanticEvidence` and
+`externalCallerEvidence` prove that the symbol has meaning separate from rollout state and that
+external callers require the public contract. Export syntax, an unchanged name/signature, or the
+possibility of unknown callers is not evidence. Missing either proof forbids `APPROVE`.
 
 The report is reviewer-owned. Critical or Important findings produce
 `REQUEST_CHANGES`; Minor-only findings produce `COMMENT`; zero findings produce `APPROVE`. Do not
@@ -180,6 +248,16 @@ inside the function. If any call supplies another value, the parameter has indep
 meaning, or external callers cannot be ruled out, preserve the parameter and simplify only the
 graduated call path.
 
+When the changed call site visibly replaces a gate-derived option property with a literal, such as
+`isDashboardPersonalizationEnabled: true`, but the review has not established ownership of the
+downstream type and implementation, emit a non-blocking **Minor** suggestion immediately. The
+description must start with `Nit:` and ask the author to check whether the property has any other
+callers or independent meaning; if not, remove it from the options type and call site and fold the
+permanent branch into the downstream implementation. This Minor suggestion does not require the
+reviewer to perform a repository-wide caller scan or add the property to the residual inventory.
+Upgrade it to **Important** only when available source evidence already proves the property is
+gate-only and always fixed, yet the PR retains it as configurable input.
+
 Also trace values that are not gate booleans but exist only to share the same expression across
 gate branches. If selecting the permanent branch leaves such a local temporary with exactly one
 reference, inline it at that reference and delete the declaration. This includes JSX elements,
@@ -249,6 +327,26 @@ changed-file review is insufficient. Before approving:
 This propagation is transitive. A fixed wrapper called by another wrapper, property initializer,
 or callback remains unfinished until every downstream consumer has been simplified or a proven
 independent contract boundary is reached.
+
+### Reverse-scan fixed residue independently
+
+Do not stop when Flight/KS SDK calls disappear. For each retired gate, derive a search vocabulary
+from the merge-base version: gate/Flight name, helper and wrapper symbols, GUID/ID, imports/exports,
+aliases, boolean properties, parameters receiving the value, and downstream callers. Search HEAD
+for every term, then follow symbol references and the call chain in both directions. Inspect
+renamed carriers and consumers whose source no longer contains the original gate name.
+
+Record every surviving fixed-return helper, retained export of that helper/carrier, gate-only
+parameter now always receiving a literal, and conditional still controlled by a permanent literal
+in the caller-owned residual inventory. The inventory is intentionally over-inclusive: the reviewer
+must account for each candidate rather than silently omit it. A no-match SDK search cannot clear a
+helper-name, GUID, alias, or call-chain candidate.
+
+An exported helper such as `export function isSchedulingEnabledForCoAuth(): boolean { return true; }`
+is an Important finding unless source evidence proves independent non-gate semantics and external
+callers that require the contract. Substitute `true` at every caller, simplify the resulting logic,
+and delete the helper, export/imports, aliases, parameters, and obsolete tests when no such contract
+exists.
 
 ```ts
 // Before graduation: gate wrapper
@@ -342,6 +440,21 @@ function useInteraction(options: { item: Item }): void {
   enableInteraction(options.item);
 }
 ```
+
+When downstream ownership has not already been established, report the visible fixed option without
+blocking approval or requiring a new class sweep:
+
+```ts
+// Graduation diff: suggest checking whether the option can be removed downstream
+startFRETimer(false, {
+  targetingOptions: {
+    isDashboardPersonalizationEnabled: true,
+  },
+});
+```
+
+Example finding: `Nit: Check whether isDashboardPersonalizationEnabled has any other callers or
+independent meaning. If not, remove the option and fold the enabled behavior into startFRETimer.`
 
 Branch-sharing temporaries must not survive as single-use indirection:
 

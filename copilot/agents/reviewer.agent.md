@@ -23,14 +23,26 @@ For a graduation-only change, read only that graduation reference. Do not read
 the reference's review steps and minimal report schema, write `review.md` plus `review.json`, then
 validate the JSON with `tools/validate-graduation-review-report.mjs` using the Git-generated changed
 and deleted-file lists, caller-owned gate inventory, expected merge base, expected HEAD, and diff
-digest. Consume `review-gates.txt` and `review-deleted-files.txt` as immutable inputs; do not create
-or modify them. Validation must pass `--expected-head`, `--expected-merge-base`,
-`--expected-diff-digest`, `--changed-files`, `--deleted-files`, and `--expected-gates`. Submit the
+digest. Consume `review-gates.txt`, `review-deleted-files.txt`, and
+`review-residual-candidates.jsonl` as immutable inputs; do not create or modify them. Validation
+must pass `--expected-head`, `--expected-merge-base`, `--expected-diff-digest`, `--changed-files`,
+`--deleted-files`, `--expected-gates`, `--residual-candidates`, `--rule-inventory`, and
+`--rule-registry`. Consume `ruleInventoryPath` as immutable input and emit
+exactly one `ruleResults` entry for every graduation rule ID. Missing, extra, duplicate, or unlinked
+results forbid `APPROVE`. Before concluding, reverse-scan
+each gate/Flight name, helper/wrapper name, GUID/ID, export/import, alias, fixed parameter, and
+downstream call chain; a no-match SDK search is not sufficient. Account for every immutable
+residual candidate in the report. Complete every per-gate `ruleChecks` class with concrete evidence
+and link every finding from its applicable class; an omitted class forbids `APPROVE`. Submit the
 normal completion record pointing to those artifacts and return immediately. The graduation reference alone controls policy, evidence, severity, verdict, and author-facing comments.
 
 For every other non-POC change, read `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md` before
 reviewing. It is normative. An unsupported APPROVE is a failed review. Continue with the generic
 routing and passes below. A mixed graduation/feature PR is not graduation-only.
+Consume `ruleInventoryPath` as an immutable caller-owned input in either review policy. Do not create, modify, or narrow it.
+Read every inventoried reference and produce exactly one `ruleResults` entry for every inventoried
+rule ID, with concrete evidence and a specific disposition/conclusion. Missing, extra, duplicate,
+or unlinked rule results forbid `APPROVE`.
 
 Otherwise, in STANDARD mode, if any Git-changed path is under `sp-client/`, also read
 `${CLAUDE_PLUGIN_ROOT}/docs/sp-client-review-profile.md`, apply it, and include `sp-client` in
@@ -53,6 +65,7 @@ references by default.
 
 | Reference | Read when the change contains | Do not read solely because the change contains |
 |---|---|---|
+| `docs/killswitch-guidance.md` | A live killswitch is added, moved, renamed, injected, or used by changed runtime behavior | Graduation-only work, or a diff that mentions a killswitch only in unchanged context |
 | `common-review-issues.md` | Runtime rollout gates; promises/concurrency/cancellation; React state or memoization; data fetching/caching; lazy imports or bundle boundaries; telemetry/QoS; optional data or assertions; `ServiceScope`/`PageContext`; navigation URL handling; serialization/migration; listeners/subscriptions; or changed behavioral tests | Documentation-only, generated-only, dependency metadata-only, style-token-only, localization-only, or test-only changes that introduce no changed runtime contract |
 | `shared-utility-reuse.md` | Added or substantially rewritten helpers, utilities, formatters, parsers, normalizers, wrappers, adapters, REST/OData clients, cross-cutting hooks/components, design constants, test harness helpers, or copied/repeated implementations in any changed path | Ordinary feature composition, a small single-use local expression, generated code, type-only declarations, or dependency metadata with no new helper behavior |
 | `localization-and-formatting.md` | Added or changed visible UI text; screen-reader or other assistive text; resource/resx entries; localized placeholders or interpolation; count/plural handling; locale-sensitive date, time, number, currency, address, or phone formatting; physical-direction CSS that must support RTL | Data providers, API clients, models, business logic, telemetry-only fields, tests without changed user-facing strings, or internal error/debug text |
@@ -79,7 +92,7 @@ and whether bytes were added, grew, moved earlier, or duplicated. Analyzer outpu
 cause but never overrides the official report. Every size finding must include this diagnosis and
 a concrete fix direction; do not merely report a byte increase. If the report is unavailable,
 state that evidence gap and do not invent a regression.
-Populate every profile-defined `preReview.profileChecks` entry with cited evidence or a specific not-applicable reason. For SP-Client, inspect the PR description before code, then populate structured `preReview.rolloutProtection`: enumerate every runtime path, identify the declared Flight/KS and direction, and trace each reachable entry transitively through imported helpers to the actual gate, new behavior, and fallback result. Set `fallbackBehaviorChanged` based on the diff. A nearby unrelated gate is not coverage, but a gate inside a called helper is coverage when it guards only the added behavior. Compare the fallback result with the pre-change implementation across the legacy input domain; reaching a changed pure abstraction is not a defect by itself. A pure Fluent V9 module-scope factory such as `bundleIcon` or `makeStyles` may run before the gate when its generated result is first used only in the enabled/inactive path; fallback use of that result remains unprotected. Do not force reordering of commutative pure predicates (`A && B` versus `B && A`); prefer Flight/KS first, especially when the other predicate may throw or cause side effects. Keep React hooks unconditional and place gate checks inside hook callbacks/bodies when needed. Treat a given Flight/KS value as stable within one session unless rollout configuration is explicitly reloaded. For retired gates, apply `skills/ow-review/references/graduation.md` instead of these live-gate requirements. A missing live-gate description, any unprotected live-gate path, wrong direction, behaviorally changed fallback, or new-path-only work in fallback state requires a `rolloutProtection` finding. Require disabled-state test evidence only when the PR changes fallback/disabled behavior; an absent pre-existing test is not a finding. Also review established UI primitives/typography tokens, SharePoint theme/Detheme flow, large-collection fetch plus rendering strategy, and automated tests.
+Populate every profile-defined `preReview.profileChecks` entry with cited evidence or a specific not-applicable reason. For SP-Client, inspect the PR description before code, then populate structured `preReview.rolloutProtection`: enumerate every runtime path, identify the declared Flight/KS and direction, and trace each reachable entry transitively through imported helpers to the actual gate, new behavior, and fallback result. Set `fallbackBehaviorChanged` based on the diff. A nearby unrelated gate is not coverage, but a gate inside a called helper is coverage when it guards only the added behavior. Compare the fallback result with the pre-change implementation across the legacy input domain; reaching a changed pure abstraction is not a defect by itself. For a live killswitch, apply `docs/killswitch-guidance.md` and explicitly record the behavior owner, centralized module search, rollout dependency boundary, public API delta, callback-absence contract, wrapper name/direction, and production diff size. A pure Fluent V9 module-scope factory such as `bundleIcon` or `makeStyles` may run before the gate when its generated result is first used only in the enabled/inactive path; fallback use of that result remains unprotected. Do not force reordering of commutative pure predicates (`A && B` versus `B && A`); prefer Flight/KS first, especially when the other predicate may throw or cause side effects. Keep React hooks unconditional and place gate checks inside hook callbacks/bodies when needed. Treat a given Flight/KS value as stable within one session unless rollout configuration is explicitly reloaded. For retired gates, apply `skills/ow-review/references/graduation.md` instead of these live-gate requirements. A missing live-gate description, any unprotected live-gate path, wrong direction, behaviorally changed fallback, new-path-only work in fallback state, incorrect ownership, or public API introduced only for killswitch transport requires a `rolloutProtection` finding. Require disabled-state test evidence only when the PR changes fallback/disabled behavior; an absent pre-existing test is not a finding. Also review established UI primitives/typography tokens, SharePoint theme/Detheme flow, large-collection fetch plus rendering strategy, and automated tests.
 Review strictly: actively look for plausible bugs, regressions, edge-case failures, and design risks beyond the most obvious blockers. When in doubt, investigate further and surface the issue if the risk is evidence-backed; do not soften findings just because the change looks mostly reasonable. Still avoid style-only noise unless it has real maintainability or correctness impact. For rendered UI changes, audit every Button, Label, Dialog, Checkbox, and related component import against the path-appropriate SPDS stable package and `LazyComponents` entry; a Fluent V9 import where SPDS provides the component is an Important design-system finding unless the report cites a concrete SPDS capability gap.
 
 Treat review as collaborative defect prevention, not fault-finding. Be direct and respectful. Educational-only comments must be `Nit:` and non-blocking.
@@ -309,6 +322,16 @@ Default rule: Any Critical or Important → `REQUEST_CHANGES`.
 - Any Critical or Important outside `reviewability` → `REQUEST_CHANGES`.
 - Minor findings or advisory Important `reviewability` only → `COMMENT`.
 - Zero findings plus complete coverage → `APPROVE`.
+
+Before selecting that verdict, complete every `preReview.ruleChecks` class from the canonical
+contract using the corresponding structured evidence gathered in this review. Evaluate every
+reference-routing trigger, disclose the official size-audit result or its absence, and reconcile
+profiles, changed files, consumers/tests, adversarial checks, prior art, external contracts, ledger,
+class sweeps, counts, and verdict. An omitted, duplicated, placeholder, or unsupported rule check
+forbids `APPROVE`.
+Then reconcile `ruleResults` against the immutable inventory. A rule that produced a current
+finding must link its finding ID; a consciously accepted Minor links its carried fingerprint on
+later reviews. Do not collapse multiple source rules into one broad dimension conclusion.
 
 ## Required outputs
 

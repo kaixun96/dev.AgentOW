@@ -6,7 +6,7 @@
     "agentow": "./dist/ow/index.js"
   },
   "scripts": {
-    "build": "npm run validate-harness-contract && npm run validate-prompts && npm run validate-a11y && npm run validate-review-contract && npm run validate-graduation-review-contract && npm run validate-review-ledger && npm run validate-class-sweep && npm run validate-prior-art && npm run validate-run-state && npm run validate-pr-description && tsup && npm run sync-artifacts",
+    "build": "npm run validate-harness-contract && npm run validate-prompts && npm run validate-a11y && npm run validate-review-contract && npm run validate-graduation-review-contract && npm run validate-review-ledger && npm run validate-rule-inventory && npm run validate-class-sweep && npm run validate-prior-art && npm run validate-run-state && npm run validate-pr-description && tsup && npm run sync-artifacts",
     "validate-harness-contract": "node scripts/harness-contract.test.mjs && node scripts/validate-harness-contract.mjs",
     "validate-a11y": "node scripts/a11y-evidence.test.mjs",
     "sync-artifacts": "node scripts/sync-build-artifacts.mjs",
@@ -14,6 +14,7 @@
     "validate-review-contract": "node scripts/validate-review-report.test.mjs",
     "validate-graduation-review-contract": "node scripts/graduation-review-report.test.mjs",
     "validate-review-ledger": "node scripts/review-ledger.test.mjs",
+    "validate-rule-inventory": "node scripts/review-rule-inventory.test.mjs",
     "validate-class-sweep": "node scripts/class-sweep.test.mjs",
     "validate-prior-art": "node scripts/prior-art.test.mjs",
     "validate-pr-description": "node scripts/pr-description-budget.test.mjs",

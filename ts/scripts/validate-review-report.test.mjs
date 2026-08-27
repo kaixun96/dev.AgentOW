@@ -3,13 +3,22 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const validator = fileURLToPath(new URL("../../tools/validate-review-report.mjs", import.meta.url));
 const tempDir = fs.mkdtempSync(`${os.tmpdir()}/agentow-review-contract-`);
 const changedFilesPath = `${tempDir}/changed-files.txt`;
 const diffNumstatPath = `${tempDir}/numstat.txt`;
+const ruleInventoryPath = `${tempDir}/review-rule-inventory.json`;
+const ruleRegistryPath = `${tempDir}/review-rule-registry.json`;
 const reportPath = `${tempDir}/review.json`;
+const ruleReferencePath = `${tempDir}/docs/review-contract.md`;
+fs.mkdirSync(path.dirname(ruleReferencePath), { recursive: true });
+fs.writeFileSync(ruleReferencePath, "Review scope and coverage.\n");
+const registryContent = `${JSON.stringify({ schemaVersion: 1, references: ["docs/review-contract.md"] }, null, 2)}\n`;
+fs.writeFileSync(ruleRegistryPath, registryContent);
+const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const contractRepo = path.join(tempDir, "contract-repo");
 fs.mkdirSync(contractRepo, { recursive: true });
 const runGit = (repoRoot, ...args) =>
@@ -26,6 +35,19 @@ runGit(contractRepo, "commit", "--quiet", "-am", "head");
 const contractHead = runGit(contractRepo, "rev-parse", "HEAD");
 fs.writeFileSync(changedFilesPath, "src/example.ts\n");
 fs.writeFileSync(diffNumstatPath, "10\t2\tsrc/example.ts\n");
+const makeRuleInventory = (reviewedHead = contractHead, mergeBase = contractBase, diffDigest = "c".repeat(64)) => ({
+  schemaVersion: 1,
+  reviewedHead,
+  mergeBase,
+  diffDigest,
+  registryDigest: digest(registryContent),
+  references: [{ id: "review-contract", path: "docs/review-contract.md", sourceDigest: digest(fs.readFileSync(ruleReferencePath, "utf8")) }],
+  rules: [
+    { id: "rr.review-contract.scope", referenceId: "review-contract", path: "docs/review-contract.md", line: 1, heading: "Scope", textDigest: "e".repeat(64) },
+    { id: "rr.review-contract.coverage", referenceId: "review-contract", path: "docs/review-contract.md", line: 2, heading: "Coverage", textDigest: "f".repeat(64) },
+  ],
+});
+fs.writeFileSync(ruleInventoryPath, JSON.stringify(makeRuleInventory()));
 
 const dimensionNames = [
   "behavior",
@@ -67,6 +89,25 @@ for (const key of dimensionNames) {
     conclusion: dimensionConclusions[key],
   };
 }
+const generalRuleChecks = [
+  ["intent-and-scope", "The request evidence and changed behavior establish a focused, necessary implementation scope"],
+  ["reference-routing", "All review references were evaluated against their triggers and applicable references were used"],
+  ["profile-routing", "The global profile applies and no additional path-specific profile is triggered"],
+  ["changed-file-coverage", "Every Git-changed file is represented in the risk map and whole-file coverage"],
+  ["consumer-and-test-coverage", "Direct consumers and relevant tests were inspected for every changed file"],
+  ["adversarial-pass", "A falsifiable failure hypothesis was checked independently during the second pass"],
+  ["size-audit", "The official size-audit obligation was checked and no reported regression applies"],
+  ["prior-art", "The changed local behavior does not introduce a cross-cutting utility requiring reuse"],
+  ["external-contracts", "No changed behavior relies on an unverified external semantic contract"],
+  ["ledger-reconciliation", "No accepted ledger entries exist for this branch and no finding is carried"],
+  ["finding-class-sweep", "No blocking finding class exists that requires repository-wide instance accounting"],
+  ["verdict-reconciliation", "The zero finding counts support APPROVE after all mandatory checks completed"],
+].map(([rule, conclusion]) => ({
+  rule,
+  status: "clear",
+  evidence: ["src/example.ts:1"],
+  conclusion,
+}));
 
 function makeReport() {
   return {
@@ -82,6 +123,7 @@ function makeReport() {
       necessityAndScope: "The focused change is necessary to prevent valid empty results from crashing callers",
       intentMatch: "The implementation matches the stated behavior and does not expand beyond the affected path",
       profiles: ["global"],
+      ruleChecks: structuredClone(generalRuleChecks),
       reviewLedger: { status: "absent", ledgerPath: null, entryCount: 0, carriedCount: 0 },
       priorArt: [],
       externalContracts: [],
@@ -128,6 +170,20 @@ function makeReport() {
         },
       ],
     },
+    ruleResults: [
+      {
+        ruleId: "rr.review-contract.scope",
+        disposition: "satisfied",
+        evidence: ["src/example.ts:1"],
+        conclusion: "The implementation remains within the requested behavior and necessary scope",
+      },
+      {
+        ruleId: "rr.review-contract.coverage",
+        disposition: "satisfied",
+        evidence: ["src/example.ts:1"],
+        conclusion: "Every changed file, direct consumer, test, and risk dimension was reviewed",
+      },
+    ],
     findings: [],
     previouslyAccepted: [],
     counts: { critical: 0, important: 0, minor: 0 },
@@ -159,22 +215,41 @@ function validate(
   report,
   {
     expectedHead = contractHead,
+    expectedMergeBase = report.mergeBase,
     expectedDigest = "c".repeat(64),
     repoRoot = contractRepo,
+    preserveRuleInventory = false,
+    preserveRuleLinks = false,
   } = {},
 ) {
+  if (!preserveRuleInventory) {
+    fs.writeFileSync(ruleInventoryPath, JSON.stringify(makeRuleInventory(report.reviewedHead, report.mergeBase, report.diffDigest)));
+  }
+  if (!preserveRuleLinks && report.findings.length > 0) {
+    report.ruleResults[0] = {
+      ...report.ruleResults[0],
+      disposition: "finding",
+      findingIds: report.findings.map((finding) => finding.id),
+    };
+  }
   fs.writeFileSync(reportPath, JSON.stringify(report));
   const args = [
     validator,
     reportPath,
     "--expected-head",
     expectedHead,
+    "--expected-merge-base",
+    expectedMergeBase,
     "--expected-diff-digest",
     expectedDigest,
     "--changed-files",
     changedFilesPath,
     "--diff-numstat",
     diffNumstatPath,
+    "--rule-inventory",
+    ruleInventoryPath,
+    "--rule-registry",
+    ruleRegistryPath,
   ];
   if (repoRoot) args.push("--repo", repoRoot);
   return spawnSync(
@@ -185,6 +260,74 @@ function validate(
 }
 
 assert.equal(validate(makeReport()).status, 0, "complete clean review should pass");
+
+const missingUniversalRule = makeReport();
+missingUniversalRule.ruleResults.pop();
+assert.equal(validate(missingUniversalRule).status, 1, "every inventoried review rule must be reported");
+
+const extraUniversalRule = makeReport();
+extraUniversalRule.ruleResults.push({
+  ruleId: "rr.unexpected.rule",
+  disposition: "satisfied",
+  evidence: ["src/example.ts:1"],
+  conclusion: "An unrecognized rule cannot be injected into the immutable review inventory",
+});
+assert.equal(validate(extraUniversalRule).status, 1, "extra non-inventoried rule results are rejected");
+
+const duplicateUniversalRule = makeReport();
+duplicateUniversalRule.ruleResults[1].ruleId = duplicateUniversalRule.ruleResults[0].ruleId;
+assert.equal(validate(duplicateUniversalRule).status, 1, "duplicate rule results cannot hide an omitted rule");
+
+const unlinkedUniversalFinding = makeReport();
+addBlockingRolloutFinding(unlinkedUniversalFinding);
+assert.equal(
+  validate(unlinkedUniversalFinding, { preserveRuleLinks: true }).status,
+  1,
+  "every current finding must be linked from an inventoried rule result",
+);
+
+const originalInventory = fs.readFileSync(ruleInventoryPath, "utf8");
+const staleRuleInventory = JSON.parse(originalInventory);
+staleRuleInventory.diffDigest = "9".repeat(64);
+fs.writeFileSync(ruleInventoryPath, JSON.stringify(staleRuleInventory));
+assert.equal(validate(makeReport(), { preserveRuleInventory: true }).status, 1, "rule inventory identity must match the reviewed diff");
+fs.writeFileSync(ruleInventoryPath, originalInventory);
+
+assert.equal(
+  validate(makeReport(), { expectedMergeBase: "9".repeat(40) }).status,
+  1,
+  "the report and inventory must match the caller-owned merge base",
+);
+
+const originalReference = fs.readFileSync(ruleReferencePath, "utf8");
+fs.writeFileSync(ruleReferencePath, `${originalReference}Changed after inventory.\n`);
+assert.equal(
+  validate(makeReport(), { preserveRuleInventory: true }).status,
+  1,
+  "reference source changes after inventory creation are rejected",
+);
+fs.writeFileSync(ruleReferencePath, originalReference);
+
+const originalRegistry = fs.readFileSync(ruleRegistryPath, "utf8");
+fs.writeFileSync(ruleRegistryPath, JSON.stringify({ schemaVersion: 1, references: [] }));
+assert.equal(
+  validate(makeReport(), { preserveRuleInventory: true }).status,
+  1,
+  "the inventory cannot omit references from the canonical registry",
+);
+fs.writeFileSync(ruleRegistryPath, originalRegistry);
+
+const missingRuleCheck = makeReport();
+missingRuleCheck.preReview.ruleChecks.pop();
+assert.equal(validate(missingRuleCheck).status, 1, "every general-review rule class must be reported");
+
+const duplicateRuleCheck = makeReport();
+duplicateRuleCheck.preReview.ruleChecks[1].rule = duplicateRuleCheck.preReview.ruleChecks[0].rule;
+assert.equal(validate(duplicateRuleCheck).status, 1, "one rule check cannot stand in for another class");
+
+const vagueRuleCheck = makeReport();
+vagueRuleCheck.preReview.ruleChecks[0].conclusion = "N/A";
+assert.equal(validate(vagueRuleCheck).status, 1, "rule checks require a specific conclusion");
 
 fs.unlinkSync(changedFilesPath);
 assert.equal(validate(makeReport()).status, 1, "missing changed-file evidence should fail closed");

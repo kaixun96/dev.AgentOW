@@ -105,13 +105,41 @@ function repo() {
   fs.rmSync(root, { recursive: true, force: true });
 }
 
+// --- blocking findings can never be accepted -------------------------------
+{
+  const { root } = repo();
+  fs.writeFileSync(`${root}/a.ts`, "authorizeSensitiveOperation();\n");
+  const report = {
+    reviewedHead: "0".repeat(40),
+    findings: [{ id: "IMPORTANT-1", severity: "Important", path: "a.ts", line: 1, description: "Missing authorization check" }],
+  };
+  fs.writeFileSync(`${root}/r.json`, JSON.stringify(report));
+
+  const rejected = run(
+    [ledgerTool, "accept", "--report", `${root}/r.json`, "--ledger", `${root}/l.json`, "--accept", "IMPORTANT-1=The caller is trusted by convention and the team accepts this risk for the current release.", "--repo", root],
+    root,
+  );
+  assert.equal(rejected.status, 1, "an Important finding cannot be accepted into the ledger");
+  assert.match(rejected.stdout, /only Minor findings may be accepted/);
+
+  const unsafeLedger = {
+    schemaVersion: 1,
+    entries: [{ fingerprint: "abc123", path: "a.ts", severity: "Important", disposition: "accepted", reason: "Previously accepted." }],
+  };
+  fs.writeFileSync(`${root}/unsafe.json`, JSON.stringify(unsafeLedger));
+  const loaded = run([ledgerTool, "match", "--report", `${root}/r.json`, "--ledger", `${root}/unsafe.json`, "--repo", root], root);
+  assert.equal(loaded.status, 2, "a historical ledger containing an accepted Important finding fails closed");
+  assert.match(loaded.stderr, /not a Minor finding/);
+  fs.rmSync(root, { recursive: true, force: true });
+}
+
 // --- the PR description carries the ledger to other machines ----------------
 {
   const { root } = repo();
   const ledger = {
     schemaVersion: 1,
     entries: [
-      { fingerprint: "abc123", path: "a.ts", anchor: "const x = 1;", description: "Nit: unexplained constant", disposition: "accepted", reason: "Documented in the adjacent design note; changing it is out of scope." },
+      { fingerprint: "abc123", path: "a.ts", anchor: "const x = 1;", severity: "Minor", description: "Nit: unexplained constant", disposition: "accepted", reason: "Documented in the adjacent design note; changing it is out of scope." },
     ],
   };
   fs.writeFileSync(`${root}/l.json`, JSON.stringify(ledger));
@@ -123,6 +151,7 @@ function repo() {
   const parsed = JSON.parse(run([ledgerTool, "parse", "--description", `${root}/desc.md`], root).stdout);
   assert.equal(parsed.entries.length, 1, "the block round-trips out of a PR description");
   assert.equal(parsed.entries[0].fingerprint, "abc123");
+  assert.equal(parsed.entries[0].severity, "Minor", "the round trip preserves the acceptance severity");
   fs.rmSync(root, { recursive: true, force: true });
 }
 

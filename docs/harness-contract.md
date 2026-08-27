@@ -19,7 +19,7 @@ The command runs negative fixtures and validates the live repository against
 - `@agentow-copilot:*` references against installed Copilot agents;
 - marketplace, plugin manifest, and MCP mirror consistency;
 - ordered lifecycle markers for STANDARD, POC, and A11y flows;
-- generated tool, review-reference, and documentation mirrors;
+- generated tools and explicitly shared review-reference/documentation mirrors;
 - draft-only PR creation/update and the no-comment attachment path;
 - review evidence binding to the current Git HEAD and diff digest.
 
