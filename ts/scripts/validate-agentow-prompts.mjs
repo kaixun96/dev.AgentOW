@@ -1429,7 +1429,6 @@ const mirroredChecks = [
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
-  ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
   ["skills/ow-review/references/accessibility.md", "copilot/skills/ow-review/references/accessibility.md"],
   ["skills/ow-review/references/common-review-issues.md", "copilot/skills/ow-review/references/common-review-issues.md"],
   ["skills/ow-review/references/graduation.md", "copilot/skills/ow-review/references/graduation.md"],

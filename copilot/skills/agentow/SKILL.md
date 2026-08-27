@@ -27,9 +27,11 @@ You (the main session) drive this end to end. You are the orchestrator AND the i
 Execution profile and interaction mode are separate:
 
 - `--poc` selects **POC profile**: optimize for a runnable result and fast visual feedback, not
+  <!-- agentow-contract:profile:poc -->
   production readiness. It uses bounded main-session planning, skips tests by default, performs an
   advisory safety review, and captures AFTER-only UI evidence for the requested/default scenario.
 - Without `--poc`, use the **STANDARD profile** and every normal quality gate in this document.
+  <!-- agentow-contract:profile:standard -->
 - `--auto` (or "no questions" / "just do it") selects **AUTO interaction** and skips user gates.
   Otherwise interaction is **INTERACTIVE**. `--poc --auto` is valid.
 
@@ -418,6 +420,7 @@ If the context link is resolved:
 If plan maintenance changed a routed context document, re-read it before implementation. Do not rerun planning unless the context update introduces a new mandatory guard that invalidates the approved plan.
 
 ## Step 4: Implement (you write the code)
+<!-- agentow-contract:gate:implement-build:profiles=poc,standard -->
 
 Record durable phase `implementation`.
 Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
@@ -547,6 +550,7 @@ Write `/workspaces/odsp-web/.aero/<session>/implementation/iter<N>.md` after eac
 Submit the generator/implementation record through `run-state.mjs report`.
 
 ## Step 5: Verify (dispatch evaluator)
+<!-- agentow-contract:gate:evaluate:profiles=poc,standard -->
 
 Record durable phase `evaluation`.
 Append `[HH:MM:SS] 🔍 Evaluator started (cycle N)` before dispatching.
@@ -632,6 +636,7 @@ Before starting each fix cycle, append `[HH:MM:SS] 🔁 Fix cycle N+1 — <reaso
 **PASS:** continue to Step 7.
 
 ## Step 7: Review (dispatch reviewer)
+<!-- agentow-contract:gate:review:profiles=poc,standard -->
 
 Record durable phase `review`, dispatch the reviewer, then reconcile immediately after it returns. (dispatch reviewer)
 
@@ -724,6 +729,7 @@ Read the final evaluator NDJSON record immediately before dispatch. Pass only ar
 
 In STANDARD profile, after the reviewer returns, independently recompute the merge base, HEAD, diff
 digest, and changed-file list. When `reviewPolicy=graduation-only`, validate only with:
+<!-- agentow-contract:evidence:review-bound-to-head -->
 
 ```bash
 mergeBase=$(git merge-base origin/main HEAD)
@@ -801,6 +807,7 @@ evaluation and review.
 No-update, patch-only, disabled, dirty-worktree, read-only, auth, or conflict outcomes are recorded but never block PR creation.
 
 ## Step 9: Ship
+<!-- agentow-contract:delivery:draft-pr -->
 
 1. **Push** the branch. For a new run, create the draft PR with `ow-pr-create`. When promoting an
    existing POC, call `ow-pr-update` with its existing `prId`; never call `ow-pr-create`, never create
@@ -847,6 +854,7 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/review-ledger.mjs" render \
    primary images. Include `visualValidation.source`.
    Component crops may be attached as clearly labeled supplemental detail links.
    - Pass the table to `ow-pr-attach`; it replaces the prior
+     <!-- agentow-contract:safety:no-pr-comments -->
      `<!-- agentow:visual-validation:start -->` block instead of appending duplicates.
    - Azure DevOps limits descriptions to 4000 characters. Keep Summary, Changes, required
      verification disclosures, accepted-review ledger, and scenario evidence. Low-value generated

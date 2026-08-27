@@ -31313,7 +31313,7 @@ var PrClient = class {
     }
     this.logger?.info("pr-create", `pushed ${branch}`);
     const target = input.targetBranch ?? "main";
-    const draft = input.draft ?? true;
+    const draft = true;
     const descFile = path2.join(os.tmpdir(), `ow-pr-desc-${Date.now()}.md`);
     fs2.writeFileSync(descFile, input.description, "utf8");
     const azArgs = [
@@ -31378,7 +31378,7 @@ ${prResult.stdout}`);
     return { prId, prUrl, branch, draft };
   }
   async updatePr(input, signal) {
-    const draft = input.draft ?? true;
+    const draft = true;
     const descFile = path2.join(os.tmpdir(), `ow-pr-desc-${Date.now()}.md`);
     fs2.writeFileSync(descFile, input.description, "utf8");
     const azArgs = [
@@ -32172,7 +32172,6 @@ function registerOwTools(server2, logger2, logDir) {
       title: external_exports.string().describe("PR title (keep under 70 chars)"),
       description: external_exports.string().describe("PR body in markdown"),
       targetBranch: external_exports.string().optional().describe("Target branch (default: main)"),
-      draft: external_exports.boolean().optional().describe("Create as draft (default: true)"),
       workItems: external_exports.string().optional().describe("Space-separated work item IDs to link")
     }
   }, async (input, extras) => {
@@ -32180,7 +32179,6 @@ function registerOwTools(server2, logger2, logDir) {
       title: input.title,
       description: input.description,
       targetBranch: input.targetBranch,
-      draft: input.draft,
       workItems: input.workItems
     }, extras.signal);
     return successResultWithDebug(logger2, "ow-pr-create", result);
@@ -32190,15 +32188,13 @@ function registerOwTools(server2, logger2, logDir) {
     inputSchema: {
       prId: external_exports.number().describe("Pull request ID to update"),
       title: external_exports.string().describe("Replacement PR title"),
-      description: external_exports.string().describe("Replacement PR body in markdown"),
-      draft: external_exports.boolean().optional().describe("Keep as draft (default: true)")
+      description: external_exports.string().describe("Replacement PR body in markdown")
     }
   }, async (input, extras) => {
     const result = await pr.updatePr({
       prId: input.prId,
       title: input.title,
-      description: input.description,
-      draft: input.draft
+      description: input.description
     }, extras.signal);
     return successResultWithDebug(logger2, "ow-pr-update", result);
   });

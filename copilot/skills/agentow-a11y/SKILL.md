@@ -82,6 +82,7 @@ match viewport/scroll/target geometry, and attribute each number to page DOM/UIA
 OS surfaces. Never infer ownership from visual proximity; unmapped numbers are inconclusive.
 
 ## Step 2: Twin reproduction gate
+<!-- agentow-contract:a11y:reproduce-before-implement -->
 
 Write `a11y/reproduce/evaluator-request.json`.
 
@@ -131,6 +132,7 @@ Only after reproduction:
 No planner approval phase exists in A11y mode.
 
 ## Step 4: Implement and build
+<!-- agentow-contract:a11y:implement-build -->
 
 1. Create a fresh branch from `origin/main` only now.
 2. Make the smallest behavior-preserving fix.
@@ -147,6 +149,7 @@ No planner approval phase exists in A11y mode.
 Maximum three implementation cycles. A11y mode is not a broad refactoring loop.
 
 ## Step 5: Exact-scenario verification
+<!-- agentow-contract:a11y:exact-scenario-verify -->
 
 Create `a11y/verify/evaluator-request.json` by copying the canonical reproduction scenario:
 
@@ -181,6 +184,7 @@ Gate:
 Static axe, accessibility-tree, and code checks cannot upgrade missing real-AT evidence.
 
 ## Step 6: Review
+<!-- agentow-contract:a11y:review -->
 
 After strict verify PASS, dispatch `@agentow-copilot:reviewer` with:
 
@@ -193,8 +197,10 @@ After strict verify PASS, dispatch `@agentow-copilot:reviewer` with:
 
 Critical/Important findings return to Step 4 and require a complete Step 5 replay. Never reuse a
 PASS from an older commit.
+<!-- agentow-contract:a11y:evidence-bound-to-head -->
 
 ## Step 7: Ship and preserve evidence
+<!-- agentow-contract:a11y:delivery:draft-pr -->
 
 Create the draft PR only after verification and review pass.
 

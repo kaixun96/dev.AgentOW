@@ -22,7 +22,6 @@ const copilotMirrorFiles = [
   ["graduation-review-rule-registry.json", "copilot/graduation-review-rule-registry.json"],
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
-  ["docs/sp-client-review-profile.md", "copilot/docs/sp-client-review-profile.md"],
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
 ];
 
