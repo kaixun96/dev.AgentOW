@@ -134,10 +134,15 @@ No planner approval phase exists in A11y mode.
 
 1. Create a fresh branch from `origin/main` only now.
 2. Make the smallest behavior-preserving fix.
-3. Follow repository test policy. Do not add tests merely because the pipeline exists.
-4. Run the smallest existing build/lint/test commands that cover the changed package.
-5. Commit without pushing.
-6. Write `a11y/implementation/iter<N>.md` with commit, diff scope, and build result.
+3. When adding, moving, renaming, or changing a live killswitch, read and follow
+   `docs/killswitch-guidance.md` before editing. Record the behavior owner, centralized module
+   search, dependency boundary, original rollback expression, and expected diff size. Do not add
+   public API or host callback plumbing when the behavior-owning package can evaluate its own
+   killswitch.
+4. Follow repository test policy. Do not add tests merely because the pipeline exists.
+5. Run the smallest existing build/lint/test commands that cover the changed package.
+6. Commit without pushing.
+7. Write `a11y/implementation/iter<N>.md` with commit, diff scope, and build result.
 
 Maximum three implementation cycles. A11y mode is not a broad refactoring loop.
 

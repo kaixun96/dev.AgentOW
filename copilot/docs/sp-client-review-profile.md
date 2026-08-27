@@ -19,7 +19,9 @@ For every review with SP-Client runtime changes, first apply the rollout-isolati
 `skills/ow-review/references/common-review-issues.md`. That reference is authoritative for gate
 ordering, invocation-boundary protection, legacy equivalence, call-time evaluation, both-state
 testing, and live-gate behavior. For a retired gate, also apply
-`skills/ow-review/references/graduation.md`. This profile adds the SP-Client-specific requirements below:
+`skills/ow-review/references/graduation.md`. For every added, moved, renamed, or changed live
+killswitch, also apply `docs/killswitch-guidance.md`, including its ownership decision tree and
+blocking review findings. This profile adds the SP-Client-specific requirements below:
 
 - Read the PR description first. It must identify the flight/KS, state whether it is a Flight, KS, or KS+Flight, explain the enabled/disabled direction, and name the fallback. If reviewing before PR creation, require this information in the plan and ensure the generated PR description puts it on the first line.
 - Enumerate every changed runtime path, then follow imported helpers and callees transitively from each reachable entry point to the changed behavior. A gate inside a helper counts when it guards the behavior added by the PR and the fallback state remains equivalent to the pre-change implementation; do not stop at the caller or infer protection from an unrelated nearby check.
@@ -93,7 +95,7 @@ For every `sp-client/` review, record these IDs in `preReview.profileChecks`. Ea
 
 ## Blocking examples
 
-Request changes when evidenced: runtime changes with no Flight/KS protection, PR description missing the gate and direction, incomplete gate coverage, wrong KS/Flight direction, changed behavior or new-path-only work occurring while Flight is off or KS is activated, module-evaluated SP-Client KS, missing safe fallback, performance work using only a flight, missing behavior/gate tests, unhandled meaningful async failure, PII logging, missing user-action telemetry where required by established conventions, unjustified bundle growth, unbounded collection rendering, bypassing an available Fluent/SPDS primitive without rationale, theme overrides that conflict with the formal Detheme flow, hardcoded user-facing strings/colors, inaccessible controls, or suppressions/deferred work without required rationale.
+Request changes when evidenced: runtime changes with no Flight/KS protection, PR description missing the gate and direction, incomplete gate coverage, wrong KS/Flight direction, changed behavior or new-path-only work occurring while Flight is off or KS is activated, module-evaluated SP-Client KS, missing safe fallback, incorrect killswitch ownership, public API added only for killswitch plumbing, synthetic callback-absent states, broad duplicated rollback code, performance work using only a flight, missing behavior/gate tests, unhandled meaningful async failure, PII logging, missing user-action telemetry where required by established conventions, unjustified bundle growth, unbounded collection rendering, bypassing an available Fluent/SPDS primitive without rationale, theme overrides that conflict with the formal Detheme flow, hardcoded user-facing strings/colors, inaccessible controls, or suppressions/deferred work without required rationale.
 
 Do not raise an Important rollout-protection finding for string-only localization metadata changes that do not alter runtime execution or styling paths.
 

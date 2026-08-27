@@ -425,6 +425,11 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 1. **Branch.** If on `main`, create `user/<alias>/<feature>` from `origin/main` (use `ow-git`). `<alias>` from `whoami`.
 2. **Write the code** yourself, following the planner's "patterns to follow". Surgical changes only — every line traces to the request.
    - Complete every context compliance item before build.
+  - When adding, moving, renaming, or changing a live killswitch, read and follow
+    `docs/killswitch-guidance.md` before editing. Record the behavior owner, centralized module
+    search, dependency boundary, original rollback expression, and expected diff size. Do not add
+    public API or host callback plumbing when the behavior-owning package can evaluate its own
+    killswitch.
   - When any task graduates a Flight, KS, Feature, experiment, or rollout flag, read and follow
     `skills/ow-review/references/graduation.md`. For graduation-related lines, that reference is
     exclusive: remove only the gate and code made obsolete by selecting its required branch.
