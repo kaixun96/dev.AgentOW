@@ -1,9 +1,23 @@
 # Accessibility review reference
 
-Use this reference when a change adds or modifies interactive UI, form fields, dialogs, flyouts,
-dynamic status text, focus behavior, visibility toggles, accessibility attributes, or a rendered
-collection with loading, load-more, sort, filter, search, paging, refresh, retry, empty, or error
-states. Missing accessibility code does not make these workflows out of scope.
+Use this reference for every added or changed rendered UI surface that can affect interaction,
+semantics, assistive output, or an accessibility-relevant style: color/contrast, forced colors,
+focus indication, typography/text spacing, zoom/reflow, overflow/truncation, visibility/display,
+content order, hit-target usability, motion, or state differentiation. Also use it for changes to
+forms, dialogs, flyouts, dynamic status text, accessibility attributes, or collections with
+loading, load-more, sort, filter, search, paging, refresh, retry, empty, or error states. A
+style/token-only diff proven to change only decorative spacing, radii, or shadows does not trigger
+this reference when it cannot affect reflow, clipping, targets, focus, readability, or semantics.
+Missing accessibility code does not make these workflows out of scope.
+
+Every rendered UI change must be reviewed against the applicable WCAG 2.1 Level A and AA success
+criteria and for complete keyboard-only and screen-reader operation. Accessibility is a required
+review dimension on every PR: record it as reviewed when UI is affected, or not applicable only
+when evidence shows the diff cannot affect rendered UI, user interaction, or assistive output. Do
+not claim that code inspection alone proves WCAG conformance. When an applicable criterion depends
+on runtime behavior, require focused automated or manual evidence for keyboard, focus, zoom/reflow,
+contrast, accessibility-tree output, and screen-reader announcements as appropriate; otherwise
+record the criterion as not verified.
 
 This repository primarily builds UI with SPDS and Fluent UI React V9. Review accessibility in two separate scenarios:
 
@@ -38,8 +52,59 @@ Use this Fluent V9 accessibility reference map to choose the corresponding doc b
 | general Fluent component accessibility expectations when no component-specific page above is a better fit | [Components overview](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-components-overview--docs) |
 | end-to-end user journeys, interaction patterns, or broader accessibility experience guidance beyond a single component | [Experiences](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-experiences--docs) |
 | focus visibility, custom focus styling, or focus indicator regressions | [Focus indicator](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-focus-indicator--docs) |
+| focus entry, containment, roving focus, restoration, or imperative focus movement | [Focus management](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-focus-management--docs) and [useRestoreFocusTarget](https://storybooks.fluentui.dev/react/?path=/docs/utilities-focus-management-usestorefocustarget--docs) |
 | toast/status/alert messaging, announcements, or notification timing/behavior | [Notification best practices](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-notification-best-practices--docs) |
 | text truncation, clipped labels/content, tooltip fallback for truncated text, or loss of meaning from overflow | [Truncation](https://storybooks.fluentui.dev/react/?path=/docs/concepts-developer-accessibility-truncation--docs) |
+
+## Cross-cutting rendered UI checks
+
+Apply these checks to SPDS/Fluent usage and custom UI alike:
+
+- **Design tokens and accessible states:** inspect new or changed color, spacing, typography,
+  outline, border, icon, and state styling for the owning design-system token or supported styling
+  API. Treat token misuse as an accessibility defect when it breaks contrast, focus visibility,
+  forced-colors/high-contrast behavior, text reflow, target usability, or state differentiation.
+  Do not report an arbitrary raw spacing value as WCAG nonconformance without a user impact.
+- **Hand-rolled interaction:** when custom markup recreates a control or interaction already
+  provided by native HTML, SPDS, or Fluent, require the existing primitive unless a documented gap
+  prevents it. If custom behavior is unavoidable, verify its full name/role/value, keyboard, focus,
+  disabled/state, pointer, high-contrast, and screen-reader contract rather than approving isolated
+  ARIA attributes or key handlers.
+- **Styles tied to element identity:** when an element or component type changes, trace every reused
+  class, selector, and style assumption written for the former element. Verify sizing, display,
+  overflow, hit target, focus indicator, disabled/selected states, and forced-colors behavior on the
+  rendered replacement. Do not assume a class remains accessible merely because its visual result
+  looks similar.
+- **Presentational-role misuse:** reject `role="presentation"` or `role="none"` when it removes
+  required semantics from an interactive, focusable, structural, or relationship-bearing element.
+  Verify the rendered accessibility tree and descendants; do not approve the role merely because
+  the element looks like a wrapper.
+- **Named groups:** related controls need an accessible group name and relationship. Prefer native
+  `fieldset`/`legend` where appropriate, or the owning Fluent/SPDS component's documented label,
+  `aria-labelledby`, or `aria-describedby` pattern. A nearby visual heading alone is not proof that
+  the group is named programmatically.
+- **Zoom and reflow:** at 400% zoom (equivalent to a 320 CSS-pixel-wide viewport for typical desktop
+  content), text and controls must remain visible and operable without overlap, clipping, or lost
+  actions. Ordinary vertically scrolling content must not require two-dimensional scrolling;
+  preserve the WCAG exception for content whose meaning requires a two-dimensional layout, such as
+  a data table, map, or diagram.
+- **Contrast:** require at least $4.5:1$ for normal text and $3:1$ for large text. Meaningful UI
+  component boundaries, states, and focus indicators require at least $3:1$ against adjacent
+  colors. Verify default, hover, selected, disabled where applicable, themed, and high-contrast
+  states rather than checking one screenshot or token name in isolation.
+- **Truncation:** when clipping or ellipsis can hide meaningful text, verify the complete value is
+  available to keyboard, touch, and screen-reader users through the component's documented
+  truncation/Tooltip or accessible-description pattern. A `title` attribute alone is not a reliable
+  cross-input fallback. Do not require duplicate accessible text when the full value is already
+  exposed by the component.
+- **Heading semantics:** text that functions visually as a section or dialog heading must use the
+  owning component's semantic heading API or a real, reasonably nested heading. Review the page or
+  dialog outline in context; do not enforce a universal single-`h1` rule or a fixed heading level
+  based only on visual size.
+- **Duplicate or conflicting ARIA:** inspect the accessibility output already supplied by
+  SPDS/Fluent before adding ARIA at the call site. Report duplicate names/descriptions, conflicting
+  roles or states, and wrapper ARIA that overrides the component contract. Do not report the mere
+  absence of explicit ARIA when the component already produces the required semantics.
 
 ## SPDS and Fluent V9 MessageBar announcement contract
 
@@ -159,7 +224,9 @@ Build a state-transition matrix from the changed code and inspect every reachabl
 | refresh → updated/no change | Announce the meaningful outcome without repeating an indistinguishable stale message |
 
 For each transition, record three outcomes in review evidence: visible feedback, screen-reader
-feedback, and keyboard/focus behavior. Do not infer that a spinner, skeleton, reordered DOM, or
+feedback, and keyboard/focus behavior. Apply the dynamic focus transition contract below whenever
+the operation can replace, reorder, disable, or remove the focused node or another focus target.
+Do not infer that a spinner, skeleton, reordered DOM, or
 updated item count is announced. `aria-busy` communicates processing state but does not replace the
 completion/result announcement. Avoid per-item announcements during bulk loading and avoid
 overlapping mechanisms that announce the same transition twice. Repeated identical outcomes must
@@ -221,7 +288,89 @@ stack-specific fix. Use **Minor** only when the transition is already perceivabl
 would merely improve wording or reduce redundant announcements. Do not downgrade a missing status
 contract merely because sighted users can see a spinner or changed rows.
 
-### 2. Focus management and keyboard navigation — `@msinternal/sp-a11y`
+Raise an **Important** accessibility finding when a keyboard-triggered operation can remove or
+replace the focused node and leave focus on `body`, a detached node, a non-interactive wrapper, or
+an unrelated control without a documented accessible destination. Use **Minor** only when focus
+already lands on a logical, visible, enabled destination and the recommendation merely improves a
+non-blocking detail. “By design” does not lower severity without interaction-contract and focused
+test evidence.
+
+### 2. Focus management and keyboard navigation
+
+#### Dynamic focus transition contract
+
+Do not limit focus review to opening and closing dialogs. For every keyboard-triggered operation or
+state update that can conditionally render, replace, reorder, disable, or remove DOM, identify the
+focused element before the transition and its destination after the transition. Trace stable keys,
+conditional branches, selection-derived toolbars, async rerenders, virtualized rows, toast actions,
+and cleanup effects. A successful operation that leaves `document.activeElement` on `body`, a
+non-interactive wrapper, a stale detached node, or an unrelated earlier control is a focus-loss
+defect unless navigation intentionally moved to a newly established destination.
+
+Use this transition matrix for each reachable operation:
+
+| Transition | Required focus behavior |
+|---|---|
+| Refresh, retry, paging, sort, filter, or data replacement | Preserve the focused control/row by stable identity when it still exists. If it is replaced, restore focus to its semantic equivalent after commit, not `body`. |
+| Focused row/item is removed | Move focus predictably to the next item, previous item, collection container, or initiating control according to the component contract; never rely on browser fallback. |
+| Selection change mounts or unmounts toolbar commands | Do not move focus merely because selection changed. If the focused command disappears, move focus to a persistent logical neighbor or back to the selected item/collection. |
+| Last item is deselected and selection-only UI disappears | Preserve focus in the collection unless focus was inside the disappearing UI; only then use the documented deterministic fallback. Do not steal focus from a still-mounted row. |
+| Toast, inline action, confirmation, Replace/Keep both, or retry action completes and disappears | Restore focus to the initiating control or another persistent next step. If the original trigger no longer exists, choose and test a logical fallback. |
+| Loading, save, upload, or background operation completes | Keep focus where the user left it unless the interaction contract requires navigation; announce the result separately rather than moving focus to expose status. |
+| Modal, panel, popover, menu, or teaching surface closes | Restore focus through the owning component's documented trigger/restore-focus mechanism, including abrupt unmount and animation completion. |
+
+Do not accept "by design" as sufficient evidence for a surprising focus jump. Require the product
+or component interaction contract to identify the intended destination and verify that the
+destination is logical, visible, enabled, and operable. A focus move may be intentional without
+being accessible. When the changed code can perform one of these transitions, require a focused
+interaction test that starts from the affected control, performs the exact operation, and asserts
+the post-update active element. A generic tab-order test or assertion that an element exists does
+not prove focus retention.
+
+#### Choose the fix from the focus owner
+
+Recommend a focus fix only after identifying the rendered component stack, installed package
+version, current focus owner, trigger, node that will unmount, persistent destination, and fallback.
+Use this order:
+
+1. **SPDS or Fluent UI React V9 component contract:** for `Dialog`, `Popover`, `Menu`, Drawer,
+  composite/roving-focus widgets, and other Fluent-owned surfaces, preserve the component's
+  documented Tabster focus entry, containment, navigation, and trigger restoration. Use the
+  component's documented props and composition first; use `trapFocus` only on a surface whose V9
+  contract supports and requires containment. Do not add imperative `focus()` or `A11yManager`
+  around behavior the component already owns.
+2. **Fluent V9 restoration utilities:** when a V9 trigger and surface need explicit restoration not
+  already supplied by the component, inspect the installed exports and use the documented
+  `useRestoreFocusTarget` and `useRestoreFocusSource` pairing. Attach source/target refs according
+  to the V9 contract and preserve the trigger long enough for restoration. Do not mix these hooks
+  with a second SharePoint restore owner for the same lifecycle.
+3. **Local V9 lifecycle replacement:** when a focused V9 toolbar, toast, inline action, row, or
+  command is conditionally removed while its containing surface remains, move focus after commit
+  to a named persistent target inside that workflow. For a disappearing toast action, prefer a
+  persistent toast target while the toast remains; when the whole toast closes, restore to the
+  operation's trigger. This local lifecycle does not by itself justify `A11yManager`.
+4. **SharePoint page/canvas or cross-view ownership:** use `A11yManager` when focus crosses Fluent
+  component boundaries under a SharePoint shell/canvas, must survive async loading or a view
+  transition, or the owning area already uses its hierarchical navigation model. Use the area's
+  established `saveActiveElementAs`/`restoreFocus` pattern rather than introducing a parallel
+  local convention.
+5. **Legacy, custom, or unmanaged DOM:** use `@msinternal/sp-a11y` `Focus` utilities when Tabster
+  does not own the nodes and the fix needs to locate a first, next, parent, or sibling focusable
+  element or perform imperative focus. Prefer native focus and an existing local pattern when the
+  destination is already known; do not use DOM search to hide an unspecified focus destination.
+
+`@msinternal/sp-a11y` is SharePoint/SPFx page-level accessibility infrastructure, not a replacement
+for Fluent V9 focus management. Two focus owners can race and cause duplicate restoration or move
+focus away from the user's intended target. Neither Fluent restore hooks nor
+`A11yManager.restoreFocus()` can focus a DOM node that no longer exists. If the original node is
+replaced, the fix must identify the semantic replacement or deterministic fallback and focus it
+after it mounts.
+
+Every focus finding's suggested fix must name: the owning stack; the exact component prop, Fluent
+hook, `A11yManager` pattern, or `Focus` utility supported by that stack; when the active element is
+captured; which node receives focus after commit/close; what happens if that node no longer exists;
+and the interaction test that asserts `document.activeElement`. Do not suggest only “restore focus,”
+“use a ref,” or “use `sp-a11y`.”
 
 `sp-client/libraries/sp-a11y/src/index.ts` exports reusable primitives:
 
@@ -230,9 +379,9 @@ contract merely because sighted users can see a spinner or changed rows.
 - `Keyboard` for consistent `isEscape`, `isEnter`, `isTab`, `isShiftTab`, and modifier-aware `isKey`, including Ctrl versus Cmd handling on macOS.
 - `A11yManager` and `A11yAttribute` for legacy declarative accessibility navigation on already managed surfaces. Supported attributes include `AlertOnFocusIn`, `AlertOnFocusOut`, `NavigateOnKey`, `NavigateByHierarchy`, `SkipKeys`, and `StopKeys`.
 
-Use `A11yManager` only when extending a surface that already depends on it; do not introduce it instead of native or SPDS interactions.
-
-For a modal or panel implemented through the Fluent migration layer, prefer `useRestoreFocusOnDismiss`, `ModalShim`, and `FocusTrapZoneShim` support rather than hand-writing focus restoration. Those utilities capture the trigger before focus enters the modal, restore after dismissal animation, and cover abrupt unmounts.
+For a modal or panel implemented through the Fluent migration layer rather than native V9, prefer
+the layer's established `useRestoreFocusOnDismiss`, `ModalShim`, and `FocusTrapZoneShim` support.
+Do not recommend those compatibility APIs to a native V9 subtree.
 
 ### 3. Rich-text or content accessibility checks — `@msinternal/sp-a11y-checker-util`
 
