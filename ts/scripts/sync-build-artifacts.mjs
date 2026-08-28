@@ -1,6 +1,5 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
 import { fileURLToPath } from "node:url";
 
 const tsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -64,28 +63,3 @@ for (const [source, destination] of copilotMirrorFiles) {
   fs.copyFileSync(path.join(repoRoot, source), path.join(repoRoot, destination));
 }
 console.log("copilot MCP dist synced");
-
-const pluginJson = JSON.parse(
-  fs.readFileSync(path.join(repoRoot, ".claude-plugin", "plugin.json"), "utf8"),
-);
-const claudeCache = path.join(
-  os.homedir(),
-  ".claude",
-  "plugins",
-  "cache",
-  "agentOW",
-  "agentOW",
-  pluginJson.version,
-);
-
-if (!fs.existsSync(claudeCache)) {
-  console.log(`claude plugin cache not found, skipped: ${claudeCache}`);
-  process.exit(0);
-}
-
-copyDirectoryContents(distDir, path.join(claudeCache, "ts", "dist"));
-copyMatchingFiles(path.join(repoRoot, "agents"), path.join(claudeCache, "agents"), (name) => name.endsWith(".md"));
-copyMatchingFiles(path.join(repoRoot, "docs"), path.join(claudeCache, "docs"), (name) => name.endsWith(".md"));
-copyDirectoryContents(path.join(repoRoot, "skills"), path.join(claudeCache, "skills"));
-copyDirectoryContents(path.join(repoRoot, "tools"), path.join(claudeCache, "tools"));
-console.log(`cache synced to ${claudeCache}`);

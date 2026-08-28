@@ -530,10 +530,9 @@ const checks = [
       "A demonstrated unresolved product",
     ],
   },
-  ...mirroredSnippetChecks(
-    "skills/ow-review/SKILL.md",
-    "copilot/skills/ow-review/SKILL.md",
-    [
+  {
+    file: "copilot/skills/ow-review/SKILL.md",
+    snippets: [
       "Before reading any review contract, inspect the immutable diff and classify it",
       "`reviewPolicy=graduation-only`",
       "Do not read",
@@ -568,7 +567,7 @@ const checks = [
       "--rule-inventory",
       "--rule-registry",
     ],
-  ),
+  },
   {
     file: "tools/build-review-rule-inventory.mjs",
     snippets: [
@@ -752,55 +751,10 @@ const checks = [
       "do not create a PR or claim AgentOW approval"
     ]
   },
-  {
-    file: "agents/ow-planner.md",
-    snippets: [
-      "**Exact fixture required**",
-      "A test page is a starting candidate unless Exact fixture required is true.",
-      "**Capability predicates**",
-      "**Candidate discovery hints**"
-    ]
-  },
-  {
-    file: "agents/ow-evaluator-rule.md",
-    snippets: [
-      "Resource-scoped environment discovery",
-      "`coverageManifest`",
-      "`target: \"evaluator-environment\"`",
-      "### `environment_discovery` mode",
-      "A configured candidate cap or unavailable discovery mechanism means coverage is incomplete",
-      "Any `unprobed` candidate makes the manifest incomplete",
-      "`candidatesDiscovered == candidatesProbed == candidateResults.length`",
-      "every candidate result is `rejected` with an evidence path"
-    ]
-  },
-  {
-    file: "agents/ow-orchestrator.md",
-    snippets: [
-      "`target: evaluator-environment`",
-      "same implementation cycle",
-      "An unsupported fleet-wide claim cannot be auto-shipped.",
-      "`candidatesDiscovered == candidatesProbed == candidateResults.length`",
-      "Normalize any self-declared complete manifest",
-      "If all blockers are tagged `target: evaluator-spec`",
-      "unchanged implementation `cycle`",
-      "persist the final result before writing Workflow complete",
-      "batch-result.json",
-      "BATCH_RESULT: success-with-blockers",
-      "MANIFEST: <coverageManifest path>"
-    ]
-  },
-  {
-    file: "skills/ow-batch/SKILL.md",
-    snippets: [
-      "BATCH_RESULT: success-with-blockers",
-      "Accepted statuses:",
-      "complete external fixture/environment manifest",
-      "if [ -f \"$SESSION_DIR/batch-result.json\" ]",
-      "Preserve `success-with-blockers` and its manifest path",
-      "completion-result-missing"
-    ]
-  },
+
+
+
+
   {
     file: "README.md",
     snippets: [
@@ -824,7 +778,7 @@ const checks = [
   {
     file: "docs/capability-bootstrap.md",
     snippets: [
-      "Every Claude or Copilot terminal session runs agentOW bootstrap once",
+      "Every Copilot CLI terminal session runs agentOW bootstrap once",
       "personal-persistent-profile",
       "Playwright/Heft with FIC",
       "odsp-web-mcp-servers-opt-in",
@@ -989,57 +943,7 @@ const checks = [
       "analyzer or search for speculative size issues"
     ]
   },
-  {
-    file: "agents/ow-review-agent.md",
-    snippets: [
-      "Pass 1: immutable scope and risk",
-      "Pass 2: adversarial verification",
-      "at least one falsifiable failure hypothesis",
-      "final dissent pass",
-      "Critical or Important present → `REQUEST_CHANGES`.",
-      "review.json",
-      "Never APPROVE without complete evidence.",
-      "sp-client-review-profile.md",
-      "preReview.profileChecks",
-      "inspect the PR description before code",
-      "a gate inside a called helper is coverage when it guards only the added behavior",
-      "reaching a changed pure abstraction is not a defect by itself",
-      "Repository instruction compliance does not automatically imply `Important`",
-      "Compliant code receives no finding",
-      "reading all files does not prove the review is reliable or exhaustive",
-      "Before reading any review contract",
-      "Do not read",
-      "`docs/review-contract.md` or continue into any subsequent generic review pass",
-      "validate-graduation-review-report.mjs",
-      "return immediately",
-      "A mixed graduation/feature PR is not graduation-only",
-      "explicit no-size-limit/no-split exemption",
-      "reference alone controls policy, evidence",
-      "caller-owned gate inventory",
-      "expected merge base",
-      "accessibility-relevant styles: color/contrast",
-      "style/token-only changes proven limited to decorative spacing, radii, or shadows",
-      "rendered collection that loads",
-      "missing announcement behavior is itself under review",
-      "`preliminary-non-exhaustive`",
-      "git diff --no-renames",
-      "common-review-issues.md",
-      "shared-utility-reuse.md",
-      "localization-and-formatting.md",
-      "sharepoint-design-system-and-ux-components.md",
-      "ux-architecture-and-bundle-boundaries.md",
-      "size-regression.md",
-      "PR's official size-audit report",
-      "physical-direction CSS",
-      "screen-reader or other assistive text",
-      "Reference routing",
-      "The artifact requirement remains narrower and mandatory",
-      "A data-provider-only PR loads `common-review-issues.md` only",
-      "Apply `skills/ow-review/references/graduation.md` only to gates classified as retired",
-      "load only `graduation.md` and stop reference routing",
-      "this exclusive scope overrides every subsequent instruction"
-    ]
-  },
+
   ...mirroredSnippetChecks("docs/review-misses.md", "copilot/docs/review-misses.md", reviewMissSnippets),
   ...mirroredSnippetChecks(
     "skills/ow-review/references/shared-utility-reuse.md",
@@ -1081,46 +985,7 @@ const checks = [
     "copilot/skills/ow-review/references/size-regression.md",
     sizeRegressionSnippets,
   ),
-  {
-    file: "agents/ow-orchestrator.md",
-    snippets: [
-      "validate-review-report.mjs",
-      "Before reading any review contract, inspect the immutable Git diff",
-      "`reviewPolicy=graduation-only`",
-      "Do not read the general",
-      "Only for `reviewPolicy=general`, resolve the branch's review ledger",
-      "For `reviewPolicy=graduation-only`, omit `contextLinkPath`",
-      "return without generic review passes",
-      "validate-graduation-review-report.mjs",
-      "--expected-head",
-      "--expected-merge-base",
-      "--expected-diff-digest",
-      "--changed-files",
-      "--deleted-files",
-      "--expected-gates",
-      "--residual-candidates",
-      "review-residual-candidates.jsonl",
-      "build-review-rule-inventory.mjs",
-      "review-rule-registry.json",
-      "--registry",
-      "review-rule-inventory.json",
-      "ruleInventoryPath",
-      "prDescriptionPath",
-      "--rule-inventory",
-      "--rule-registry",
-      "helper/wrapper name, GUID/ID",
-      "export/import, alias, fixed parameter, and",
-      "downstream call chain",
-      "Missing artifacts, stale diff identity, incomplete coverage",
-      "Critical or Important issues",
-      "AUTO mode, and batch execution do not bypass the review gate.",
-      "Only after the evaluator result and artifacts are final",
-      "Dispatch review only after final evaluation artifacts exist.",
-      "actual planPath returned by ow-planner",
-      "Review validation is an explicit read-only Bash exception",
-      "--diff-numstat"
-    ]
-  },
+
   {
     file: "copilot/AGENTS.md",
     snippets: [
@@ -1129,17 +994,7 @@ const checks = [
       "A request to skip review also disables AgentOW PR creation"
     ]
   },
-  {
-    file: "skills/ow-init/SKILL.md",
-    snippets: [
-      "This command performs setup only.",
-      "Initialize agentOW for UI screenshots, Figma designs, Azure DevOps work items, a killswitch, and code review.",
-      "--host claude",
-      "--force",
-      "run `CODESPACES=false az login` in the current Codespace terminal",
-      "Exit code `20` means initialization succeeded but Claude must be restarted."
-    ]
-  },
+
   {
     file: "copilot/skills/ow-init/SKILL.md",
     snippets: [
@@ -1151,17 +1006,7 @@ const checks = [
       "Exit code `20` means initialization succeeded but Copilot CLI must be restarted."
     ]
   },
-  {
-    file: "skills/ow-team/SKILL.md",
-    snippets: [
-      "Step 1.1: Bootstrap Session Capabilities",
-      "agentow-bootstrap.mjs",
-      "--host claude",
-      "capabilitiesPath",
-      "stop before spawning agents",
-      "Re-run bootstrap with `--force`"
-    ]
-  },
+
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
@@ -1172,13 +1017,7 @@ const checks = [
       "stop before planning"
     ]
   },
-  {
-    file: "skills/ow-batch/SKILL.md",
-    snippets: [
-      "run the session bootstrap once",
-      "Do not start any task team"
-    ]
-  },
+
   {
     file: "copilot/skills/ow-batch/SKILL.md",
     snippets: [
@@ -1186,13 +1025,7 @@ const checks = [
       "Do not begin a batch"
     ]
   },
-  {
-    file: "agents/ow-planner.md",
-    snippets: [
-      "`capabilitiesPath`",
-      "Plan against available capabilities"
-    ]
-  },
+
   {
     file: "copilot/agents/planner.agent.md",
     snippets: [
@@ -1233,20 +1066,7 @@ const checks = [
       "targetDocumentDigest"
     ]
   },
-  {
-    file: "agents/ow-orchestrator.md",
-    snippets: [
-      "Non-blocking Plan Context Maintenance",
-      "Non-blocking As-built Context Maintenance",
-      "Context maintenance never asks the user",
-      "run **Step 1c**, then proceed to **Step 1.5",
-      "contextLinkPath: <contextLinkPath>",
-      "contextDocuments: <latest routed document paths>",
-      "clean worktree outside the generated patch",
-      "never blocks the product PR",
-      "capabilitiesPath: <capabilitiesPath>"
-    ]
-  },
+
   {
     file: "copilot/skills/ow-context-feedback/SKILL.md",
     snippets: [
@@ -1255,45 +1075,9 @@ const checks = [
       "supersedes"
     ]
   },
-  {
-    file: "skills/ow-context-feedback/SKILL.md",
-    snippets: [
-      "spawn one bounded `general-purpose` agent",
-      "target-document digest",
-      "Stage only candidate target paths."
-    ]
-  },
-  {
-    file: "skills/ow-batch/SKILL.md",
-    snippets: [
-      "`ow-context-maintainer`",
-      "routing.v1.json",
-      "next routing revision"
-    ]
-  },
-  {
-    file: "agents/ow-generator.md",
-    snippets: [
-      "`contextLinkPath`",
-      "`contextDocuments`",
-      "sizeAuditStatus: \"passed-no-regression\"",
-      "Do not run `analyze-cli` or search for speculative size issues",
-      "Prove Flight/KS graduation direction before editing",
-      "Never infer direction from names such as `Fix`, `Enabled`, `New`, `Legacy`, `Fallback`, or",
-      "KS inactive and Flight enabled by default",
-      "Replace only the target Flight/KS expression with that proven literal",
-      "Treat the result as the substitution oracle for the final code",
-      "process to a Flight using its proven enabled literal",
-      "does not become unconditional",
-      "graduation is worse than leaving the gate in place",
-      "The direction examples above apply only when adding a live KS",
-      "For Flight/KS graduation, delete removed-branch cases and gate-only support",
-      "freely rename, restructure, rewrite, or add graduation-related tests",
-      "do not preserve stale Flight/KS suite names or setup",
-      "prefer updating the threshold with no new tests",
-      "If the developer chooses to retain the current threshold"
-    ]
-  },
+
+
+
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
@@ -1317,19 +1101,7 @@ const checks = [
       "If the developer chooses to retain the current"
     ]
   },
-  {
-    file: "agents/ow-planner.md",
-    snippets: [
-      "`contextLinkPath`",
-      "`contextDocuments`",
-      "Read every `contextDocuments` file",
-      "For a Flight/KS graduation",
-      "plan graduation-related test renames, rewrites, restructuring, or additions",
-      "Require setup and expectations to match the selected old branch",
-      "prefer updating that threshold with no new tests",
-      "The developer may instead choose minimum surviving-behavior tests"
-    ]
-  },
+
   {
     file: "copilot/agents/planner.agent.md",
     snippets: [
@@ -1340,41 +1112,11 @@ const checks = [
       "The developer may instead choose minimum surviving-behavior tests"
     ]
   },
-  {
-    file: "agents/ow-evaluator.md",
-    snippets: [
-      "`contextLinkPath`",
-      "`contextDocuments`",
-      "Read routed context documents"
-    ]
-  },
-  {
-    file: "agents/ow-evaluator-rule.md",
-    snippets: ["`contextLinkPath`, `contextDocuments`"]
-  },
-  {
-    file: "agents/ow-review-agent.md",
-    snippets: ["`contextLinkPath`", "`contextDocuments`"]
-  },
-  {
-    file: "skills/ow-team/SKILL.md",
-    snippets: [
-      "Spawn all 7 idle agents FIRST",
-      "orchestrator last",
-      "Spawn all idle agents first and the orchestrator last",
-      "routing.v1.json",
-      "Reroute `{refinedRequest}`",
-      "Never rewrite an earlier revision."
-    ]
-  },
-  {
-    file: "skills/ow-batch/SKILL.md",
-    snippets: [
-      "not part of shutdown acknowledgement",
-      "Wait until all 7 return `shutdown_response`",
-      "do not create an overlapping team"
-    ]
-  }
+
+
+
+
+
 ];
 
 const forbiddenChecks = [
@@ -1396,14 +1138,8 @@ const forbiddenChecks = [
       "\"fixture.playwright-profile\""
     ]
   },
-  {
-    file: "agents/ow-evaluator-rule.md",
-    snippets: ["If a freshly created group site still lacks"]
-  },
-  {
-    file: "agents/ow-planner.md",
-    snippets: ["- Pattern D (external product dependency)"]
-  },
+
+
   {
     file: "docs/context-maintenance.md",
     snippets: [
@@ -1416,18 +1152,8 @@ const forbiddenChecks = [
     file: "copilot/skills/agentow/SKILL.md",
     snippets: ["requiredForRun"]
   },
-  {
-    file: "agents/ow-orchestrator.md",
-    snippets: ["requiredForRun"]
-  },
-  {
-    file: "skills/ow-team/SKILL.md",
-    snippets: [
-      "Spawn the orchestrator **first**",
-      "Proceed to PR creation",
-      "even if review found critical issues"
-    ]
-  },
+
+
   {
     file: "copilot/skills/ow-context-feedback/SKILL.md",
     snippets: [
@@ -1447,10 +1173,7 @@ const forbiddenChecks = [
       "save AFTER to `<sessionDir>/evaluation/iter<N>/after-<component>.png`"
     ]
   },
-  {
-    file: "agents/ow-evaluator-rule.md",
-    snippets: ["If TRIPS cannot allocate the needed users in both prod and dogfood"]
-  },
+
   {
     file: "copilot/AGENTS.md",
     snippets: [
@@ -1458,14 +1181,7 @@ const forbiddenChecks = [
       "confirm before shipping with critical review issues"
     ]
   },
-  {
-    file: "agents/ow-orchestrator.md",
-    snippets: [
-      "evaluator and review-agent start immediately",
-      "dispatch evaluator (code inspection) and review-agent simultaneously",
-      "Collect all three responses"
-    ]
-  },
+
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: ["Auto: proceed to ship anyway"]
@@ -1473,21 +1189,13 @@ const forbiddenChecks = [
 ];
 
 const orderedChecks = [
-  {
-    file: "skills/ow-team/SKILL.md",
-    first: "## Step 1.1: Bootstrap Session Capabilities",
-    second: "## Step 1.25: Resolve Linked Context"
-  },
+
   {
     file: "copilot/skills/agentow/SKILL.md",
     first: "## Step 1.25: Bootstrap session capabilities",
     second: "## Step 1.5: Resolve the context library"
   },
-  {
-    file: "skills/ow-batch/SKILL.md",
-    first: "run the session bootstrap once",
-    second: "## Step 2: For Each Task"
-  }
+
 ];
 
 const mirroredChecks = [

@@ -35,7 +35,7 @@ You are connected to the ow MCP server — a dev toolkit for odsp-web developmen
 
 ## Development Loop
 
-Since Claude Code runs directly inside the Codespace, all commands execute locally:
+Since agentOW runs directly inside the Codespace, all commands execute locally:
 
 1. ow-status — confirm git branch, node version, rush state.
 2. Edit code directly (Read/Edit/Write/Grep/Glob on /workspaces/odsp-web).

@@ -119,10 +119,9 @@ Whenever a request discusses <项目名>:
 
 如果只在一个 Session 中口头说明，这条规则会随着 Session 结束而丢失；如果只配置在一个 Codespace 中，新建 Codespace 后还要重新设置。
 
-把指令放进个人 dotfiles repository，可以让每个 Codespace 自动获得相同的项目入口：
-
-- Copilot CLI：`$HOME/.copilot/copilot-instructions.md`，或 `$HOME/.copilot/instructions/*.instructions.md`
-- Claude Code：可由 dotfiles 将相同规则安装到个人级 `CLAUDE.md`
+把指令放进个人 dotfiles repository，可以让每个 Codespace 通过
+`$HOME/.copilot/copilot-instructions.md` 或 `$HOME/.copilot/instructions/*.instructions.md`
+自动获得相同的项目入口。
 
 如何创建和配置个人 dotfiles，参见 ODSP-Web Wiki：[Using dotfiles for personal customization](https://dev.azure.com/onedrive/ODSP-Web/_wiki/wikis/ODSP-Web.wiki/141505/Using-dotfiles-for-personal-customization)。
 
@@ -139,37 +138,27 @@ Whenever a request discusses <项目名>:
 
 ## 4. 安装 agentOW
 
-### Claude Code
-
-```bash
-claude plugin marketplace add kaixun96/dev.AgentOW
-claude plugin install agentOW@agentOW
-```
-
-Claude 版本还需要启用 Agent Teams，并在运行前打开 auto-accept。具体前置条件见项目 [README](../README.md#prerequisites)。
-
-### Copilot CLI
-
 ```bash
 copilot plugin marketplace add kaixun96/dev.AgentOW
 copilot plugin install agentow-copilot@agentOW
 ```
 
-首次在一个 Claude/Copilot terminal session 中运行 agentOW 时，会先执行自动 Bootstrap：
+首次在一个 Copilot terminal session 中运行 agentOW 时，会先执行自动 Bootstrap：
 
 - 自动安装本地可信 marketplace 中缺失的 Playwright、ODSP 基础 MCP 和 Review 插件；
 - 任务引用 Figma、ADO、Bluebird、Wiki 或 Learn 时，自动安装 opt-in MCP；
 - UI 任务自动安装截图合成和 pixel diff 依赖；
-- Claude 自动补齐 Agent Teams 设置；
 - Azure CLI 已存在时自动安装 Azure DevOps extension。
 
-新插件和 Agent Teams 设置需要重启 Claude/Copilot 或 terminal 才能加载。Bootstrap 会停止在 Planning 之前并明确告知重启。登录、Figma OAuth、AAD consent、Playwright 首次登录和 tenant fixture 仍需用户完成。结果保存在 `.aero/<session>/capabilities.json`，同一个 terminal session 后续运行不会重复安装。
+新插件需要重启 Copilot 或 terminal 才能加载。Bootstrap 会停止在 Planning 之前并明确告知重启。
+登录、Figma OAuth、AAD consent、Playwright 首次登录和 tenant fixture 仍需用户完成。结果保存在
+`.aero/<session>/capabilities.json`，同一个 terminal session 后续运行不会重复安装。
 
 ### 推荐：第一次运行先执行 `ow-init`
 
 安装 agentOW 后，建议在第一次执行产品任务前主动运行一次完整初始化：
 
-在 Claude Code 或 Copilot CLI 的交互会话中直接输入：
+在 Copilot CLI 交互会话中直接输入：
 
 ```text
 /ow-init
@@ -187,12 +176,12 @@ CODESPACES=false az login
 
 ## 5. 选择运行模式
 
-| 场景 | Claude Code | Copilot CLI | 交互 |
-|---|---|---|---|
-| 单任务、需要确认需求和计划 | `/ow-team` | `/agentow` | 有 |
-| 单任务、Context 已充分 | `/ow-team --auto` | `/agentow --auto` | 零交互 |
-| 快速生成可运行 POC、暂缓质量门槛 | 不适用 | `/agentow --poc` | 可选 |
-| 多个独立任务 | `/ow-batch` | `/ow-batch` | 启动后零交互 |
+| 场景 | 命令 | 交互 |
+|---|---|---|
+| 单任务、需要确认需求和计划 | `/agentow` | 有 |
+| 单任务、Context 已充分 | `/agentow --auto` | 零交互 |
+| 快速生成可运行 POC、暂缓质量门槛 | `/agentow --poc` | 可选 |
+| 多个独立任务 | `/ow-batch` | 启动后零交互 |
 
 ### Interactive：用于补齐 Context
 

@@ -6,6 +6,14 @@ function finding(rule, file, message) {
   return { rule, severity: "error", file, message };
 }
 
+function validateForbiddenPaths(root, contract, findings) {
+  for (const relativePath of contract.forbiddenPaths ?? []) {
+    if (fs.existsSync(path.join(root, relativePath))) {
+      findings.push(finding("RETIRED_EDITION_PATH", relativePath, "Retired edition content must not be restored."));
+    }
+  }
+}
+
 function walkFiles(root, options) {
   const directory = path.join(root, options.directory);
   if (!fs.existsSync(directory)) return [];
@@ -261,6 +269,15 @@ function validatePluginManifests(root, contract, findings) {
   } catch (error) {
     findings.push(finding("MARKETPLACE_JSON", config.marketplace, error.message));
     return;
+  }
+  const expectedSources = (config.plugins ?? []).map((plugin) => plugin.source).sort();
+  const actualSources = (marketplace.plugins ?? []).map((plugin) => plugin.source).sort();
+  if (JSON.stringify(actualSources) !== JSON.stringify(expectedSources)) {
+    findings.push(finding(
+      "MARKETPLACE_PLUGIN_SET",
+      config.marketplace,
+      `Plugin sources must exactly match the contract. Expected [${expectedSources.join(", ")}], received [${actualSources.join(", ")}].`,
+    ));
   }
 
   for (const plugin of config.plugins ?? []) {
@@ -707,6 +724,7 @@ export function validateHarnessContract({ repoRoot, contract }) {
     namespaces: new Map(),
     mcpTools: new Set(),
   };
+  validateForbiddenPaths(root, contract, findings);
   validateFrontmatter(root, contract, findings, state);
   validateRolePolicies(root, contract, findings, state);
   validateMcpTools(root, contract, findings, state);

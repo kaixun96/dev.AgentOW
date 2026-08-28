@@ -223,25 +223,15 @@ function getHostProcessIdentity(host) {
 function getSessionIdentity(host, hostProcessIdentity) {
   const envId =
     process.env.AGENTOW_SESSION_ID ??
-    process.env.CLAUDE_SESSION_ID ??
     process.env.COPILOT_SESSION_ID ??
     process.env.TERM_SESSION_ID;
   return envId ? `${host}:${envId}` : hostProcessIdentity;
 }
 
 function pluginState(host, pluginName) {
-  const roots =
-    host === "copilot"
-      ? [`${os.homedir()}/.copilot/installed-plugins/odsp-web-plugins/${pluginName}`]
-      : [
-          `${os.homedir()}/.claude/plugins/cache/odsp-web-plugins/${pluginName}`,
-          `${os.homedir()}/.claude/plugins/cache/${pluginName}`,
-        ];
+  const roots = [`${os.homedir()}/.copilot/installed-plugins/odsp-web-plugins/${pluginName}`];
   if (!roots.some((root) => fs.existsSync(root))) {
     return "missing";
-  }
-  if (host !== "copilot") {
-    return "available";
   }
 
   const qualifiedName = `${pluginName}@odsp-web-plugins`;
@@ -303,18 +293,8 @@ function trustedMarketplaceRegistered(host) {
     return false;
   }
   const lines = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split(/\r?\n/);
-  if (host === "copilot") {
-    const expected = `odsp-web-plugins (Local: ${LOCAL_MARKETPLACE})`;
-    return lines.some((line) => line.trim().replace(/^[•◆❯]\s*/, "") === expected);
-  }
-  for (let index = 0; index < lines.length - 1; index++) {
-    const marketplaceName = lines[index].trim().replace(/^[•◆❯]\s*/, "");
-    const source = lines[index + 1].trim();
-    if (marketplaceName === "odsp-web-plugins" && source === `Source: Directory (${LOCAL_MARKETPLACE})`) {
-      return true;
-    }
-  }
-  return false;
+  const expected = `odsp-web-plugins (Local: ${LOCAL_MARKETPLACE})`;
+  return lines.some((line) => line.trim().replace(/^[•◆❯]\s*/, "") === expected);
 }
 
 function installPlugin(host, pluginName, actions) {
@@ -361,7 +341,6 @@ function ensurePlugin({ host, pluginName, id, role, shouldInstall, firstRun, pro
   }
   if (
     state === "disabled" &&
-    host === "copilot" &&
     shouldInstall &&
     !probeOnly &&
     enableCopilotPlugin(pluginName, actions)
@@ -400,40 +379,6 @@ function ensurePlugin({ host, pluginName, id, role, shouldInstall, firstRun, pro
     state === "disabled"
       ? `Enable ${pluginName}@odsp-web-plugins in Copilot settings and restart`
       : `Install ${pluginName}@odsp-web-plugins from ${LOCAL_MARKETPLACE}`,
-  );
-}
-
-function ensureClaudeAgentTeams(firstRun, probeOnly, actions) {
-  const settingsPath = `${os.homedir()}/.claude/settings.json`;
-  const settings = readJson(settingsPath);
-  const settingsIsObject = isPlainObject(settings);
-  const envIsObject = settingsIsObject && (settings.env === undefined || isPlainObject(settings.env));
-  if (settingsIsObject && isPlainObject(settings.env) && settings.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === "1") {
-    return makeCapability("host.claude-agent-teams", "required", "available", "Agent Teams flag is enabled");
-  }
-  if (firstRun && !probeOnly && ((!fs.existsSync(settingsPath) && settings === undefined) || (settingsIsObject && envIsObject))) {
-    const nextSettings = settings ?? {};
-    nextSettings.env = { ...(nextSettings.env ?? {}), CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1" };
-    writeJson(settingsPath, nextSettings);
-    actions.push({ type: "settings-update", target: settingsPath, status: "updated", evidence: "Agent Teams enabled" });
-    return makeCapability(
-      "host.claude-agent-teams",
-      "required",
-      "installed-restart-required",
-      "Agent Teams flag was added",
-      [],
-      false,
-      "Restart Claude Code",
-    );
-  }
-  return makeCapability(
-    "host.claude-agent-teams",
-    "required",
-    "misconfigured",
-    "Agent Teams flag is missing or settings.json is not valid JSON",
-    [],
-    true,
-    "Set CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 in ~/.claude/settings.json and restart Claude",
   );
 }
 
@@ -514,8 +459,8 @@ const requestFile = args.get("--request-file");
 const probeOnly = args.has("--probe-only");
 const force = args.has("--force");
 
-if ((host !== "claude" && host !== "copilot") || typeof sessionDir !== "string" || typeof requestFile !== "string") {
-  console.error("Usage: agentow-bootstrap --host claude|copilot --session-dir <path> --request-file <path>");
+if (host !== "copilot" || typeof sessionDir !== "string" || typeof requestFile !== "string") {
+  console.error("Usage: agentow-bootstrap --host copilot --session-dir <path> --request-file <path>");
   process.exit(2);
 }
 
@@ -567,36 +512,18 @@ capabilities.push(
   ),
 );
 
-if (host === "claude") {
-  capabilities.push(ensureClaudeAgentTeams(firstRun, probeOnly, actions));
-  capabilities.push(
-    makeCapability(
-      "host.claude-auto-accept",
-      "required",
-      "unknown",
-      "Claude permission mode is not observable from the bootstrap process",
-      [],
-      false,
-      "Enable auto-accept with Shift+Tab before unattended runs",
-    ),
-  );
-  capabilities.push(makeCapability("host.copilot-auth", "optional", "not-applicable", "Claude host"));
-} else {
-  const copilotAvailable = commandExists("copilot");
-  capabilities.push(
-    makeCapability(
-      "host.copilot-auth",
-      "required",
-      copilotAvailable ? "available" : "missing",
-      copilotAvailable ? "Bootstrap is running from an authenticated Copilot host" : "Copilot CLI missing",
-      [],
-      !copilotAvailable,
-      "Run copilot auth, then restart Copilot CLI",
-    ),
-  );
-  capabilities.push(makeCapability("host.claude-agent-teams", "optional", "not-applicable", "Copilot host"));
-  capabilities.push(makeCapability("host.claude-auto-accept", "optional", "not-applicable", "Copilot host"));
-}
+const copilotAvailable = commandExists("copilot");
+capabilities.push(
+  makeCapability(
+    "host.copilot-auth",
+    "required",
+    copilotAvailable ? "available" : "missing",
+    copilotAvailable ? "Bootstrap is running from an authenticated Copilot host" : "Copilot CLI missing",
+    [],
+    !copilotAvailable,
+    "Run copilot auth, then restart Copilot CLI",
+  ),
+);
 
 capabilities.push(
   makeCapability(
