@@ -4,25 +4,15 @@
     "name": "kaixun"
   },
   "metadata": {
-    "description": "Agentic tooling for odsp-web development in Codespaces",
-    "version": "0.4.32"
+    "description": "GitHub Copilot CLI harness for odsp-web development in Codespaces",
+    "version": "0.1.39"
   },
   "plugins": [
     {
-      "name": "agentOW",
-      "source": "./",
-      "description": "odsp-web agentic tooling. Registers ow MCP server with rush, tmux, git, and debug link tools.",
-      "version": "0.4.32",
-      "author": {
-        "name": "kaixun"
-      },
-      "repository": "https://dev.azure.com/onedrive/ODSP-Web"
-    },
-    {
       "name": "agentow-copilot",
       "source": "./copilot",
-      "description": "Copilot CLI port of agentOW. Includes an isolated reproduce-first Accessibility remediation mode.",
-  "version": "0.1.38",
+      "description": "GitHub Copilot CLI agentOW harness with standard, POC, batch, review, and Accessibility workflows.",
+      "version": "0.1.39",
       "author": {
         "name": "kaixun"
       },

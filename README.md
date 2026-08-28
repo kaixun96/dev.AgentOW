@@ -1,97 +1,12 @@
-# dev.AgentOW
+# agentOW
 
-**A**gent for **O**dsp-**W**eb — multi-agent orchestration for odsp-web feature development.
+agentOW is a GitHub Copilot CLI harness for ODSP-Web development. It takes a feature, bug, review,
+Accessibility remediation, or batch request through source-grounded planning, implementation,
+validation, review, and Draft PR delivery inside a GitHub Codespace.
 
-A Claude Code plugin that runs a full pipeline of specialized agents to take you from a feature description to a draft PR, inside a GitHub Codespace.
+The Copilot CLI edition is the only supported edition.
 
-```mermaid
-flowchart TD
-    A([💬 User describes feature]) --> B{Mode?}
-    B -- "/ow-team" --> C[💡 Brainstorm<br/>clarify intent]
-    B -- "/ow-team --auto" --> D
-    B -- "/ow-batch" --> D
-    C --> D[📋 Planner<br/>research + plan]
-    D --> E{Approve?}
-    E -- yes --> F[🔨 Generator<br/>code → build → test → dev server]
-    E -- revise --> D
-    F -.code_done.-> G & H
-    G[🔍 Dual Evaluator<br/>rule + vision ensemble]
-    H[📝 Reviewer<br/>checklist + deep review]
-    F --> I{All pass?}
-    G --> I
-    H --> I
-    I -- fail --> F
-    I -- pass --> J[🚀 git push + draft PR on ADO]
-    J --> K([🎉 PR URL])
-
-    style A fill:#7c5cff,stroke:#7c5cff,color:#fff
-    style K fill:#4ade80,stroke:#4ade80,color:#000
-    style C fill:#60a5fa,stroke:#60a5fa,color:#fff
-    style D fill:#60a5fa,stroke:#60a5fa,color:#fff
-    style F fill:#fbbf24,stroke:#fbbf24,color:#000
-    style G fill:#fbbf24,stroke:#fbbf24,color:#000
-    style H fill:#fbbf24,stroke:#fbbf24,color:#000
-    style J fill:#4ade80,stroke:#4ade80,color:#000
-```
-
-> See [docs/architecture.md](docs/architecture.md) for the full invocation flow diagram with details.
->
-> Getting started guide: [How to use agentOW: from project context to zero-interaction automation](docs/USING-AGENTOW.md) · 中文版：[如何使用 agentOW：从项目 Context 到零交互自动化](docs/USING-AGENTOW.zh-CN.md)
-
----
-
-## What it does
-
-You describe a feature. The agent team:
-
-1. Clarifies your intent through brainstorming
-2. Researches the codebase and drafts an implementation plan
-3. Asks for your approval
-4. Implements the plan (code, build, test, start dev server)
-5. Verifies acceptance criteria via Playwright (dual evaluator: rule checks + cold-eye vision review)
-6. Reviews the code (quick checklist + optional deep review)
-7. If issues are found, fixes them (up to 5 cycles)
-8. Pushes the branch and creates a draft PR on Azure DevOps
-
-You can run it in two modes — see [Quick Start](#quick-start).
-
----
-
-## Prerequisites
-
-- Claude Code CLI
-- GitHub Codespace with `odsp-web` cloned at `/workspaces/odsp-web`
-- `tmux` installed in the Codespace
-- Playwright MCP server (for evaluator browser verification)
-- superpowers plugin (recommended, for brainstorming + deep review)
-- **Agent Teams enabled** — `/ow-team` and `/ow-batch` spawn a team of agents, which requires the experimental flag. Add to `~/.claude/settings.json`, then **restart Claude Code**:
-
-  ```json
-  {
-    "env": {
-      "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-    }
-  }
-  ```
-
-  > As of Claude Code 2.1.x the old `TeamCreate` tool was removed — with this flag set, every session has an implicit team and agentOW spawns teammates directly. Without the flag, `/ow-team` cannot spawn its agents.
-
-- **Auto-accept mode on** — the orchestrator and teammates run unattended; if Claude Code stops to ask permission for every tool, the pipeline stalls. Turn on auto-accept mode (cycle permission modes with **Shift+Tab** until it shows auto-accept) before starting a run, especially for `--auto` and `/ow-batch`.
-
-agentOW now bootstraps the remaining prerequisites on the first invocation in each terminal session. It installs trusted local Playwright/ODSP/review plugins, task-triggered Figma/ADO tooling, image-diff dependencies, the Azure DevOps extension, and the Claude Agent Teams setting. Run `/ow-init` for an explicit one-time comprehensive initialization before the first task. Plugin/settings changes require one Claude/Copilot restart; authentication and browser/Figma consent remain manual.
-
----
-
-## Installation
-
-### Claude Code
-
-```bash
-claude plugin marketplace add kaixun96/dev.AgentOW
-claude plugin install agentOW@agentOW
-```
-
-### Copilot CLI
+## Install
 
 ```bash
 copilot plugin marketplace add kaixun96/dev.AgentOW
@@ -100,208 +15,103 @@ copilot plugin install agentow-copilot@agentOW
 
 ### Recommended first run: initialize prerequisites
 
-Before the first product task, run one comprehensive initialization:
+Initialize trusted prerequisites before the first task:
 
 ```text
 /ow-init
 ```
 
-`ow-init` installs or enables trusted Playwright, ODSP, review, Figma/ADO, and image-diff prerequisites without starting planning or changing product code. Restart Claude/Copilot if requested. If Azure authentication is missing, run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init`.
+Restart Copilot CLI when initialization installs or enables plugins. If Azure authentication is
+missing, run `CODESPACES=false az login` in the current Codespace terminal and rerun `/ow-init`.
 
----
+## Commands
 
-## Upgrading
+| Command | Purpose |
+|---|---|
+| `/agentow` | Full feature/bug pipeline |
+| `/agentow --auto` | Zero-interaction full pipeline |
+| `/agentow --poc` | Fast runnable proof of concept, not production-ready |
+| `/agentow-a11y` | Evidence-first Accessibility remediation |
+| `/ow-batch` | Serial, checkpointed batch execution |
+| `/ow-review` | Review a branch or existing ADO PR without editing or shipping |
+| `/ow-context-feedback` | Update linked durable context from later feedback |
+| `/ow-init` | Initialize prerequisites without changing product code |
+| `/ow-doctor` | Force environment diagnosis and repair |
 
-### Claude Code
+The main Copilot session owns orchestration and implementation so fix-cycle context is retained.
+Planner, evaluator, A11y evaluator, reviewer, and context-maintainer agents are bounded stateless
+verifiers.
 
-```bash
-claude plugin update agentOW@agentOW
-```
+agentOW is a routing/execution layer. Feature-specific rules and execution guards should live in the routed context docs rather than in generic harness prompts. Context maintenance never adds a user gate.
 
-### Copilot CLI
+## Durable delivery
 
-```bash
-copilot plugin update agentow-copilot@agentOW
-```
+Each run writes a `.aero/<session>/` tree containing:
 
----
+- `run-state.json`, request/lifecycle journals, checkpoints, and timing;
+- planner mode, plan, implementation, evaluator, review, and final artifacts;
+- content-hashed artifact index and report recovery journal;
+- linked-context routing, evidence, candidates, and apply results;
+- progress output suitable for detached reconciliation.
 
-## Quick Start
+Visible STANDARD changes require representative BEFORE/AFTER evidence. Accessibility-primary work
+uses `/agentow-a11y`; unavailable real-AT validation may produce only an explicitly labeled
+`UNVERIFIED A11Y` Draft after bounded attempts, supporting checks, and review.
 
-### Interactive mode (default)
+Critical and Important review findings block PR creation. PR tools create or update Draft PRs only,
+and attachments update the PR description rather than posting comment threads.
 
-```
-/ow-team
-> Implement a loading spinner for the photo grid component
-```
+## Documentation
 
-The team will:
-- Brainstorm with you to clarify intent (a few questions)
-- Ask you to approve the implementation plan
-- Run an evidence-backed two-pass review before creating the PR
-
-Typical interaction count: 3–5 questions.
-
-### Auto mode — zero interaction
-
-```
-/ow-team --auto
-> Implement a loading spinner for the photo grid component
-```
-
-You provide one input. You get back one draft PR URL. Nothing in between.
-- Brainstorm: skipped (planner makes reasonable assumptions)
-- Plan approval: auto
-- Review: Critical and Important findings are auto-fixed and re-reviewed; unresolved blocking findings stop the run rather than creating a PR
-
-### Batch mode — drop a list, get a list of PRs
-
-```
-/ow-batch
-1. Add loading spinner to PhotoGrid
-2. Fix elevation background on mobile
-3. Remove unused imports from sp-pages
-... (10+ tasks)
-```
-
-Designed for "leave it overnight, come back to PRs". Each task gets a fresh agent team, runs in `--auto` mode, and produces its own PR. Failures in one task do not affect the rest. A summary file lists every result and PR URL.
-
-> **Don't** invoke `ow-orchestrator` directly — always use `/ow-team` or `/ow-batch`. The orchestrator requires a properly set up Agent Team to function.
-
-### Review-only mode — no implementation, no PR
-
-```
-/ow-review                 # review the current branch against origin/main
-/ow-review 1234567         # review an existing ADO PR by ID (URL also works)
-/ow-review --base origin/releases/M1
-```
-
-Runs the same validated review gate the pipeline uses, without planning, coding, or shipping. Reviewing a PR resolves its source/target branches through `az repos pr show`; when the PR head is not the current checkout, it is materialized in a temporary detached worktree so your working tree is untouched. Findings are reported to you — this command never edits code and never creates or publishes a PR.
-
-### MCP tools directly
-
-```
-Use ow-status to check my environment
-Use ow-build to build @ms/sp-pages
-Use ow-start to launch the dev server for @ms/sp-pages
-```
-
----
-
-## Session Artifacts
-
-Each `/ow-team` run creates `/workspaces/odsp-web/.aero/<session-name>/` with:
-
-| File / Dir | Written by | Contents |
-|---|---|---|
-| `plans/plan.md` | planner | Spec, acceptance criteria, task list |
-| `evaluation/iter<N>/rule-findings.json` | evaluator-rule | Per-criterion verdict + probe values |
-| `evaluation/iter<N>/vision-findings.json` | evaluator-vision | Cold-eye PNG review verdict |
-| `evaluation/iter<N>/reflection.md` | evaluator-rule | What worked, what didn't, what to fix next cycle |
-| `evaluation/iter<N>/{before,after,composite}-*.png` | evaluator-rule | BEFORE/AFTER/composite screenshots |
-| `review.md` | review-agent | Code review findings |
-| `report.json` | all agents | NDJSON status records |
-| `progress.log` | orchestrator | Real-time pipeline progress (visible via Monitor) |
-| `capabilities.json` | launcher | Redacted prerequisite probes, installations, fallbacks, and restart/manual actions |
-| `context/link.json` | launcher | Immutable link to the run's external context library |
-| `context/evidence.ndjson` | pipeline | Plan, code, evaluation, review, and feedback provenance |
-| `context/candidates/` | context-maintainer | Immutable context update revisions |
-| `context/apply/` | orchestrator | Applied, patch-only, read-only, or conflict results |
-
----
+- [Detailed usage guide](docs/USING-AGENTOW.md)
+- [中文使用指南](docs/USING-AGENTOW.zh-CN.md)
+- [Copilot plugin architecture](copilot/README.md)
+- [Capability bootstrap](docs/capability-bootstrap.md)
+- [Run lifecycle](docs/run-lifecycle.md)
+- [Context maintenance](docs/context-maintenance.md)
+- [Review contract](docs/review-contract.md)
+- [Harness contract](docs/harness-contract.md)
+- [Success metrics](docs/value-metrics.md)
+- [Personal-account evaluator browser](docs/personal-evaluator-browser.md)
 
 ## Architecture
 
-Three-layer harness:
+```text
+Copilot CLI plugin (copilot/)
+  ├── AGENTS.md
+  ├── agents/
+  ├── skills/
+  ├── docs/
+  ├── tools/          generated from shared root tools
+  └── ts/dist/        generated from shared TypeScript MCP source
 
-| Layer | Purpose | Components |
-|-------|---------|------------|
-| **Tools (MCP)** | Deterministic operations | rush, tmux, git, debug link, PR creation |
-| **Agents** | Workflow separation | orchestrator, planner, generator, evaluator, reviewer |
-| **Skills** | Knowledge injection | build rules, test conventions, PR workflow, Playwright |
+Shared development source
+  ├── ts/
+  ├── tools/
+  ├── contracts/
+  ├── docs/
+  ├── skills/ow-review/references/
+  └── review rule registries
+```
 
-### MCP Tools (17)
-
-| Tool | Description |
-|------|-------------|
-| `ow-status` | Environment snapshot (git, node, rush, tmux) |
-| `ow-rush` | Run any rush command |
-| `ow-build` | rush build with structured error parsing |
-| `ow-test` | rush test with Jest result parsing |
-| `ow-start` | Launch `rush start` in tmux |
-| `ow-debuglink` | Extract debug link → full SharePoint test URL |
-| `ow-git` | Run git commands with structured output |
-| `ow-session-{open,send,capture,list,kill,interrupt}` | tmux pane control |
-| `ow-pr-create` | Push branch + create draft PR on Azure DevOps |
-| `ow-pr-attach` | Upload screenshots to a PR and append them to the PR description; never posts comments |
-| `ow-pr-debug-query` | Fetch PR SP-Client Validation CDN debug query from PR threads |
-| `ow-recipe-lint` | Run deterministic Tier 1 SPDS / ReplaceComponent recipe checks on a PR or local files |
-| `ow-version` | Check plugin version and update availability |
-
-Operational notes:
-- MCP tool timeout is not automatically a Rush failure. Long `rush build -t @msinternal/sp-pages` / `rush start` runs can outlive the MCP request; agents should track the underlying process and read Rush summaries before deciding.
-- Local `rush start` debug links are the preferred fast path for evaluator screenshots. PR SP-Client Validation CDN query is the fallback when localhost validation fails or the user explicitly asks for PR CDN screenshots.
-- For a Windows-hosted owner/Twinbot, see [Personal-account evaluator browser](docs/personal-evaluator-browser.md) to configure a compliant persistent Playwright profile. Twin-mediated runs prefer this route when reachable; standalone Codespaces use FIC.
-- agentOW is a routing/execution layer. Feature-specific rules and execution guards should live in the routed context docs (for example dotfiles knowledge centers), not in agentOW prompts.
-- Each run resolves at most one external context library using `docs/context-maintenance.md`. The library manifest owns routes, update targets, and `auto-commit` / `patch-only` / `disabled` policy.
-- Context maintenance never adds a user gate. Plan intent is recorded during the run; the committed diff and evaluator/reviewer results produce an as-built revision before shipping. Read-only or stale libraries leave a patch/conflict artifact without blocking the product PR.
-- Later user or PR feedback can invoke `/ow-context-feedback`, resume by run ID/session/PR URL, verify the current code, and apply a superseding context revision using the same library policy.
-
-### Agents
-
-| Agent | Role |
-|-------|------|
-| `ow-orchestrator` | Drive the pipeline (no source code access — pure dispatcher) |
-| `ow-planner` | Research codebase, draft plan |
-| `ow-generator` | Implement, build, test, start dev server |
-| `ow-evaluator` | Code-inspection verification + dry-run plan check |
-| `ow-evaluator-rule` | UI verification half: runs Playwright, parses probes, computes aria/pixel/structural diffs |
-| `ow-evaluator-vision` | UI verification half: cold-eye review of AFTER PNG with no code/plan/probe access |
-| `ow-review-agent` | Pre-PR code review |
-| `ow-context-maintainer` | Evidence-grounded context update candidate synthesis |
-
-All agents run on Claude Opus 4.7 in a persistent Agent Team — generator at cycle 2 retains full context from cycle 1.
-
-### Skills
-
-| Skill | Trigger keywords |
-|-------|------------------|
-| `ow-team` | Run the full pipeline (entry point) |
-| `ow-batch` | Run multiple tasks overnight, one PR per task |
-| `ow-review` | Review an existing PR or the current branch, without implementing or shipping |
-| `ow-dev-build` | rush build/install/update |
-| `ow-dev-test` | rush test, Jest |
-| `ow-dev-git` | git, branch, checkout |
-| `ow-dev-debuglink` | rush start, debug link |
-| `ow-dev-playwright` | Playwright MCP, browser verification |
-| `ow-dev-pr` | PR, az repos |
-| `ow-ref-monorepo` | monorepo structure, Rush/Heft |
-| `ow-ref-external-tools` | killswitch, GUID, Bluebird, ADO work items |
-| `ow-context-feedback` | Resume a completed run and update linked context from later feedback |
-| `ow-init` | Run one comprehensive prerequisite initialization without starting a task |
-| `ow-doctor` | Force a capability recheck and repair missing trusted prerequisites |
-| `search-odspweb-wiki` | wiki, documentation |
-
----
+The root `skills/ow-review/references/` directory is shared review knowledge, not a second plugin
+edition. `npm run build` validates the harness, builds the MCP server, and refreshes the packaged
+Copilot mirrors.
 
 ## Contributing
 
-External contributions go through pull requests:
+All changes go through pull requests:
 
-1. Fork or branch from `main`
-2. Push your changes to a feature branch
-3. Open a PR against `kaixun96/dev.AgentOW:main`
+1. Branch from `main`.
+2. Make and validate the change.
+3. Run:
 
-Agent, skill, lifecycle, permission, or delivery changes must also satisfy the
-[harness contract](docs/harness-contract.md):
+   ```bash
+   cd ts
+   npm run build
+   npm run typecheck
+   ```
 
-```bash
-cd ts
-npm run validate-harness-contract
-```
+4. Open a PR against `kaixun96/dev.AgentOW:main`.
 
----
-
-## Repository
-
-- GitHub: https://github.com/kaixun96/dev.AgentOW
+Repository: https://github.com/kaixun96/dev.AgentOW

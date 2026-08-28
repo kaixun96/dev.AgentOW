@@ -32136,7 +32136,9 @@ function registerOwTools(server2, logger2, logDir) {
     const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? `${OW.odspWebRoot}/../dev.AgentOW`;
     let version2 = "unknown";
     try {
-      const pkg = JSON.parse(await fs4.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
+      const directManifest = `${pluginRoot}/.claude-plugin/plugin.json`;
+      const manifestPath = fs4.existsSync(directManifest) ? directManifest : `${pluginRoot}/copilot/.claude-plugin/plugin.json`;
+      const pkg = JSON.parse(await fs4.promises.readFile(manifestPath, "utf8"));
       version2 = pkg.version ?? "unknown";
     } catch {
     }
@@ -32162,7 +32164,7 @@ function registerOwTools(server2, logger2, logDir) {
       isUpToDate,
       behindCount,
       ...isUpToDate ? {} : {
-        updateCommand: `cd ${pluginRoot} && git pull && cd ts && npm install && npm run build && claude plugin update agentOW@agentOW`
+        updateCommand: "copilot plugin update agentow-copilot"
       }
     });
   });
@@ -32265,7 +32267,7 @@ You are connected to the ow MCP server \u2014 a dev toolkit for odsp-web develop
 
 ## Development Loop
 
-Since Claude Code runs directly inside the Codespace, all commands execute locally:
+Since agentOW runs directly inside the Codespace, all commands execute locally:
 
 1. ow-status \u2014 confirm git branch, node version, rush state.
 2. Edit code directly (Read/Edit/Write/Grep/Glob on /workspaces/odsp-web).

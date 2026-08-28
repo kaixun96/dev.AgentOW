@@ -38,6 +38,8 @@ const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agentow-contract-"));
 try {
   fs.mkdirSync(path.join(fixtureRoot, "copilot", "agents"), { recursive: true });
   fs.mkdirSync(path.join(fixtureRoot, "copilot", "skills", "sample"), { recursive: true });
+  fs.mkdirSync(path.join(fixtureRoot, ".claude-plugin"), { recursive: true });
+  fs.mkdirSync(path.join(fixtureRoot, "copilot", ".claude-plugin"), { recursive: true });
   fs.mkdirSync(path.join(fixtureRoot, "ts", "src"), { recursive: true });
   fs.writeFileSync(
     path.join(fixtureRoot, "copilot", "agents", "planner.agent.md"),
@@ -74,6 +76,23 @@ try {
     path.join(fixtureRoot, "ts", "src", "schema.ts"),
     "const inputSchema = { 'draft': true };\n",
   );
+  fs.writeFileSync(
+    path.join(fixtureRoot, ".claude-plugin", "marketplace.json"),
+    JSON.stringify({
+      plugins: [
+        { name: "sample", source: "./copilot", version: "1.0.0" },
+        { name: "retired", source: "./", version: "1.0.0" },
+      ],
+    }),
+  );
+  fs.writeFileSync(
+    path.join(fixtureRoot, "copilot", ".claude-plugin", "plugin.json"),
+    JSON.stringify({ name: "sample", version: "1.0.0", mcpServers: {} }),
+  );
+  fs.writeFileSync(
+    path.join(fixtureRoot, "copilot", ".mcp.json"),
+    JSON.stringify({ mcpServers: {} }),
+  );
 
   const fixtureContract = {
     frontmatterNamespaces: [
@@ -99,6 +118,16 @@ try {
       directory: "copilot",
       prefix: "@agentow-copilot:",
       namespace: "copilot-agents",
+    },
+    pluginManifests: {
+      marketplace: ".claude-plugin/marketplace.json",
+      plugins: [
+        {
+          source: "./copilot",
+          manifest: "copilot/.claude-plugin/plugin.json",
+          mcpMirror: "copilot/.mcp.json",
+        },
+      ],
     },
     markerContracts: [{ file: "markers.md", ordered: ["first", "second"] }],
     commandPolicies: [
@@ -145,6 +174,7 @@ try {
   assert(rules.has("ROLE_FRONTMATTER_INVALID"));
   assert(rules.has("MCP_TOOL_REFERENCE"));
   assert(rules.has("AGENT_REFERENCE"));
+  assert(rules.has("MARKETPLACE_PLUGIN_SET"));
   assert(rules.has("LIFECYCLE_MARKER_ORDER"));
   assert(rules.has("TEST_COMMAND"));
   assert(!rules.has("TEST_VALID_COMMAND"));

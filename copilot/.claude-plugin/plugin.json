@@ -1,6 +1,6 @@
 {
   "name": "agentow-copilot",
-  "description": "Copilot CLI port of agentOW: standard delivery plus isolated reproduce-first Accessibility remediation.",
+  "description": "GitHub Copilot CLI agentOW harness with standard, POC, batch, review, and Accessibility workflows.",
   "version": "0.1.39",
   "author": {
     "name": "kaixun"

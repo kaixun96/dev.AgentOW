@@ -336,7 +336,11 @@ export function registerOwTools(
     const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? `${OW.odspWebRoot}/../dev.AgentOW`;
     let version = "unknown";
     try {
-      const pkg = JSON.parse(await fs.promises.readFile(`${pluginRoot}/.claude-plugin/plugin.json`, "utf8"));
+      const directManifest = `${pluginRoot}/.claude-plugin/plugin.json`;
+      const manifestPath = fs.existsSync(directManifest)
+        ? directManifest
+        : `${pluginRoot}/copilot/.claude-plugin/plugin.json`;
+      const pkg = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
       version = pkg.version ?? "unknown";
     } catch { /* ignore */ }
 
@@ -363,7 +367,7 @@ export function registerOwTools(
       isUpToDate,
       behindCount,
       ...(isUpToDate ? {} : {
-        updateCommand: `cd ${pluginRoot} && git pull && cd ts && npm install && npm run build && claude plugin update agentOW@agentOW`,
+        updateCommand: "copilot plugin update agentow-copilot",
       }),
     });
   });

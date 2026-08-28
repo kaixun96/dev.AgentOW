@@ -120,10 +120,9 @@ Whenever a request discusses <project>:
 
 Say it out loud in a single session and the rule dies with that session. Configure it in one Codespace and you get to configure it again in the next one.
 
-Putting the instruction in a personal dotfiles repository gives every Codespace the same project entry point automatically:
-
-- Copilot CLI: `$HOME/.copilot/copilot-instructions.md`, or `$HOME/.copilot/instructions/*.instructions.md`
-- Claude Code: dotfiles can install the same rule into the personal-level `CLAUDE.md`
+Putting the instruction in a personal dotfiles repository gives every Codespace the same project
+entry point automatically through `$HOME/.copilot/copilot-instructions.md` or
+`$HOME/.copilot/instructions/*.instructions.md`.
 
 For how to create and configure personal dotfiles, see the ODSP-Web wiki: [Using dotfiles for personal customization](https://dev.azure.com/onedrive/ODSP-Web/_wiki/wikis/ODSP-Web.wiki/141505/Using-dotfiles-for-personal-customization).
 
@@ -140,37 +139,28 @@ Personal memory is only for stable "where to read" rules. Shared architecture, s
 
 ## 4. Install agentOW
 
-### Claude Code
-
-```bash
-claude plugin marketplace add kaixun96/dev.AgentOW
-claude plugin install agentOW@agentOW
-```
-
-The Claude version additionally needs Agent Teams enabled and auto-accept turned on before running. See the project [README](../README.md#prerequisites) for the full prerequisites.
-
-### Copilot CLI
-
 ```bash
 copilot plugin marketplace add kaixun96/dev.AgentOW
 copilot plugin install agentow-copilot@agentOW
 ```
 
-The first agentOW run in a given Claude/Copilot terminal session starts with an automatic bootstrap:
+The first agentOW run in a given Copilot terminal session starts with an automatic bootstrap:
 
 - installs any missing Playwright, ODSP baseline MCP, and review plugins from the local trusted marketplace;
 - installs opt-in MCPs when the task references Figma, ADO, Bluebird, wiki, or Learn;
 - installs screenshot composition and pixel-diff dependencies for UI tasks;
-- completes the Agent Teams setup on Claude;
 - installs the Azure DevOps extension when the Azure CLI is already present.
 
-New plugins and Agent Teams settings only load after Claude/Copilot or the terminal restarts. Bootstrap stops before planning and says so explicitly. Sign-in, Figma OAuth, AAD consent, the first Playwright login, and tenant fixtures still need you. Results are saved to `.aero/<session>/capabilities.json`, so later runs in the same terminal session do not reinstall.
+New plugins only load after Copilot or the terminal restarts. Bootstrap stops before planning and
+says so explicitly. Sign-in, Figma OAuth, AAD consent, the first Playwright login, and tenant
+fixtures still need you. Results are saved to `.aero/<session>/capabilities.json`, so later runs in
+the same terminal session do not reinstall.
 
 ### Recommended: run `ow-init` first
 
 After installing agentOW, run a full initialization once before your first product task.
 
-In an interactive Claude Code or Copilot CLI session, type:
+In an interactive Copilot CLI session, type:
 
 ```text
 /ow-init
@@ -188,12 +178,12 @@ Re-run `/ow-init` once that finishes.
 
 ## 5. Choose a run mode
 
-| Situation | Claude Code | Copilot CLI | Interaction |
-|---|---|---|---|
-| Single task, requirements and plan need confirming | `/ow-team` | `/agentow` | yes |
-| Single task, context is already sufficient | `/ow-team --auto` | `/agentow --auto` | none |
-| Runnable proof of concept, quality gates deferred | n/a | `/agentow --poc` | optional |
-| Several independent tasks | `/ow-batch` | `/ow-batch` | none after launch |
+| Situation | Command | Interaction |
+|---|---|---|
+| Single task, requirements and plan need confirming | `/agentow` | yes |
+| Single task, context is already sufficient | `/agentow --auto` | none |
+| Runnable proof of concept, quality gates deferred | `/agentow --poc` | optional |
+| Several independent tasks | `/ow-batch` | none after launch |
 
 ### Interactive: for filling context gaps
 

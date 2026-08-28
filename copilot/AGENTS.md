@@ -20,7 +20,7 @@ You keep the work that needs continuity and user interaction: talking to the use
 
 ## Session artifacts
 
-Keep the Copilot run artifact-compatible with the Claude pipeline wherever practical:
+Keep every Copilot run compatible with the durable artifact contract:
 
 ```text
 /workspaces/odsp-web/.aero/<session>/
