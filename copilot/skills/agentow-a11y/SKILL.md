@@ -1,6 +1,6 @@
 ---
 name: agentow-a11y
-description: "Fix an odsp-web Accessibility bug through a lightweight reproduce-first pipeline. Twinbot owns real DevBox assistive technology and supplies hashed evidence; agentOW edits only after reproduction and ships only after the exact scenario passes. Triggers on: A11y bug, accessibility bug, WCAG, screen reader, NVDA, Narrator, Voice Access, keyboard focus, ARIA, accessible name, live region."
+description: "Fix an odsp-web Accessibility bug through a lightweight evidence-first pipeline. Twinbot owns real DevBox assistive technology and supplies hashed evidence when available; after bounded evidence attempts are exhausted, agentOW may implement and open an explicitly unverified draft PR without claiming AT validation. Triggers on: A11y bug, accessibility bug, WCAG, screen reader, NVDA, Narrator, Voice Access, keyboard focus, ARIA, accessible name, live region."
 ---
 
 # agentOW Accessibility remediation mode
@@ -91,7 +91,10 @@ Use the dispatcher-provided Twin evidence bridge:
 - If a Twin evaluator command is provided, invoke it with request/result paths.
 - If Twin already provided a result artifact, copy only the immutable result metadata/URI into the
   run; do not copy private profiles or credentials.
-- If neither route is available, write `final.md` with status `needs-twin-evaluator` and stop.
+- Make up to three meaningful attempts to acquire and validate real-AT reproduction evidence. An
+   attempt must try an available route or correct a concrete bridge, request, environment, or
+   evidence defect; never repeat an identical unavailable command merely to reach the limit. If no
+   Twin route exists, capability discovery exhausts the available routes immediately.
 
 After Twin writes the result, dispatch `@agentow-copilot:a11y-evaluator` with phase `reproduce`.
 Also run `validate-a11y-evidence.mjs` directly.
@@ -101,17 +104,30 @@ Gate:
 | Result | Action |
 |---|---|
 | `reproduced` + evaluator PASS | Continue |
-| `not-reproduced` | Stop; no branch, code, or PR |
-| `blocked` | Stop with exact blocker |
-| `inconclusive` | Stop; never guess |
-| invalid/mismatched evidence | Stop as `INVALID_EVIDENCE` |
+| `not-reproduced` | Correct procedural or scenario defects and retry when possible |
+| `blocked` | Repair the concrete capability/environment blocker and retry when possible |
+| `inconclusive` | Correct the evidence gap and retry when possible; never call it reproduced |
+| invalid/mismatched evidence | Correct and retry; never reinterpret it as valid evidence |
+
+When the available routes or three meaningful attempts are exhausted without a valid reproduced
+result, do not stop solely because real-AT validation is unavailable. Set
+`validationMode: "unverified-fallback"`, record every attempted route and exact blocker in
+`final.md`, and continue to source investigation. This fallback requires a concrete reported
+actual/expected behavior and runnable acceptance scenario. If those are absent, stop for missing
+requirements rather than guessing at the bug. User authorization may select this fallback early
+once capability discovery proves no Twin route exists.
+
+The fallback authorizes investigation, implementation, review, and an explicitly unverified draft
+PR. It does not turn missing, invalid, blocked, inconclusive, or not-reproduced evidence into PASS,
+and it never authorizes claims that NVDA, Narrator, Voice Access, keyboard focus, UI Automation, or
+screenshots were validated. Use `validationMode: "strict"` when reproduction passes normally.
 
 Preserve the approved reproduce request/result as immutable files. Record the SHA-256 of the exact
 reproduce result file bytes; it becomes `baselineEvidenceSha256`.
 
 ## Step 3: Minimal source investigation
 
-Only after reproduction:
+After strict reproduction PASS or entry into `unverified-fallback`:
 
 1. Trace the failing element/event to its implementation.
 2. Read the predecessor/native SPDS or Fluent implementation before hand-writing ARIA, focus,
@@ -122,7 +138,7 @@ Only after reproduction:
 
    ```markdown
    # A11y implementation note
-   - Reproduced failure:
+   - Reproduced failure or reported failure when unverified:
    - Root cause:
    - Files:
    - Existing pattern reused:
@@ -178,31 +194,44 @@ Gate:
 - `pass` + evaluator PASS: continue.
 - `fail` caused by product behavior: fix, rebuild, and replay; maximum three cycles.
 - evaluator-spec/invalid evidence: request corrected Twin evidence without editing code.
-- `blocked` or `inconclusive`: stop. Unlike standard visual delivery, A11y mode never creates an
-  explicitly unverified draft.
+- `blocked` or `inconclusive`: correct the concrete blocker and retry when possible.
+
+In `unverified-fallback`, or when verification capability becomes unavailable after implementation,
+make up to three meaningful verification attempts using the same bounded-attempt rule from Step 2.
+Run all available scoped builds, tests, lint, static accessibility checks, and source-level contract
+checks, but label them as supporting checks. When the routes or attempts are exhausted, record the
+exact missing AFTER evidence and continue to review with `verifyVerdict: "UNVERIFIED"`. A valid
+real-AT result showing the changed product still fails is not an unavailable-validator case: fix it
+and replay, and do not create a PR while that demonstrated product failure remains.
 
 Static axe, accessibility-tree, and code checks cannot upgrade missing real-AT evidence.
 
 ## Step 6: Review
 <!-- agentow-contract:a11y:review -->
 
-After strict verify PASS, dispatch `@agentow-copilot:reviewer` with:
+After strict verify PASS or completion of the `unverified-fallback` supporting checks, dispatch
+`@agentow-copilot:reviewer` with:
 
 - original bug and implementation note;
 - changed files and actual diff;
 - A11y knowledge manifest;
 - reproduce and verify evaluator reports;
 - evidence metadata and hashes;
+- validation mode, exhausted attempt log, unavailable evidence types, and supporting checks;
 - `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/accessibility.md`.
 
-Critical/Important findings return to Step 4 and require a complete Step 5 replay. Never reuse a
-PASS from an older commit.
+Critical/Important findings return to Step 4. Strict mode requires a complete Step 5 replay. In
+fallback mode, rerun affected supporting checks and retry real-AT verification only when the
+capability or blocker changed. Never reuse a PASS from an older commit.
 <!-- agentow-contract:a11y:evidence-bound-to-head -->
 
 ## Step 7: Ship and preserve evidence
 <!-- agentow-contract:a11y:delivery:draft-pr -->
 
-Create the draft PR only after verification and review pass.
+Create the draft PR after review passes. Strict mode also requires verification PASS. Fallback mode
+may create a draft PR with no real-AT PASS only when all bounded attempts, blockers, supporting
+checks, and residual risks are recorded. Prefix the validation section heading with
+`UNVERIFIED A11Y` and do not present the PR as accessibility-validated or ready for final approval.
 
 The PR description must stand alone and include:
 
@@ -220,6 +249,23 @@ The PR description must stand alone and include:
 |---|---|---|---|
 ```
 
+For `unverified-fallback`, replace that template with:
+
+```markdown
+## UNVERIFIED A11Y - validation unavailable
+
+- Validation mode: Unverified fallback
+- Reported bug and expected behavior: <summary>
+- Real-AT attempts: <count and routes>
+- Blocker: <Twin/AT/environment/evidence blocker>
+- Not validated: <NVDA/Narrator/Voice Access/keyboard/UIA/screenshots as applicable>
+- Supporting checks: <build, scoped tests, lint, static checks and results>
+- Residual risk: The accessibility fix has not been verified with the required real AT.
+```
+
+Do not include a fabricated BEFORE/AFTER evidence table, evidence hashes, or `PASS` result in a
+fallback PR. State what was not run as plainly as what did run.
+
 Attach reviewer-safe evidence through `ow-pr-attach` so it updates the PR description, never a
 comment thread. Prefer:
 
@@ -232,10 +278,12 @@ comment thread. Prefer:
 Do not attach raw credentials, profiles, tokens, unrelated desktop content, or private knowledge
 documents.
 
-Write `final.md` with branch, commit, PR, build, reproduce verdict, verify verdict, scenario hash,
-evidence hashes, reviewer verdict, and any remaining non-blocking notes.
+Write `final.md` with validation mode, branch, commit, PR, build, reproduce verdict, verify verdict,
+scenario hash, available evidence hashes, exhausted attempt log, supporting checks, reviewer
+verdict, residual risk, and any remaining non-blocking notes.
 
 ## Batch semantics
 
-Each A11y item gets one isolated run/branch/PR. `not-reproduced`, `blocked`, `inconclusive`, and
-invalid evidence end only that item. Continue to the next batch item without source changes.
+Each A11y item gets one isolated run/branch/PR. Missing requirements or a demonstrated unresolved
+product failure end only that item. Exhausted evidence capability may use `unverified-fallback`;
+continue to the next batch item after recording whether a draft PR was created.

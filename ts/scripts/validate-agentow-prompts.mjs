@@ -486,6 +486,47 @@ const sizeRegressionSnippets = [
 ];
 
 const checks = [
+  {
+    file: "copilot/skills/agentow-a11y/SKILL.md",
+    snippets: [
+      "Make up to three meaningful attempts to acquire and validate real-AT reproduction evidence",
+      "capability discovery exhausts the available routes immediately",
+      "validationMode: \"unverified-fallback\"",
+      "User authorization may select this fallback early",
+      "The fallback authorizes investigation, implementation, review, and an explicitly unverified draft",
+      "never authorizes claims that NVDA, Narrator, Voice Access, keyboard focus, UI Automation, or",
+      "changed product still fails is not an unavailable-validator case",
+      "verifyVerdict: \"UNVERIFIED\"",
+      "## UNVERIFIED A11Y - validation unavailable",
+      "Do not include a fabricated BEFORE/AFTER evidence table",
+    ],
+  },
+  {
+    file: "copilot/docs/a11y/README.md",
+    snippets: [
+      "continue only through the explicitly labeled",
+      "Missing real-AT evidence remains `INCONCLUSIVE`, never PASS",
+      "A valid real-AT result showing that the changed product still fails",
+    ],
+  },
+  {
+    file: "copilot/docs/a11y/evidence-contract.md",
+    snippets: [
+      "through at most three meaningful attempts",
+      "may enter `unverified-fallback` for source investigation, implementation",
+      "retain `UNVERIFIED`; do not convert it to PASS",
+      "Fallback delivery requires a draft PR labeled `UNVERIFIED A11Y`",
+      "A valid result proving the changed product still fails blocks delivery",
+    ],
+  },
+  {
+    file: "copilot/skills/ow-batch/SKILL.md",
+    snippets: [
+      "exhaust the available real-AT routes or at most three",
+      "explicitly labeled `unverified-fallback`",
+      "A demonstrated unresolved product",
+    ],
+  },
   ...mirroredSnippetChecks(
     "skills/ow-review/SKILL.md",
     "copilot/skills/ow-review/SKILL.md",

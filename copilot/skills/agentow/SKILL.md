@@ -13,8 +13,8 @@ name/role/state/value, ARIA, live regions, headings/landmarks, zoom/reflow, cont
 failure — invoke the `agentow-a11y` skill with the original request and stop this standard flow.
 
 Do not create a standard agentOW session first. Do not dispatch the standard planner or evaluator.
-The A11y skill owns its isolated session, knowledge, Twin evidence bridge, and strict
-reproduce-before-fix gate.
+The A11y skill owns its isolated session, knowledge, Twin evidence bridge, evidence-first attempts,
+and explicitly unverified draft fallback when all real-AT routes are exhausted.
 
 Stay in the standard flow when Accessibility is only an incidental quality dimension of a broader
 feature request. Route to A11y mode only when assistive-technology or accessibility behavior is the
