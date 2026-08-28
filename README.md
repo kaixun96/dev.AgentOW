@@ -71,6 +71,7 @@ and attachments update the PR description rather than posting comment threads.
 - [Context maintenance](docs/context-maintenance.md)
 - [Review contract](docs/review-contract.md)
 - [Harness contract](docs/harness-contract.md)
+- [Success metrics](docs/value-metrics.md)
 - [Personal-account evaluator browser](docs/personal-evaluator-browser.md)
 
 ## Architecture

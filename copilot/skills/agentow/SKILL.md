@@ -425,7 +425,16 @@ If plan maintenance changed a routed context document, re-read it before impleme
 Record durable phase `implementation`.
 Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 
-1. **Branch.** If on `main`, create `user/<alias>/<feature>` from `origin/main` (use `ow-git`). `<alias>` from `whoami`.
+1. **Branch.**
+   - For a resumed run, requirement revision, or POC promotion, resolve the expected feature branch
+     from the latest implementation/final/checkpoint artifact or recorded PR. If the current branch
+     differs, fetch it when necessary and check it out without `-B`; verify it matches the recorded
+     run before editing. Never reset or recreate an existing same-run branch.
+   - For a new run on `main`, fetch `origin/main`, create `user/<alias>/<feature>` from that exact
+     ref with `ow-git`, then verify `git merge-base origin/main HEAD` equals
+     `git rev-parse origin/main` before the first commit.
+   - After changing the branch base, run `rush install` once when the Rush install state is missing
+     or stale. `<alias>` comes from the installed alias tool; do not guess it.
 2. **Write the code** yourself, following the planner's "patterns to follow". Surgical changes only — every line traces to the request.
    - Complete every context compliance item before build.
   - When adding, moving, renaming, or changing a live killswitch, read and follow
@@ -459,6 +468,10 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
      classification, and implement its provider, hook, v8, nested-provider, killswitch, and
      SCSS-token guidance as applicable. Do not guess the killswitch/flight for an existing
      surface.
+   - For a UI component migration, v8-to-SPDS replacement, or Panel/Drawer conversion, also read
+     `skills/ow-ref-replace-component/SKILL.md`. Select and record the migration shape, audit the
+     old wrapper props and established shim behavior, preserve package dependency/lockfile
+     discipline, and create Rush change files for affected publishable packages before push.
    - Do not implement rendered UI until the plan contains a grounded component-fit analysis.
      Confirm the selected component still satisfies every mapped requirement using its documented
      API and stable SPDS export. If source inspection changes the choice, update the matrix and

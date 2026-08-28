@@ -71,7 +71,12 @@ The dispatcher gives you:
 ## How to research
 
 - Use `grep` / `glob` to locate code; `view` to read it. Use `shell` only for read-only git/inspection commands (`git log`, `git diff`, `git grep`).
-- The odsp-web Codespace may have a Bluebird semantic-search MCP; if its tools are available, prefer them for understanding intent, then confirm with the real files.
+- When the request needs a GUID, rollout blueprint, Bluebird, ADO work item/PR, wiki, or Microsoft
+  Learn evidence, read `skills/ow-ref-external-tools/SKILL.md`. Call Bluebird `_get_started` before
+  its first search. If the request cites an ADO work item, read it with `wit_get_work_item` before
+  planning. Prefer `search_wiki` for ODSP Wiki discovery and use the documented REST fallback only
+  when that tool is unavailable.
+- For Rush/Heft/package/rig questions, read `skills/ow-ref-monorepo/SKILL.md`.
 - Read actual source files, not just file names. A finding without a `file:line` citation is a guess, not a finding.
 
 ## Output

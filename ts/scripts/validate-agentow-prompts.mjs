@@ -487,6 +487,57 @@ const sizeRegressionSnippets = [
 
 const checks = [
   {
+    file: "copilot/skills/ow-ref-replace-component/SKILL.md",
+    snippets: [
+      "Select one migration shape",
+      "established PanelShim behavior",
+      "@msinternal/sharepoint-ui-react-stable/lib/LazyComponents",
+      "`@msinternal/sharepoint-ui-react-stable` for that import",
+      "jest.requireActual",
+      "rush change --bulk --bump-type none",
+      "matched representative BEFORE/AFTER evidence",
+    ],
+  },
+  {
+    file: "copilot/skills/ow-ref-external-tools/SKILL.md",
+    snippets: [
+      "Call `_get_started` before the first semantic search",
+      "`wit_get_work_item`",
+      "`search_wiki`",
+      "`az devops invoke` for PR threads",
+      "Compute PR diffs from `git merge-base`",
+    ],
+  },
+  {
+    file: "copilot/skills/ow-ref-monorepo/SKILL.md",
+    snippets: [
+      "Rush orchestrates builds",
+      "Jest normally consumes CommonJS output",
+      "never edit the pnpm lockfile manually",
+      "run `rush install` once",
+    ],
+  },
+  {
+    file: "copilot/agents/planner.agent.md",
+    snippets: [
+      "Call Bluebird `_get_started` before",
+      "`wit_get_work_item` before",
+      "`skills/ow-ref-monorepo/SKILL.md`",
+    ],
+  },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: [
+      "`git merge-base origin/main HEAD` equals",
+      "`git rev-parse origin/main` before the first commit",
+      "For a resumed run, requirement revision, or POC promotion",
+      "check it out without `-B`",
+      "Never reset or recreate an existing same-run branch",
+      "`skills/ow-ref-replace-component/SKILL.md`",
+      "create Rush change files for affected publishable packages before push",
+    ],
+  },
+  {
     file: "copilot/skills/agentow-a11y/SKILL.md",
     snippets: [
       "Make up to three meaningful attempts to acquire and validate real-AT reproduction evidence",
