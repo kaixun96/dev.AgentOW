@@ -7,7 +7,8 @@ A Twin-managed DevBox is also excluded: Twinbot retains exclusive control of its
 AT, and agentOW consumes the resulting evidence through the Twin bridge.
 
 This guide contains the complete host setup and routing contract needed by `/agentow-a11y`. The
-workflow does not require or invoke an external test skill.
+setup below incorporates Jimu team guidance and the ADO `odsp-automation-test-tool`
+`skills/a11y-test` procedures. The workflow does not require or invoke an external test skill.
 
 ## Preflight
 
