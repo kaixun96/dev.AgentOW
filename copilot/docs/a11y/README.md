@@ -7,12 +7,15 @@ agentOW planner/evaluator flow does not load it unless Accessibility is the prim
 
 | Layer | Owns |
 |---|---|
-| Twinbot on DevBox | Real assistive technology, Windows UI Automation, OS input, ETW, audio, browser foreground, screenshots, evidence hashes |
-| agentOW in Codespace | Request contract, source lookup, implementation, build, evidence validation, review, branch, PR |
-| `a11y-evaluator` | Independent validation of Twin-produced reproduce/verify evidence |
+| External evaluator for a Codespace run | Real assistive technology, Windows UI Automation, OS input, ETW, audio, browser foreground, screenshots, evidence hashes |
+| agentOW in Codespace | Request contract, source lookup, implementation, build, evidence validation, review, branch, PR; skips unavailable host-only Windows tests |
+| agentOW on an independent Windows host | Uses `windows-host-testing.md` to install prerequisites and collect host-capable evidence directly; also owns source and delivery |
+| `a11y-evaluator` | Independent validation of approved producer reproduce/verify evidence |
 
-agentOW must not remotely control or emulate DevBox assistive technology. Twinbot must not modify
-the odsp-web worktree.
+Codespace agentOW must not install, remotely control, or emulate Windows assistive technology.
+Host-only tests without an external bridge are recorded as `skipped-environment`, not failed.
+Windows-host agentOW may run AT only through `windows-host-testing.md`; Twin-managed DevBoxes still
+use the Twin bridge. The evidence evaluator never controls AT or modifies product code.
 
 ## Source priority
 
@@ -22,7 +25,7 @@ Read the sources applicable to the bug in this order:
 2. Existing odsp-web implementation and its v8/predecessor behavior, including load-bearing A11y
    comments and timing.
 3. SPDS/Fluent component accessibility contract; prefer the component's native behavior.
-4. Jimu team guidance and the ADO `odsp-automation-test-tool` `skills/a11y-test` procedures.
+4. The self-contained host setup and routing contract in `windows-host-testing.md`.
 5. WCAG 2.2 AA success criteria and Microsoft platform guidance.
 
 Do not paste private Jimu/owner documents into the repository or PR. Record only the portable rule,
@@ -38,6 +41,9 @@ source title/URL when shareable, and evidence needed by a reviewer.
 - Playwright accessibility tree and axe are supporting diagnostics, not substitutes for real AT.
 
 Never run NVDA and Narrator simultaneously.
+
+See `windows-host-testing.md` for environment detection, safe dependency installation, direct test
+procedures, explicit manual prerequisites, and cleanup.
 
 ## Rule selection
 
@@ -79,4 +85,8 @@ WCAG mapping classifies the defect. It does not prove reproduction or repair.
 - Evidence declarations cannot weaken the gate: the validator maps NVDA, Narrator, Voice Access,
   Keyboard, and Windows UI Automation to mandatory AT-specific artifact types for every step.
 
-See `evidence-contract.md` for the artifact handshake.
+See:
+
+- `evidence-contract.md` for the artifact handshake.
+- `pr-evidence-capture-guide.md` for the normative screenshot, recording, annotation, exact-HEAD,
+  PR attachment, and actual PR-page acceptance requirements.
