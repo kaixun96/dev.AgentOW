@@ -201,9 +201,16 @@ const graduationReviewSnippets = [
   "removing the gate does not authorize changing the existing predicate",
   "Preserve comments by default",
   "Do not delete, rewrite, shorten, or otherwise polish comments merely because the gate is removed",
-  "Graduation test work is deletion-only",
-  "preserve tests for the surviving branch unchanged",
-  "do not create any unit, integration, automation, or manual test task for graduation",
+  "Graduation-related tests may be deleted, renamed, reorganized, rewritten, or added",
+  "do not report an issue merely because the",
+  "a surviving-branch suite may be renamed or restructured",
+  "an old fallback/control test may be rewritten",
+  "graduation-related tests may be added",
+  "Tests added or changed with no relationship to the graduation",
+  "non-blocking **Minor** suggestion prefixed `Nit:`",
+  "Unrelated test additions alone must not produce `REQUEST_CHANGES`",
+  "unrelated behavior means production behavior; unrelated test-only scope",
+  "follows the non-blocking Minor rule above",
   "running an existing scoped test is validation, not a test implementation task",
   "Do not convert the review contract's internal artifact fields into author-facing PR-description",
   "does not require a generic test plan",
@@ -1236,7 +1243,9 @@ const checks = [
       "does not become unconditional",
       "graduation is worse than leaving the gate in place",
       "The direction examples above apply only when adding a live KS",
-      "For Flight/KS graduation, do not add, update, rewrite, or reorganize tests",
+      "For Flight/KS graduation, delete removed-branch cases and gate-only support",
+      "freely rename, restructure, rewrite, or add graduation-related tests",
+      "do not preserve stale Flight/KS suite names or setup",
       "prefer updating the threshold with no new tests",
       "If the developer chooses to retain the current threshold"
     ]
@@ -1257,8 +1266,9 @@ const checks = [
       "same substitution process to a Flight using its proven enabled literal",
       "does not become unconditional",
       "reversed graduation is worse than leaving the gate in place",
-      "For Flight/KS graduation, do not add,",
-      "only delete cases for the removed branch",
+      "For Flight/KS graduation, delete cases",
+      "allow graduation-related test renames",
+      "Check their setup and expectations for correctness",
       "prefer updating the threshold with no new",
       "If the developer chooses to retain the current"
     ]
@@ -1270,7 +1280,8 @@ const checks = [
       "`contextDocuments`",
       "Read every `contextDocuments` file",
       "For a Flight/KS graduation",
-      "do not create any TEST task",
+      "plan graduation-related test renames, rewrites, restructuring, or additions",
+      "Require setup and expectations to match the selected old branch",
       "prefer updating that threshold with no new tests",
       "The developer may instead choose minimum surviving-behavior tests"
     ]
@@ -1279,8 +1290,8 @@ const checks = [
     file: "copilot/agents/planner.agent.md",
     snippets: [
       "For a Flight/KS graduation",
-      "do not create any test task",
-      "only delete cases for the removed branch",
+      "plan graduation-related test renames, rewrites, restructuring, or additions",
+      "Require setup and expectations to match the selected old branch",
       "prefer updating that threshold with no new tests",
       "The developer may instead choose minimum surviving-behavior tests"
     ]

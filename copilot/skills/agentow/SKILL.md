@@ -512,9 +512,11 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 6. **Test:** in POC profile, do not add or run tests unless the user explicitly requests them; append
    `🧪 Tests skipped — POC profile` and record the skip in implementation/final artifacts and the PR
    description. In STANDARD profile, run `ow-test` scoped to tests that own the changed observable
-  behavior (not every changed file and not the full suite). For Flight/KS graduation, do not add,
-  update, rewrite, or reorganize tests; only delete cases for the removed branch and test support
-  used exclusively by it, then run existing scoped tests and the project coverage command. If
+  behavior (not every changed file and not the full suite). For Flight/KS graduation, delete cases
+  for the removed branch and gate-only support, and allow graduation-related test renames,
+  restructuring, rewrites, or additions that express and verify the selected ungated behavior.
+  Check their setup and expectations for correctness; do not add unrelated test work. Then run
+  scoped tests and the project coverage command. If
   coverage actually fails its configured threshold, prefer updating the threshold with no new
   tests and recommend a separate follow-up test PR. If the developer chooses to retain the current
   threshold, add only the minimum tests for surviving behavior. In either case, record the failing

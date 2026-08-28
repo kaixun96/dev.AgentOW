@@ -642,16 +642,25 @@ import generic security policy or raise pre-existing gaps.
 ## 4. Review tests and evidence
 
 A graduation-only change should be behaviorally equivalent to the selected old branch.
-Graduation test work is deletion-only unless deleting the obsolete branch causes an actual failure
-against the project's configured unit-test coverage threshold:
+Graduation-related tests may be deleted, renamed, reorganized, rewritten, or added when the change
+removes gate setup and expresses the selected ungated behavior directly. Review those tests for
+behavioral correctness and useful regression coverage; do not report an issue merely because the
+author changed or added them.
 
-- remove only test cases for the deleted fallback/control branch and mocks, fixtures, or setup used
-  exclusively by that branch;
-- preserve tests for the surviving branch unchanged;
-- do not add, expand, rewrite, rename, reorganize, or otherwise polish tests;
-- do not create any unit, integration, automation, or manual test task for graduation;
-- do not require new coverage, including a test for the removed gate constant or identifier;
+- remove tests for the deleted branch and mocks, fixtures, constants, comments, or setup used only
+  to configure the retired gate;
+- a surviving-branch suite may be renamed or restructured to describe always-on, always-off, or
+  otherwise ungated behavior;
+- an old fallback/control test may be rewritten to prove the same input now follows the selected
+  branch, such as a Syntex-only user no longer passing an always-on SPCopilot license check;
+- graduation-related tests may be added when they assert the selected ungated behavior; evaluate
+  whether their setup and expectations are correct rather than treating their addition as a defect;
+- do not require new coverage for a removed gate constant or identifier itself;
 - running an existing scoped test is validation, not a test implementation task.
+
+Tests added or changed with no relationship to the graduation are scope cleanup only. Report them,
+if useful, as a non-blocking **Minor** suggestion prefixed `Nit:` asking the author to move them to a
+separate PR. Unrelated test additions alone must not produce `REQUEST_CHANGES`.
 
 Do not convert the review contract's internal artifact fields into author-facing PR-description
 requirements. The reviewer must record what validation evidence was available and what was not run
@@ -687,12 +696,13 @@ must remain separate from graduation test cleanup.
 ## 5. Findings
 
 Request changes when the ungated implementation is not equivalent to the old branch selected by
-the PR, leaves reachable retired behavior, keeps a fixed gate behind old conditional structure, misses a
+the PR, a changed graduation-related test asserts incorrect selected-branch behavior, leaves reachable retired behavior, keeps a fixed gate behind old conditional structure, misses a
 runtime entry point, retains a value-discarded gate invocation, retains a discarded gate-only
-property or DOM read or its unused ref/prop/parameter supply chain, changes coverage threshold or
-tests without an actual coverage failure and required PR-description evidence, leaves a
+property or DOM read or its unused ref/prop/parameter supply chain, changes the coverage threshold
+without an actual coverage failure and required PR-description evidence, leaves a
 fixed-return wrapper or any transitive consumer unsimplified, or mixes unrelated behavior into the
-graduation edit.
+graduation edit. Here, unrelated behavior means production behavior; unrelated test-only scope
+follows the non-blocking Minor rule above.
 
 Do not raise a finding merely because a graduation-only PR description omits generic test results,
 a risk assessment, rollback/recovery prose, or per-family shipping details. These are not required
