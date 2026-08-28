@@ -59,15 +59,23 @@ WCAG mapping classifies the defect. It does not prove reproduction or repair.
 
 ## Implementation rules
 
-- Reproduce before reading toward a fix. Do not infer reproduction from source.
-- If Twin returns `not-reproduced`, `blocked`, or `inconclusive`, stop without code changes.
+- Attempt real-AT reproduction before reading toward a fix. Do not infer reproduction from source.
+- Make up to three meaningful attempts to repair an available Twin, request, environment, or
+  evidence path. Do not repeat an identical unavailable operation just to increase the count.
+- If all available evidence routes are exhausted, continue only through the explicitly labeled
+  `unverified-fallback`: use the concrete bug report and source knowledge to implement the smallest
+  plausible fix, run all available supporting checks, obtain code review, and create a draft PR.
+- Missing real-AT evidence remains `INCONCLUSIVE`, never PASS. The fallback PR must identify every
+  unavailable evidence type, attempt, blocker, and residual risk, and must not contain fabricated
+  BEFORE/AFTER evidence or accessibility-validation claims.
+- A valid real-AT result showing that the changed product still fails is not a validator outage and
+  cannot use the fallback while that demonstrated failure remains.
 - Read the predecessor/native component before hand-writing ARIA, announcement timing, focus
   management, screen-reader-only styles, or keyboard behavior.
 - Preserve behavior outside the requested A11y defect.
 - Do not add a test merely to satisfy the pipeline; follow repository and user test policy.
 - Never hide a native semantic problem with an unverified `aria-*` patch.
 - AFTER must replay the exact scenario hash used for BEFORE.
-- Missing real-AT evidence is `INCONCLUSIVE`, never PASS.
 - Evidence declarations cannot weaken the gate: the validator maps NVDA, Narrator, Voice Access,
   Keyboard, and Windows UI Automation to mandatory AT-specific artifact types for every step.
 

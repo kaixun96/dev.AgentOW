@@ -158,9 +158,11 @@ Treat the task exactly as if the user had invoked:
 Execute the previously persisted route:
 
 - **`taskRoute == a11y`:** invoke `/agentow-a11y --auto <normalized task text>` and execute only that skill.
-  Its reproduce-first gate is authoritative: `not-reproduced`, `blocked`, or `inconclusive` ends
-  the item without a branch, source edit, or PR. When it finishes, skip the remainder of Step 4b
-  and continue directly to Step 4c.
+  Its evidence-first policy is authoritative: exhaust the available real-AT routes or at most three
+  meaningful attempts, then use its explicitly labeled `unverified-fallback` when the bug contract
+  is concrete and validation capability remains unavailable. A demonstrated unresolved product
+  failure or missing bug requirements still ends the item. When it finishes, skip the remainder of
+  Step 4b and continue directly to Step 4c.
 - **`taskRoute == standard`:** invoke the `agentow` skill if it is not already loaded, then execute its
   complete pipeline below.
 

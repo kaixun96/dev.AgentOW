@@ -51,7 +51,6 @@ const makeReport = () => ({
   mergeBase: "c".repeat(40),
   diffDigest: "b".repeat(64),
   summary: "The permanent enabled branch is preserved and retired artifacts are removed",
-  authorizationEvidence: ["artifact:pr-description.md rollout reached 100 percent"],
   ruleResults: ruleInventory.rules.map((rule) => ({
     ruleId: rule.id,
     disposition: "satisfied",
@@ -67,7 +66,7 @@ const makeReport = () => ({
       callSitesChecked: ["src/consumer.tsx:20"],
       cleanupEvidence: ["command:rg EditFlight src => no matches"],
       ruleChecks: [
-        "permanent-branch",
+        "selected-branch",
         "fixed-carriers",
         "fixed-inputs",
         "obsolete-control-flow",
@@ -120,6 +119,14 @@ function validateGraduationReview(report, validationOptions) {
 }
 
 assert.deepEqual(validateGraduationReview(makeReport(), options), [], "valid graduation report passes");
+
+const noRolloutAuthorizationEvidence = makeReport();
+assert.equal("authorizationEvidence" in noRolloutAuthorizationEvidence, false);
+assert.deepEqual(
+  validateGraduationReview(noRolloutAuthorizationEvidence, options),
+  [],
+  "graduation review trusts the author and does not require PR rollout-state evidence",
+);
 
 const missingUniversalRule = makeReport();
 missingUniversalRule.ruleResults.pop();
@@ -208,10 +215,6 @@ const missingDigestOptions = new Map(options);
 missingDigestOptions.delete("--expected-diff-digest");
 assert.ok(validateGraduationReview(makeReport(), missingDigestOptions).length > 0, "expected diff digest is mandatory");
 
-const malformedEvidence = makeReport();
-malformedEvidence.authorizationEvidence = ["PR description says rollout is complete"];
-assert.ok(validateGraduationReview(malformedEvidence, options).length > 0, "evidence uses structured references");
-
 const incompleteGateInventory = makeReport();
 incompleteGateInventory.gates[0].name = "OtherFlight";
 assert.ok(validateGraduationReview(incompleteGateInventory, options).length > 0, "reported gates match independent inventory");
@@ -289,8 +292,8 @@ assert.deepEqual(
 
 const blockingReport = makeReport();
 blockingReport.gates[0].disposition = "finding";
-blockingReport.gates[0].ruleChecks.find((check) => check.rule === "permanent-branch").status = "finding";
-blockingReport.gates[0].ruleChecks.find((check) => check.rule === "permanent-branch").findingIds = ["G-DIRECTION"];
+blockingReport.gates[0].ruleChecks.find((check) => check.rule === "selected-branch").status = "finding";
+blockingReport.gates[0].ruleChecks.find((check) => check.rule === "selected-branch").findingIds = ["G-DIRECTION"];
 blockingReport.findings.push({
   id: "G-DIRECTION",
   gateName: "EditFlight",
@@ -311,7 +314,7 @@ missingRuleCheck.gates[0].ruleChecks.pop();
 assert.ok(validateGraduationReview(missingRuleCheck, options).length > 0, "every mandatory rule class must be reported");
 
 const unlinkedFinding = structuredClone(blockingReport);
-delete unlinkedFinding.gates[0].ruleChecks.find((check) => check.rule === "permanent-branch").findingIds;
+delete unlinkedFinding.gates[0].ruleChecks.find((check) => check.rule === "selected-branch").findingIds;
 assert.ok(validateGraduationReview(unlinkedFinding, options).length > 0, "every finding must be linked from its rule check");
 
 const duplicateFindingLink = structuredClone(blockingReport);

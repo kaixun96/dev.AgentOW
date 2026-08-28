@@ -154,13 +154,22 @@ raw tokens, private user data, or unrelated screen content.
 
 ## Gates
 
-1. No valid reproduce result: no branch, edit, build, or PR.
-2. `not-reproduced`, `blocked`, or `inconclusive`: stop without fixing.
+1. Attempt valid real-AT reproduction first. Correct concrete request, bridge, environment, and
+  evidence defects through at most three meaningful attempts; exhaust fewer attempts when no
+  additional route or correction exists.
+2. A valid reproduced result enters strict mode. When valid reproduction remains unavailable after
+  those bounded attempts, a concrete bug report with actual behavior, expected behavior, and a
+  runnable scenario may enter `unverified-fallback` for source investigation, implementation,
+  supporting checks, review, and an explicitly unverified draft PR.
 3. Verify scenario/hash mismatch: invalid evidence.
 4. Missing required type/hash/step: invalid evidence.
 5. Verify `fail`: fix and replay, maximum three implementation cycles.
-6. Verify `blocked` or `inconclusive`: stop; A11y mode cannot ship an unverified draft.
+6. Verify `blocked` or `inconclusive`: correct and retry when possible. If evidence capability is
+  still unavailable after bounded attempts, retain `UNVERIFIED`; do not convert it to PASS.
 7. Verify `pass`: run reviewer, then attach reviewer-safe evidence to the PR description.
+8. Fallback delivery requires a draft PR labeled `UNVERIFIED A11Y`, the attempt log, exact missing
+  evidence, supporting-check results, and residual risk. Never fabricate BEFORE/AFTER evidence,
+  hashes, or AT claims. A valid result proving the changed product still fails blocks delivery.
 
 Validate each result with:
 

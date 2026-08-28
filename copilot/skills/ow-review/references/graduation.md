@@ -19,7 +19,6 @@ Write `review.json` with this minimal schema and validate it with
   "mergeBase": "<40-character lowercase SHA>",
   "diffDigest": "<64-character lowercase SHA-256>",
   "summary": "<specific graduation conclusion>",
-  "authorizationEvidence": ["<path:line, artifact:..., or command:... evidence>"],
   "ruleResults": [
     {
       "ruleId": "<exact id from review-rule-inventory.json>",
@@ -33,13 +32,13 @@ Write `review.json` with this minimal schema and validate it with
     {
       "name": "<retired gate identifier>",
       "type": "Flight|KS|Experiment|Feature|Rollout",
-      "permanentState": "<enabled, inactive, treatment, control, or evidenced exception>",
+      "permanentState": "<old branch selected by the PR: enabled, disabled, active, inactive, treatment, or control>",
       "directionEvidence": ["<source or rollout citation>"],
       "callSitesChecked": ["<path:line>"],
       "cleanupEvidence": ["<path:line or bounded no-match search evidence>"],
       "ruleChecks": [
         {
-          "rule": "permanent-branch|fixed-carriers|fixed-inputs|obsolete-control-flow|discarded-evaluations|transitive-gates|stale-artifacts|runtime-entry-points|coverage-and-tests|scope-purity|minor-cleanup",
+          "rule": "selected-branch|fixed-carriers|fixed-inputs|obsolete-control-flow|discarded-evaluations|transitive-gates|stale-artifacts|runtime-entry-points|coverage-and-tests|scope-purity|minor-cleanup",
           "status": "clear|finding|suggestion|not-applicable",
           "evidence": ["<path:line, artifact:..., or bounded command evidence>"],
           "findingIds": ["<required for finding or suggestion>"]
@@ -111,7 +110,7 @@ direction, call-site, and cleanup evidence.
 
 Every gate must also contain exactly one `ruleChecks` entry for each of these classes:
 
-- `permanent-branch`: authorization, permanent direction, and surviving branch correctness.
+- `selected-branch`: the ungated code is equivalent to the old branch selected by this PR.
 - `fixed-carriers`: fixed helpers, wrappers, exports, aliases, and transitive carriers.
 - `fixed-inputs`: gate-derived parameters, options, properties, defaults, and literals.
 - `obsolete-control-flow`: conditionals, switches, ternaries, and branch-only structure.
@@ -183,43 +182,43 @@ caller, wrapper, registration, test artifact, and resource in one PR. This exemp
 to a mixed PR containing separate feature or refactor work, and it does not reduce exhaustive
 changed-file review, transitive consumer tracing, evidence, or correctness requirements.
 
-## 1. Establish that graduation is authorized
+## 1. Trust the author-owned graduation decision
 
-Identify every retired gate by type, identifier, owner, and all registration and consumption sites.
-Use the PR description, linked work item, rollout evidence, and source history; do not infer
-readiness from the code change alone.
+Opening a graduation PR is the author's assertion that the Flight, Feature, experiment,
+killswitch, or rollout control is ready for removal and that the branch selected by the diff is the
+intended terminal behavior. Reviewers must not re-evaluate that operational decision. Do not
+require PR-description statements, linked work items, rollout screenshots, portal state, Merlin
+output, ring/scope status, or other external authorization evidence. Missing or apparently
+incomplete rollout-state prose is not a finding and must not produce a reminder.
 
-- **Killswitch:** by default, require evidence that it is inactive in every ring before accepting
-  removal. For SP-Client, Merlin `Test-GridKillSwitch` output is suitable evidence. The exception
-  is a KS activated globally because the inactive/new path caused a regression: the PR description
-  must explicitly explain that decision and that graduation preserves the active/fallback path.
-  Require evidence of the claimed global state. If an existing PR omits the applicable evidence or
-  explanation, leave an explicit reminder for the author to attach it; do not claim verification.
-- **Flight/Feature:** by default, require evidence that rollout has reached the enabled state. The
-  exception is a Flight that was never rolled out anywhere: the PR description must explicitly
-  state that fact and that the gated code should be removed. Do not reuse KS inactive evidence as
-  Flight graduation evidence.
-- **Experiment:** require an explicit decision selecting treatment or control and confirmation that
-  exposure/measurement is no longer required.
-- **Composite gates:** establish the final state of each Flight, KS, experiment, or configuration
-  term independently before simplifying the combined predicate.
+When a PR description is available, read it before reviewing code and use its stated graduation
+direction as the author-owned intent. For example, a Flight described as enabled in all intended
+environments selects the enabled branch; a Flight described as never enabled selects the
+disabled/control branch for removal of the unused behavior. Accept that statement without
+independently validating rollout status. If no description is available, infer the selected branch
+from the code removed and retained by the PR; absence of the description is not a finding.
+
+Identify every retired gate and its registration and consumption sites from the diff and source so
+cleanup can be checked. For a composite predicate, identify which old branch the PR selects for
+each removed term. Record `permanentState` from the author-stated direction when available, and
+record `directionEvidence` from that intent plus the merge-base branch mapping. These are
+code-equivalence fields, not rollout-state proof. If the resulting code does not match the stated
+direction, report an implementation mismatch; do not challenge whether the stated status is true.
 
 ## 2. Prove the surviving behavior
 
 Read the merge-base implementation and construct the gate truth table before judging the diff.
 When a changed file is deleted, read its merge-base contents and verify that every removed symbol,
-resource, test, registration, and export was gate-only or obsolete under the proven permanent state.
+resource, test, registration, and export was gate-only or obsolete under the selected branch.
 Account for negation, wrapper names, aliases, early returns, nested ternaries, and compound
 predicates.
 
-- A graduated killswitch must preserve the KS-inactive/new path unless the PR description explains
-  that the KS is activated globally because the inactive/new path is a regression and graduation
-  must instead preserve the KS-active/fallback path.
-- A graduated Flight must preserve the enabled/treatment path unless the PR description states
-  that the Flight was never rolled out anywhere and its gated code must be removed; only then
-  preserve the disabled/control path.
+- For a killswitch, Flight, Feature, experiment, or other rollout control, infer the selected branch
+  from the code removed and retained by the PR. Verify that the ungated implementation is exactly
+  equivalent to that old branch. Do not judge whether the selected branch matches current portal,
+  ring, scope, treatment, control, enabled, disabled, active, or inactive state.
 - Compare inputs, outputs, state writes, requests, telemetry, QoS lifecycle, errors, and side
-  effects between the prior permanent state and the ungated code.
+  effects between the selected old branch and the ungated code.
 - Preserve every non-gate operand, predicate, operator, fallback value, call, and evaluation order.
   Removing `gate && condition` may produce `condition`; it does not permit changing `condition`.
   In particular, do not change `some` to `every`, `&&` to `||`, comparison operators, error
@@ -642,17 +641,26 @@ import generic security policy or raise pre-existing gaps.
 
 ## 4. Review tests and evidence
 
-A graduation-only change should be behaviorally equivalent to the previously permanent state.
-Graduation test work is deletion-only unless deleting the obsolete branch causes an actual failure
-against the project's configured unit-test coverage threshold:
+A graduation-only change should be behaviorally equivalent to the selected old branch.
+Graduation-related tests may be deleted, renamed, reorganized, rewritten, or added when the change
+removes gate setup and expresses the selected ungated behavior directly. Review those tests for
+behavioral correctness and useful regression coverage; do not report an issue merely because the
+author changed or added them.
 
-- remove only test cases for the deleted fallback/control branch and mocks, fixtures, or setup used
-  exclusively by that branch;
-- preserve tests for the surviving branch unchanged;
-- do not add, expand, rewrite, rename, reorganize, or otherwise polish tests;
-- do not create any unit, integration, automation, or manual test task for graduation;
-- do not require new coverage, including a test for the removed gate constant or identifier;
+- remove tests for the deleted branch and mocks, fixtures, constants, comments, or setup used only
+  to configure the retired gate;
+- a surviving-branch suite may be renamed or restructured to describe always-on, always-off, or
+  otherwise ungated behavior;
+- an old fallback/control test may be rewritten to prove the same input now follows the selected
+  branch, such as a Syntex-only user no longer passing an always-on SPCopilot license check;
+- graduation-related tests may be added when they assert the selected ungated behavior; evaluate
+  whether their setup and expectations are correct rather than treating their addition as a defect;
+- do not require new coverage for a removed gate constant or identifier itself;
 - running an existing scoped test is validation, not a test implementation task.
+
+Tests added or changed with no relationship to the graduation are scope cleanup only. Report them,
+if useful, as a non-blocking **Minor** suggestion prefixed `Nit:` asking the author to move them to a
+separate PR. Unrelated test additions alone must not produce `REQUEST_CHANGES`.
 
 Do not convert the review contract's internal artifact fields into author-facing PR-description
 requirements. The reviewer must record what validation evidence was available and what was not run
@@ -662,12 +670,10 @@ description. Absence of those sections is not a finding. The default recovery fo
 graduation is reverting the graduation PR; do not require that ordinary fact to be restated for
 each retired gate or family.
 
-Require author-supplied PR-description content only where this reference explicitly says so: an
-exception that selects the non-default KS/Flight branch, or an actual coverage-threshold failure
-and its chosen resolution. Graduation authorization may also be grounded in the linked work item,
-rollout evidence, and source history as specified above. Do not demand that closed review-thread
-comments be copied into the PR description unless they are the only location of required
-authorization evidence and that evidence is otherwise unavailable to future reviewers.
+Do not require author-supplied PR-description content about Flight/KS state, rollout percentage,
+rings, scopes, exclusions, portal operations, or graduation authorization. The reviewer owns no
+operational-state approval gate. The separate coverage-threshold exception below may still require
+its own failure details because that evidence explains a test-threshold edit, not rollout state.
 
 When the existing coverage command actually fails after graduation cleanup:
 
@@ -689,18 +695,18 @@ must remain separate from graduation test cleanup.
 
 ## 5. Findings
 
-Request changes when the diff preserves the wrong branch, lacks required authorization evidence,
-leaves reachable retired behavior, keeps a fixed gate behind old conditional structure, misses a
+Request changes when the ungated implementation is not equivalent to the old branch selected by
+the PR, a changed graduation-related test asserts incorrect selected-branch behavior, leaves reachable retired behavior, keeps a fixed gate behind old conditional structure, misses a
 runtime entry point, retains a value-discarded gate invocation, retains a discarded gate-only
-property or DOM read or its unused ref/prop/parameter supply chain, changes coverage threshold or
-tests without an actual coverage failure and required PR-description evidence, leaves a
+property or DOM read or its unused ref/prop/parameter supply chain, changes the coverage threshold
+without an actual coverage failure and required PR-description evidence, leaves a
 fixed-return wrapper or any transitive consumer unsimplified, or mixes unrelated behavior into the
-graduation edit.
+graduation edit. Here, unrelated behavior means production behavior; unrelated test-only scope
+follows the non-blocking Minor rule above.
 
 Do not raise a finding merely because a graduation-only PR description omits generic test results,
 a risk assessment, rollback/recovery prose, or per-family shipping details. These are not required
-graduation fields. Keep reviewer-owned evidence gaps in the review artifact unless they prevent
-proof of graduation authorization or surviving behavior.
+graduation fields. Rollout-state or authorization evidence gaps are outside graduation review scope.
 
 A redundant unkeyed Fragment left after removing a gate condition is not reachable retired
 behavior. When removal is proven reconciliation-safe, report only a **Minor** suggestion prefixed
@@ -720,7 +726,6 @@ Do not raise findings for unrelated pre-existing issues or optional improvements
 contains an unrelated change, classify that change outside graduation-only scope and route only
 that separate change through the applicable normal review rules.
 
-Make every finding name the retired gate, prior permanent state, affected path, concrete failure,
-and cleanup or correction needed. Keep missing author-supplied rollout evidence distinct from a
-proven code defect. Do not raise graduation findings against gates that remain live or are newly
-introduced.
+Make every finding name the retired gate, selected old branch, affected path, concrete failure, and
+cleanup or correction needed. Do not raise findings for missing author-supplied rollout evidence.
+Do not raise graduation findings against gates that remain live or are newly introduced.

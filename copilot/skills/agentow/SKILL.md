@@ -13,8 +13,8 @@ name/role/state/value, ARIA, live regions, headings/landmarks, zoom/reflow, cont
 failure — invoke the `agentow-a11y` skill with the original request and stop this standard flow.
 
 Do not create a standard agentOW session first. Do not dispatch the standard planner or evaluator.
-The A11y skill owns its isolated session, knowledge, Twin evidence bridge, and strict
-reproduce-before-fix gate.
+The A11y skill owns its isolated session, knowledge, Twin evidence bridge, evidence-first attempts,
+and explicitly unverified draft fallback when all real-AT routes are exhausted.
 
 Stay in the standard flow when Accessibility is only an incidental quality dimension of a broader
 feature request. Route to A11y mode only when assistive-technology or accessibility behavior is the
@@ -512,9 +512,11 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
 6. **Test:** in POC profile, do not add or run tests unless the user explicitly requests them; append
    `🧪 Tests skipped — POC profile` and record the skip in implementation/final artifacts and the PR
    description. In STANDARD profile, run `ow-test` scoped to tests that own the changed observable
-  behavior (not every changed file and not the full suite). For Flight/KS graduation, do not add,
-  update, rewrite, or reorganize tests; only delete cases for the removed branch and test support
-  used exclusively by it, then run existing scoped tests and the project coverage command. If
+  behavior (not every changed file and not the full suite). For Flight/KS graduation, delete cases
+  for the removed branch and gate-only support, and allow graduation-related test renames,
+  restructuring, rewrites, or additions that express and verify the selected ungated behavior.
+  Check their setup and expectations for correctness; do not add unrelated test work. Then run
+  scoped tests and the project coverage command. If
   coverage actually fails its configured threshold, prefer updating the threshold with no new
   tests and recommend a separate follow-up test PR. If the developer chooses to retain the current
   threshold, add only the minimum tests for surviving behavior. In either case, record the failing
@@ -701,6 +703,7 @@ reviewPolicy: <graduation-only or general>
 gateInventoryPath: <sessionDir>/review-gates.txt               # graduation-only
 deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
 ruleInventoryPath: <sessionDir>/review-rule-inventory.json      # both policies
+prDescriptionPath: <sessionDir>/pr-description.md               # when available
 changedFiles: <changed files>
 sessionDir: /workspaces/odsp-web/.aero/<session>
 reportFile: /workspaces/odsp-web/.aero/<session>/report.json
@@ -721,8 +724,9 @@ evaluationArtifactPaths:
 
 For `reviewPolicy=graduation-only`, omit `reviewLedgerPath`, `contextDocuments`, `planPath`,
 `implementationEvidencePaths`, and `evaluationArtifactPaths`. Pass only the immutable diff identity,
-PR-description authorization evidence when available, changed-file/session/report paths, and review
-artifact paths. Instruct the reviewer to use only `graduation.md`, produce its minimal report, and
+changed-file/session/report paths, review artifact paths, and `prDescriptionPath` when a PR
+description is available. The reviewer uses it as trusted selected-branch intent, not rollout
+authorization evidence. Do not require a description or request external state proof. Instruct the reviewer to use only `graduation.md`, produce its minimal report, and
 return without entering generic review passes.
 
 Read the final evaluator NDJSON record immediately before dispatch. Pass only artifact paths that the record actually returned and that exist; do not synthesize conventional paths. If the final evaluator record or its required artifacts are missing, classify it as `evaluator-spec` and stop or retry under Step 6 rather than reviewing stale evidence.

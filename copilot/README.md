@@ -125,6 +125,6 @@ copilot/
 │   └── reviewer.agent.md        stateless: review → verdict
 └── skills/
     ├── agentow/SKILL.md         main-session orchestration
-    ├── agentow-a11y/SKILL.md    lightweight reproduce-first A11y flow
+    ├── agentow-a11y/SKILL.md    evidence-first A11y flow with an explicit unverified fallback
     └── ow-batch/SKILL.md        serial main-session agentOW loop with task checkpoints
 ```

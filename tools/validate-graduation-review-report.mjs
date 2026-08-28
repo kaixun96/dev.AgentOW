@@ -11,7 +11,7 @@ const SEVERITIES = new Set(["Critical", "Important", "Minor"]);
 const GATE_TYPES = new Set(["Flight", "KS", "Experiment", "Feature", "Rollout"]);
 const RESIDUAL_KINDS = new Set(["fixed-return-helper", "retained-export", "fixed-parameter", "fixed-conditional"]);
 const REQUIRED_RULE_CHECKS = [
-  "permanent-branch",
+  "selected-branch",
   "fixed-carriers",
   "fixed-inputs",
   "obsolete-control-flow",
@@ -165,7 +165,6 @@ export function validateGraduationReview(report, options = new Map()) {
   if (!HASH_40.test(report.mergeBase ?? "")) errors.push("mergeBase must be a lowercase 40-character SHA");
   if (!HASH_64.test(report.diffDigest ?? "")) errors.push("diffDigest must be a lowercase 64-character SHA-256");
   if (!nonEmpty(report.summary)) errors.push("summary is required");
-  if (!evidenceReferences(report.authorizationEvidence)) errors.push("authorizationEvidence must contain valid evidence references");
 
   const expectedHead = options.get("--expected-head");
   if (!expectedHead || report.reviewedHead !== expectedHead) errors.push("reviewedHead does not match current HEAD");

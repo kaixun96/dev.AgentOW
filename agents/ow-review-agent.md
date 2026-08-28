@@ -93,8 +93,12 @@ Apply `skills/ow-review/references/graduation.md` only to gates classified as re
 also adds or changes a live gate, review that gate separately under the normal rollout rules.
 In graduation-only mode, this exclusive scope overrides every subsequent instruction to inspect
 size, SP-Client profiles, UI, accessibility, telemetry, architecture, localization, or general code
-quality. Do not raise findings or suggest changes from those rules. Review only graduation
-authorization, surviving-branch correctness, directly caused cleanup, and directly affected tests.
+quality. Do not raise findings or suggest changes from those rules. Trust the author's operational
+graduation decision; review only selected-branch code equivalence, directly caused cleanup, and
+directly affected tests. When `prDescriptionPath` is supplied, read it and use its enabled,
+never-enabled, disabled, active, inactive, treatment, or control statement as trusted author intent
+for selecting the old branch. Do not require the description or external rollout-state evidence,
+and do not independently validate the stated operational status.
 When `sharepoint-theme-and-detheme.md` matches, also read `skills/detheme/SKILL.md` from this Claude plugin. For every Detheme violation, make `suggestedFix` identify the surface classification and the exact remediation from that skill; never stop at saying that a color or theme is incorrect.
 For every non-graduation-only code review, locate and read the PR's official size-audit report before drawing a size
 conclusion. If it reports no regression, record that evidence and stop size analysis without a
