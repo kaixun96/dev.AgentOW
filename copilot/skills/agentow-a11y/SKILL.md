@@ -275,6 +275,18 @@ comment thread. Prefer:
 - Voice Access result JSON, volume summary, and screenshot;
 - focus sequence or UI Automation state.
 
+In strict mode, for semantic-only changes whose rendered pixels are intentionally unchanged, raw
+full-page BEFORE/AFTER screenshots are route and geometry evidence, not proof of the fix. Do not
+present a pixel-identical image table as though it shows the behavior change. The PR must attach
+both one full-page context image showing where the target lives and one reviewer-safe matched
+semantic capture proving what changed; neither replaces the other. Build the semantic capture from
+the verified DOM/accessibility-tree facts: show the same target crop and geometry beside the exact
+BEFORE and AFTER computed names, roles, states, or relationships. Explain the difference in the
+image and PR text. A KS-activated state is still required to prove emergency rollback, but a
+separate rollback screenshot is required only when rollback changes pixels; otherwise show the
+rollback semantic facts in the matched capture. In fallback mode, list the unavailable semantic
+evidence in `Not validated`; never synthesize a matched capture from source inference.
+
 Do not attach raw credentials, profiles, tokens, unrelated desktop content, or private knowledge
 documents.
 

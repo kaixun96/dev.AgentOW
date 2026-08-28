@@ -499,6 +499,9 @@ const checks = [
       "verifyVerdict: \"UNVERIFIED\"",
       "## UNVERIFIED A11Y - validation unavailable",
       "Do not include a fabricated BEFORE/AFTER evidence table",
+      "In strict mode, for semantic-only changes",
+      "In fallback mode, list the unavailable semantic",
+      "never synthesize a matched capture from source inference",
     ],
   },
   {
