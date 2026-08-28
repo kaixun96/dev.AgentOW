@@ -106,6 +106,10 @@ result `testedCommitSha`, and the exact `commit:<HEAD>` build selector must all 
 
 ## Evidence types
 
+Evidence selection, capture equivalence, reviewer-safe media, exact-HEAD binding, and publication
+must also satisfy `pr-evidence-capture-guide.md`. A structurally valid artifact that violates that
+guide remains invalid evidence.
+
 Use the narrowest applicable type:
 
 - `screenshot`
@@ -170,6 +174,8 @@ raw tokens, private user data, or unrelated screen content.
 8. Fallback delivery requires a draft PR labeled `UNVERIFIED A11Y`, the attempt log, exact missing
   evidence, supporting-check results, and residual risk. Never fabricate BEFORE/AFTER evidence,
   hashes, or AT claims. A valid result proving the changed product still fails blocks delivery.
+9. Any applicable rejection condition in `pr-evidence-capture-guide.md` invalidates the media and
+   requires recapture; prose cannot waive or explain away invalid evidence.
 
 Validate each result with:
 

@@ -49,6 +49,7 @@ OS-level input. Twinbot never edits the odsp-web worktree.
 4. Read:
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/README.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/evidence-contract.md`
+   - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/pr-evidence-capture-guide.md`
    - `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/accessibility.md`
 5. Write `knowledge-manifest.json` listing exact documents, versions/URLs when known, and why each
    applies. Keep this manifest A11y-only.
@@ -267,7 +268,8 @@ Do not include a fabricated BEFORE/AFTER evidence table, evidence hashes, or `PA
 fallback PR. State what was not run as plainly as what did run.
 
 Attach reviewer-safe evidence through `ow-pr-attach` so it updates the PR description, never a
-comment thread. Prefer:
+comment thread. Every screenshot, recording, annotation, attachment URL, and actual PR-page check
+must satisfy `${CLAUDE_PLUGIN_ROOT}/docs/a11y/pr-evidence-capture-guide.md`. Prefer:
 
 - annotated BEFORE/AFTER screenshots;
 - normalized NVDA transcript excerpts;
