@@ -79,4 +79,8 @@ WCAG mapping classifies the defect. It does not prove reproduction or repair.
 - Evidence declarations cannot weaken the gate: the validator maps NVDA, Narrator, Voice Access,
   Keyboard, and Windows UI Automation to mandatory AT-specific artifact types for every step.
 
-See `evidence-contract.md` for the artifact handshake.
+See:
+
+- `evidence-contract.md` for the artifact handshake.
+- `pr-evidence-capture-guide.md` for the normative screenshot, recording, annotation, exact-HEAD,
+  PR attachment, and actual PR-page acceptance requirements.
