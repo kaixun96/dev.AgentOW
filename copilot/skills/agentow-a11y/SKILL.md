@@ -1,6 +1,6 @@
 ---
 name: agentow-a11y
-description: "Fix an odsp-web Accessibility bug through a lightweight evidence-first pipeline. Twinbot owns real DevBox assistive technology and supplies hashed evidence when available; after bounded evidence attempts are exhausted, agentOW may implement and open an explicitly unverified draft PR without claiming AT validation. Triggers on: A11y bug, accessibility bug, WCAG, screen reader, NVDA, Narrator, Voice Access, keyboard focus, ARIA, accessible name, live region."
+description: "Fix an odsp-web Accessibility bug through a lightweight evidence-first pipeline. Codespaces skip host-only Windows AT tests unless an external evidence bridge is available; Windows hosts install safe scriptable prerequisites and run supported tests directly. After bounded evidence routes are exhausted, agentOW may open an explicitly unverified draft PR without claiming AT validation. Triggers on: A11y bug, accessibility bug, WCAG, screen reader, NVDA, Narrator, Voice Access, keyboard focus, ARIA, accessible name, live region."
 ---
 
 # agentOW Accessibility remediation mode
@@ -12,22 +12,48 @@ The main session is the orchestrator and implementer. Dispatch only
 `@agentow-copilot:a11y-evaluator` for Twin evidence validation and the existing
 `@agentow-copilot:reviewer` after strict verification passes.
 
-## Non-negotiable boundary
+## Execution environment contract
 
-Twinbot controls the DevBox and real assistive technology. agentOW controls the Codespace and
-odsp-web source. agentOW never launches NVDA, Narrator, Voice Access, ETW, virtual audio, or
-OS-level input. Twinbot never edits the odsp-web worktree.
+Detect the execution environment before creating the run:
+
+- `codespace`: `CODESPACES == "true"` or `CODESPACE_NAME` is non-empty.
+- `windows-host`: not a Codespace and the current host is Windows.
+- `unsupported-host`: every other environment.
+
+Record `executionEnvironment`, the detection signal, and `repoRoot` in `a11y/intake.json` and
+`final.md`. Never infer Windows AT availability merely because a bridge command or a path was
+provided.
+
+In a Codespace, agentOW never installs or launches NVDA, Narrator, Voice Access, ETW, VB-CABLE,
+audio routing, Windows UI Automation, or OS-level input. Twinbot or another dispatcher-provided
+external evaluator may produce that evidence. If no external route exists, record each applicable
+host-only test as `skipped-environment`, explain that it requires a Windows host, and continue
+through the existing unverified fallback. A deliberate environment skip is not a failed test and
+must not be retried three times.
+
+On an independently controlled Windows host, the main session may run real AT only through the
+procedures in `${CLAUDE_PLUGIN_ROOT}/docs/a11y/windows-host-testing.md`. That guide is self-contained;
+`/agentow-a11y` does not require or invoke an external test skill. A Twin-managed DevBox is not
+independently controlled: Twinbot retains exclusive ownership of its browsers and AT, so agentOW
+must use the Twin evidence bridge there. Install only the safe scriptable prerequisites described
+in the host guide. Never bypass security prompts, silently install a driver or language pack, claim
+an RDP session is equivalent to the console session, or run NVDA and Narrator simultaneously. The
+evidence evaluator validates artifacts but never controls AT or edits product code.
+
+On an unsupported host, run only host-supported browser/static checks and mark Windows-only checks
+`skipped-environment`; never attempt Windows installation commands.
 
 ## Step 0: Create the isolated run
 
-1. Confirm `/workspaces/odsp-web` is clean. Stop on pre-existing changes; never auto-stash them.
+1. Resolve `repoRoot`: use `/workspaces/odsp-web` in a Codespace; otherwise use the current odsp-web
+   Git worktree root. Confirm it is clean. Stop on pre-existing changes; never auto-stash them.
 2. Fetch `origin/main`, then unconditionally run
-   `git -C /workspaces/odsp-web switch --detach origin/main`. Reproduction must not be attached to
-   `main` or any other branch.
+   `git -C "<repoRoot>" switch --detach origin/main`. Reproduction must not be attached to `main`
+   or any other branch.
 3. Create:
 
    ```text
-   /workspaces/odsp-web/.aero/a11y-<slug>-<timestamp>/
+   <repoRoot>/.aero/a11y-<slug>-<timestamp>/
    ├── request.txt
    ├── progress.log
    ├── final.md
@@ -50,6 +76,7 @@ OS-level input. Twinbot never edits the odsp-web worktree.
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/README.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/evidence-contract.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/pr-evidence-capture-guide.md`
+   - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/windows-host-testing.md`
    - `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/accessibility.md`
 5. Write `knowledge-manifest.json` listing exact documents, versions/URLs when known, and why each
    applies. Keep this manifest A11y-only.
@@ -87,7 +114,21 @@ OS surfaces. Never infer ownership from visual proximity; unmapped numbers are i
 
 Write `a11y/reproduce/evaluator-request.json`.
 
-Use the dispatcher-provided Twin evidence bridge:
+Route evidence collection by `executionEnvironment`:
+
+- In a Codespace, use a dispatcher-provided external evidence bridge when one exists. Otherwise
+  record the applicable Windows-only procedures as `skipped-environment`, including NVDA speech,
+  Narrator ETW, Voice Access/audio, Windows UI Automation, and real OS input. Do not install or
+  launch their dependencies in the Codespace.
+- On an independently controlled Windows host, run the prerequisite preflight from
+  `windows-host-testing.md`. Install missing safe scriptable dependencies, then run the applicable
+  keyboard, browser, WCAG, NVDA, Narrator, or Voice Access procedure directly. Convert the produced
+  artifacts to the `evidence-contract.md` request/result shape before validation. On a Twin-managed
+  DevBox, use its Twin evidence bridge instead of this direct route.
+- On an unsupported host, mark Windows-only procedures `skipped-environment` and run only supported
+  checks.
+
+For an external evidence bridge:
 
 - If a Twin evaluator command is provided, invoke it with request/result paths.
 - If Twin already provided a result artifact, copy only the immutable result metadata/URI into the
@@ -95,10 +136,11 @@ Use the dispatcher-provided Twin evidence bridge:
 - Make up to three meaningful attempts to acquire and validate real-AT reproduction evidence. An
    attempt must try an available route or correct a concrete bridge, request, environment, or
    evidence defect; never repeat an identical unavailable command merely to reach the limit. If no
-   Twin route exists, capability discovery exhausts the available routes immediately.
+   evidence route exists, capability discovery exhausts the available routes immediately. A
+   Codespace `skipped-environment` entry consumes no attempt.
 
-After Twin writes the result, dispatch `@agentow-copilot:a11y-evaluator` with phase `reproduce`.
-Also run `validate-a11y-evidence.mjs` directly.
+After the selected producer writes the result, dispatch `@agentow-copilot:a11y-evaluator` with
+phase `reproduce`. Also run `validate-a11y-evidence.mjs` directly.
 
 Gate:
 
@@ -176,7 +218,10 @@ Create `a11y/verify/evaluator-request.json` by copying the canonical reproductio
 - approved `baselineEvidenceSha256`;
 - same required evidence types.
 
-Twinbot replays the scenario and writes `evaluator-result.json`. Dispatch
+Use the same environment route and evidence producer selected for reproduction to replay the
+scenario and write `evaluator-result.json`. Codespaces must not attempt host-only Windows AT
+locally; when no external bridge exists, retain the matching `skipped-environment` entries.
+Dispatch
 `@agentow-copilot:a11y-evaluator` with phase `verify`, the immutable baseline request/result paths,
 then run:
 
@@ -187,7 +232,7 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-a11y-evidence.mjs" \
   --result "<verify-result>" \
   --baseline-request "<reproduce-request>" \
   --baseline-result "<reproduce-result>" \
-  --repo-root "/workspaces/odsp-web"
+  --repo-root "<repoRoot>"
 ```
 
 Gate:
@@ -256,8 +301,10 @@ For `unverified-fallback`, replace that template with:
 ## UNVERIFIED A11Y - validation unavailable
 
 - Validation mode: Unverified fallback
+- Execution environment: <codespace | windows-host | unsupported-host>
 - Reported bug and expected behavior: <summary>
 - Real-AT attempts: <count and routes>
+- Environment-skipped tests: <host-only tests and reason, or none>
 - Blocker: <Twin/AT/environment/evidence blocker>
 - Not validated: <NVDA/Narrator/Voice Access/keyboard/UIA/screenshots as applicable>
 - Supporting checks: <build, scoped tests, lint, static checks and results>
@@ -300,4 +347,5 @@ verdict, residual risk, and any remaining non-blocking notes.
 
 Each A11y item gets one isolated run/branch/PR. Missing requirements or a demonstrated unresolved
 product failure end only that item. Exhausted evidence capability may use `unverified-fallback`;
-continue to the next batch item after recording whether a draft PR was created.
+continue to the next batch item after recording whether a draft PR was created. Batch summaries
+separate `skipped-environment` from attempted-and-failed tests.
