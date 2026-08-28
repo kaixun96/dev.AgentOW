@@ -553,6 +553,7 @@ SendMessage to ow-review-agent:
   deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
   residualCandidatesPath: <sessionDir>/review-residual-candidates.jsonl # graduation-only
   ruleInventoryPath: <sessionDir>/review-rule-inventory.json             # both policies
+  prDescriptionPath: <sessionDir>/pr-description.md                      # when available
   contextLinkPath: <contextLinkPath>
   contextDocuments: <latest routed document paths>
   reviewLedgerPath: <resolved $reviewLedgerPath>
@@ -566,8 +567,9 @@ SendMessage to ow-review-agent:
 
 For `reviewPolicy=graduation-only`, omit `contextLinkPath`, `contextDocuments`, `reviewLedgerPath`,
 `planPath`, `implementationEvidencePath`, and `evaluationArtifactPaths`. Pass the immutable diff
-identity, changed-file/session/report paths, PR-description authorization evidence when available,
-and review artifact paths only. Require the reviewer to use only `graduation.md`, produce its minimal
+identity, changed-file/session/report paths, review artifact paths, and `prDescriptionPath` when a
+PR description is available. The reviewer uses it as trusted selected-branch intent, not rollout
+authorization evidence. Do not require a description or request external state proof. Require the reviewer to use only `graduation.md`, produce its minimal
 report, and return without generic review passes.
 
 Wait for the reviewer response and recompute Git scope. For `reviewPolicy=graduation-only`, validate

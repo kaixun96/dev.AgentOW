@@ -701,6 +701,7 @@ reviewPolicy: <graduation-only or general>
 gateInventoryPath: <sessionDir>/review-gates.txt               # graduation-only
 deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
 ruleInventoryPath: <sessionDir>/review-rule-inventory.json      # both policies
+prDescriptionPath: <sessionDir>/pr-description.md               # when available
 changedFiles: <changed files>
 sessionDir: /workspaces/odsp-web/.aero/<session>
 reportFile: /workspaces/odsp-web/.aero/<session>/report.json
@@ -721,8 +722,9 @@ evaluationArtifactPaths:
 
 For `reviewPolicy=graduation-only`, omit `reviewLedgerPath`, `contextDocuments`, `planPath`,
 `implementationEvidencePaths`, and `evaluationArtifactPaths`. Pass only the immutable diff identity,
-PR-description authorization evidence when available, changed-file/session/report paths, and review
-artifact paths. Instruct the reviewer to use only `graduation.md`, produce its minimal report, and
+changed-file/session/report paths, review artifact paths, and `prDescriptionPath` when a PR
+description is available. The reviewer uses it as trusted selected-branch intent, not rollout
+authorization evidence. Do not require a description or request external state proof. Instruct the reviewer to use only `graduation.md`, produce its minimal report, and
 return without entering generic review passes.
 
 Read the final evaluator NDJSON record immediately before dispatch. Pass only artifact paths that the record actually returned and that exist; do not synthesize conventional paths. If the final evaluator record or its required artifacts are missing, classify it as `evaluator-spec` and stop or retry under Step 6 rather than reviewing stale evidence.
