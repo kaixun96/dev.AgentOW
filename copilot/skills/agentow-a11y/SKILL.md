@@ -186,7 +186,9 @@ After strict reproduction PASS or entry into `unverified-fallback`:
 4. Read directly applicable routed project instructions.
 5. Identify the smallest source change that addresses the reproduced behavior.
 6. For an Input border or contrast change, inspect the version-pinned native Fluent V9 Input and
-   migration-shim styles. For the default outline appearance, preserve
+   migration-shim styles. If they already provide the requested border hierarchy, remove the
+   consumer override and let the component own its styles. Otherwise, for the default outline
+   appearance, preserve
    `borderColor: tokens.colorNeutralStroke1` on all four edges and
    `borderBottomColor: tokens.colorNeutralStrokeAccessible` on the bottom edge; do not use the
    accessible token as the full `borderColor`.
