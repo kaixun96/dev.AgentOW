@@ -186,8 +186,10 @@ After strict reproduction PASS or entry into `unverified-fallback`:
 4. Read directly applicable routed project instructions.
 5. Identify the smallest source change that addresses the reproduced behavior.
 6. For an Input border or contrast change, inspect the version-pinned native Fluent V9 Input and
-   migration-shim styles. Preserve the normal four-edge stroke and darker accessible bottom edge;
-   do not use an accessible `borderColor` shorthand that darkens all four edges.
+   migration-shim styles. For the default outline appearance, preserve
+   `borderColor: tokens.colorNeutralStroke1` on all four edges and
+   `borderBottomColor: tokens.colorNeutralStrokeAccessible` on the bottom edge; do not use the
+   accessible token as the full `borderColor`.
 7. Write a short implementation note, not a long general plan:
 
    ```markdown
