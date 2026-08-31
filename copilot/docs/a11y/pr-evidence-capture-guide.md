@@ -23,7 +23,7 @@
 | 颜色、布局、可见文本、静态 focus indicator | 匹配的全页 BEFORE/AFTER + 清晰 target crop |
 | accessible name、role、state、heading、relationship | 全页 BEFORE/AFTER + 标注对比图 + AX/UIA/DOM 机器证据 |
 | 键盘焦点顺序、焦点移动、动态更新 | 真实连续 BEFORE/AFTER 视频 |
-| Screen reader 朗读、重复/遗漏 announcement | 真实连续 BEFORE/AFTER 视频，包含同步音频或可核验 transcript |
+| Screen reader 朗读、重复/遗漏 announcement | 真实连续 BEFORE/AFTER 视频，包含同步真实音频；transcript 仅作辅助 |
 | Voice Access 编号/overlay | 全 overlay 截图 + 完整 overlay map；涉及交互时再加视频 |
 | reflow、zoom、responsive behavior | 固定 viewport/zoom 的匹配截图；动态变化时加视频 |
 
@@ -132,6 +132,17 @@ target rect 只能有渲染抖动允许范围内的小误差。任一无关状�
 对 heading level、accessible name、role、state、relationship 等不可见语义，必须把机器读取值
 清晰叠加到对应 target 附近。不能仅贴 accessibility tree 大图让 reviewer 自己寻找。
 
+### 6.4 Heading level 必须来自完整页面层级
+
+不得根据视觉字号、组件名称、设计稿层级或假定的页面结构选择 heading level。修改 heading 前必须：
+
+1. 从真实页面采集完整 heading outline，而不是只检查目标元素；
+2. 识别目标最近的 parent heading，以及同一区域的 sibling headings；
+3. 使用能保持该已验证层级的 level，并记录选择依据；
+4. 在 BEFORE/AFTER 机器证据中同时保留足够的 surrounding heading context。
+
+如果无法证明 parent/sibling 层级，heading level 结论为 `INCONCLUSIVE`，不得凭经验指定 H1/H2/H3。
+
 标注不得：
 
 - 遮住被证明的 UI；
@@ -172,6 +183,8 @@ target rect 只能有渲染抖动允许范围内的小误差。任一无关状�
 
 Screen reader 证据必须同时证明“操作对象”和“实际输出”：
 
+- 所有 screen reader 缺陷都必须提供修复后真实连续 AFTER 录屏；截图、AX/UIA tree、
+  transcript、ETW 或测试结果不能替代 AFTER 视频；
 - 录入真实 Narrator/NVDA 音频，不能由 TTS 后期重配；
 - 视频中必须能识别 focus/cursor 实际移动，而不是只听到孤立语音；
 - 保留原始音频或 ETW/log，并生成带时间戳 transcript；
@@ -284,6 +297,8 @@ API 上传成功、HTTP 200 或 markdown 文本正确都不能替代真实 PR �
 - [ ] 同时保留 full viewport、target crop 和机器证据。
 - [ ] 标注图直接说明 defect、change 和 acceptance criteria。
 - [ ] 动态/焦点/朗读缺陷使用真实连续视频。
+- [ ] Heading level 来自完整页面 parent/sibling outline，而非视觉或假设。
+- [ ] 所有 screen reader 缺陷均提供修复后真实连续 AFTER 录屏。
 - [ ] Screen reader 视频包含真实移动和真实音频/transcript。
 - [ ] AFTER 绑定并加载实际 PR HEAD。
 - [ ] 附件使用 ADO PR attachment 和绝对 `visualstudio.com` URL。
