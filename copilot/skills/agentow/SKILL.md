@@ -912,7 +912,7 @@ new revision; it does not erase the completed revision.
 
 After completion, build the local privacy-filtered run-insights report. In interactive mode, tell
 <!-- agentow-contract:insights:local-build -->
-the user its Markdown path and ask whether they want to preview it; sharing is handled only through
+the user its HTML path and ask whether they want to preview it; sharing is handled only through
 `/ow-share-insights`, which requires separate direct consent for the current report digest. In
 AUTO/batch mode, build the report without asking and never share it automatically. Insight
 generation or delivery failure is non-blocking and must not change, retract, or misstate the Draft
