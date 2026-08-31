@@ -22,6 +22,8 @@ const copilotMirrorFiles = [
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
+  ["docs/run-insights.md", "copilot/docs/run-insights.md"],
+  ["contracts/run-insights.schema.json", "copilot/contracts/run-insights.schema.json"],
 ];
 
 function copyDirectoryContents(source, destination) {
@@ -60,6 +62,8 @@ for (const fileSet of copilotMirrorFileSets) {
 
 fs.mkdirSync(path.join(repoRoot, "copilot", "docs"), { recursive: true });
 for (const [source, destination] of copilotMirrorFiles) {
-  fs.copyFileSync(path.join(repoRoot, source), path.join(repoRoot, destination));
+  const destinationPath = path.join(repoRoot, destination);
+  fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+  fs.copyFileSync(path.join(repoRoot, source), destinationPath);
 }
 console.log("copilot MCP dist synced");

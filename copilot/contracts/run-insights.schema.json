@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kaixun96/dev.AgentOW/contracts/run-insights.schema.json",
+  "title": "AgentOW Run Insights",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "reportId",
+    "generatedAt",
+    "privacy",
+    "run",
+    "phases",
+    "blockers",
+    "metrics",
+    "recommendations"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "reportId": { "type": "string", "format": "uuid" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "containsSourceCode",
+        "containsPromptText",
+        "containsRawLogs",
+        "containsUserIdentity",
+        "containsFreeText"
+      ],
+      "properties": {
+        "classification": { "const": "anonymous-operational" },
+        "containsSourceCode": { "const": false },
+        "containsPromptText": { "const": false },
+        "containsRawLogs": { "const": false },
+        "containsUserIdentity": { "const": false },
+        "containsFreeText": { "const": false }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "agentowVersion",
+        "executionProfile",
+        "revisionCount",
+        "wallDurationMs",
+        "activeDurationMs",
+        "interruptedDurationMs",
+        "draftPrCreated"
+      ],
+      "properties": {
+        "outcome": { "type": "string" },
+        "agentowVersion": { "type": "string" },
+        "executionProfile": { "enum": ["standard", "poc"] },
+        "revisionCount": { "type": "integer", "minimum": 1 },
+        "wallDurationMs": { "type": "integer", "minimum": 0 },
+        "activeDurationMs": { "type": "integer", "minimum": 0 },
+        "interruptedDurationMs": { "type": "integer", "minimum": 0 },
+        "draftPrCreated": { "type": "boolean" }
+      }
+    },
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase", "durationMs", "sharePercent"],
+        "properties": {
+          "phase": { "type": "string" },
+          "durationMs": { "type": "integer", "minimum": 0 },
+          "sharePercent": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "blocker",
+          "category",
+          "phase",
+          "status",
+          "durationMs",
+          "attemptCount",
+          "attempts",
+          "humanIntervention",
+          "automatedResolution",
+          "summary",
+          "resolutionKind",
+          "resolution"
+        ],
+        "properties": {
+          "blocker": { "type": "string", "pattern": "^B[1-9][0-9]*$" },
+          "category": {
+            "enum": [
+              "auth",
+              "build",
+              "dependency",
+              "environment",
+              "evaluation",
+              "network",
+              "requirements",
+              "review",
+              "source",
+              "test",
+              "tooling",
+              "other"
+            ]
+          },
+          "phase": { "type": "string" },
+          "status": { "enum": ["open", "resolved", "abandoned"] },
+          "durationMs": { "type": "integer", "minimum": 0 },
+          "attemptCount": { "type": "integer", "minimum": 0 },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["attempt", "strategy", "outcome", "automated"],
+              "properties": {
+                "attempt": { "type": "integer", "minimum": 1 },
+                "strategy": { "type": "string", "maxLength": 240 },
+                "outcome": { "type": "string", "maxLength": 240 },
+                "automated": { "type": "boolean" }
+              }
+            }
+          },
+          "humanIntervention": { "type": "boolean" },
+          "automatedResolution": { "type": "boolean" },
+          "summary": { "type": "string", "maxLength": 240 },
+          "resolutionKind": { "type": "string" },
+          "resolution": { "type": "string", "maxLength": 240 }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blockerCount",
+        "resolvedBlockerCount",
+        "automatedResolutionCount",
+        "humanInterventionCount",
+        "implementationCycles",
+        "evaluationCycles",
+        "reviewCycles"
+      ],
+      "properties": {
+        "blockerCount": { "type": "integer", "minimum": 0 },
+        "resolvedBlockerCount": { "type": "integer", "minimum": 0 },
+        "automatedResolutionCount": { "type": "integer", "minimum": 0 },
+        "humanInterventionCount": { "type": "integer", "minimum": 0 },
+        "implementationCycles": { "type": "integer", "minimum": 0 },
+        "evaluationCycles": { "type": "integer", "minimum": 0 },
+        "reviewCycles": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["signal", "finding", "suggestedFocus"],
+        "properties": {
+          "signal": { "type": "string" },
+          "finding": { "type": "string" },
+          "suggestedFocus": { "type": "string" }
+        }
+      }
+    }
+  }
+}

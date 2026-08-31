@@ -1191,6 +1191,30 @@ const checks = [
       "The developer may instead choose minimum surviving-behavior tests"
     ]
   },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: [
+      "build the local privacy-filtered run-insights report",
+      "AUTO/batch mode, build the report without asking and never share it automatically"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-share-insights/SKILL.md",
+    snippets: [
+      "SHARE RUN INSIGHTS ONCE",
+      "an earlier opt-in",
+      "are never consent",
+      "If the report changed after consent"
+    ]
+  },
+  {
+    file: "docs/run-insights.md",
+    snippets: [
+      "Nothing is shared without a direct user response",
+      "user-authored free text",
+      "Concurrent sends are rejected by an exclusive lock"
+    ]
+  },
 
 
 
@@ -1281,6 +1305,8 @@ const mirroredChecks = [
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
+  ["docs/run-insights.md", "copilot/docs/run-insights.md"],
+  ["contracts/run-insights.schema.json", "copilot/contracts/run-insights.schema.json"],
   ["skills/ow-review/references/accessibility.md", "copilot/skills/ow-review/references/accessibility.md"],
   ["skills/ow-review/references/common-review-issues.md", "copilot/skills/ow-review/references/common-review-issues.md"],
   ["skills/ow-review/references/graduation.md", "copilot/skills/ow-review/references/graduation.md"],

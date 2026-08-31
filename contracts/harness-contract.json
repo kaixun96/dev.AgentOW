@@ -108,7 +108,14 @@
         "agentow-contract:gate:review:profiles=poc,standard",
         "agentow-contract:evidence:review-bound-to-head",
         "agentow-contract:delivery:draft-pr",
-        "agentow-contract:safety:no-pr-comments"
+        "agentow-contract:safety:no-pr-comments",
+        "agentow-contract:insights:local-build"
+      ]
+    },
+    {
+      "file": "copilot/skills/ow-share-insights/SKILL.md",
+      "ordered": [
+        "agentow-contract:insights:explicit-consent"
       ]
     },
     {
@@ -135,6 +142,8 @@
     ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
     ["docs/review-contract.md", "copilot/docs/review-contract.md"],
     ["docs/review-misses.md", "copilot/docs/review-misses.md"],
+    ["docs/run-insights.md", "copilot/docs/run-insights.md"],
+    ["contracts/run-insights.schema.json", "copilot/contracts/run-insights.schema.json"],
     ["skills/ow-review/references/graduation.md", "copilot/skills/ow-review/references/graduation.md"],
     ["skills/ow-review/references/shared-utility-reuse.md", "copilot/skills/ow-review/references/shared-utility-reuse.md"],
     ["skills/ow-review/references/common-review-issues.md", "copilot/skills/ow-review/references/common-review-issues.md"],

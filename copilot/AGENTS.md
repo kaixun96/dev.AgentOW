@@ -32,6 +32,10 @@ Keep every Copilot run compatible with the durable artifact contract:
 ├── request-history.ndjson
 ├── lifecycle.ndjson
 ├── artifact-index.json
+├── insights/
+│   ├── run-insights.v1.json
+│   ├── run-insights.md
+│   └── consent.json
 ├── checkpoints/
 ├── planning/
 │   ├── planner-mode.json
@@ -66,6 +70,9 @@ Keep every Copilot run compatible with the durable artifact contract:
   partial record. Consumers read the union and deduplicate artifact IDs; reconciliation may
   backfill artifact records once the report is healthy and never truncates another writer's data.
 - `report.json` is NDJSON. Append one JSON object for planner mode, each planner pass, each implementation cycle, evaluator, reviewer, and final status.
+- Record each concrete stop as a structured blocker lifecycle: open it when work stops, record each
+  materially different attempt, then resolve or abandon it. Do not reconstruct blockers from raw
+  logs at completion.
 - All report writers use `run-state.mjs report` with a one-object JSON file. Direct append to
   `report.json` is forbidden. Readers consume the deduplicated union of the main and recovery
   journals.
@@ -113,6 +120,10 @@ Use this exact style. Each line starts with `[HH:MM:SS]`, one emoji, and a short
 [HH:MM:SS] 🧠 Context plan update — <applied|no-update|patch-only|conflict|disabled>
 [HH:MM:SS] 🧠 Context as-built update — <applied|no-update|patch-only|conflict|disabled>
 [HH:MM:SS] 🔁 Fix cycle N+1 — <reason>
+[HH:MM:SS] ⛔ Blocker opened — <id>: <category>
+[HH:MM:SS] 🧪 Blocker attempt — <id>: <outcome>
+[HH:MM:SS] ✅ Blocker resolved — <id>: <resolution type>
+[HH:MM:SS] ⚠️ Blocker abandoned — <id>: <resolution type>
 [HH:MM:SS] 🚀 Creating PR...
 [HH:MM:SS] ✅ PR created — <url>
 [HH:MM:SS] ✅ Workflow complete

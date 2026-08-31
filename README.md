@@ -35,6 +35,7 @@ missing, run `CODESPACES=false az login` in the current Codespace terminal and r
 | `/ow-batch` | Serial, checkpointed batch execution |
 | `/ow-review` | Review a branch or existing ADO PR without editing or shipping |
 | `/ow-context-feedback` | Update linked durable context from later feedback |
+| `/ow-share-insights` | Preview and explicitly opt in to sharing a privacy-filtered run report |
 | `/ow-init` | Initialize prerequisites without changing product code |
 | `/ow-doctor` | Force environment diagnosis and repair |
 
@@ -49,6 +50,7 @@ agentOW is a routing/execution layer. Feature-specific rules and execution guard
 Each run writes a `.aero/<session>/` tree containing:
 
 - `run-state.json`, request/lifecycle journals, checkpoints, and timing;
+- privacy-filtered run insights, generated locally and shared only after explicit per-report consent;
 - planner mode, plan, implementation, evaluator, review, and final artifacts;
 - content-hashed artifact index and report recovery journal;
 - linked-context routing, evidence, candidates, and apply results;
@@ -68,6 +70,7 @@ and attachments update the PR description rather than posting comment threads.
 - [Copilot plugin architecture](copilot/README.md)
 - [Capability bootstrap](docs/capability-bootstrap.md)
 - [Run lifecycle](docs/run-lifecycle.md)
+- [Run insights and consent](docs/run-insights.md)
 - [Context maintenance](docs/context-maintenance.md)
 - [Review contract](docs/review-contract.md)
 - [Harness contract](docs/harness-contract.md)

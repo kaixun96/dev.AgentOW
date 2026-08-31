@@ -17,6 +17,27 @@ const BOOKKEEPING_FILES = new Set([
   'run-state.json'
 ]);
 const LOCK_TIMEOUT_MS = 60_000;
+const BLOCKER_EVENT_TYPES = new Set([
+  'blocker-opened',
+  'blocker-attempted',
+  'blocker-resolved',
+  'blocker-abandoned'
+]);
+const BLOCKER_CATEGORIES = new Set([
+  'auth',
+  'build',
+  'dependency',
+  'environment',
+  'evaluation',
+  'network',
+  'requirements',
+  'review',
+  'source',
+  'test',
+  'tooling',
+  'other'
+]);
+const BLOCKER_ATTEMPT_OUTCOMES = new Set(['failed', 'succeeded', 'partial', 'blocked', 'no-change']);
 
 function now() {
   return new Date().toISOString();
@@ -541,6 +562,118 @@ function latestLifecycleEvent(sessionDir, status, since) {
   return latest;
 }
 
+function blockerLifecycle(sessionDir, blockerId) {
+  const lifecyclePath = path.join(sessionDir, 'lifecycle.ndjson');
+  if (!fs.existsSync(lifecyclePath)) return [];
+  const events = [];
+  for (const line of fs.readFileSync(lifecyclePath, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const record = JSON.parse(line);
+      if (record.blockerId === blockerId && BLOCKER_EVENT_TYPES.has(record.status)) {
+        events.push(record);
+      }
+    } catch {
+      // Preserve malformed evidence; complete blocker events remain independently parseable.
+    }
+  }
+  return events;
+}
+
+function requiredOption(options, name, eventType) {
+  const value = options[name];
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`--${name} is required for ${eventType}`);
+  }
+  return value.trim();
+}
+
+function parseBooleanOption(value, name) {
+  if (value === undefined) return undefined;
+  if (value === true || value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(`--${name} must be true or false`);
+}
+
+function blockerEventDetails(sessionDir, state, type, options) {
+  if (state.status !== 'active') {
+    throw new Error(`${type} requires an active run`);
+  }
+  const blockerId = requiredOption(options, 'blocker-id', type);
+  const priorEvents = blockerLifecycle(sessionDir, blockerId);
+  const opened = priorEvents.find((event) => event.status === 'blocker-opened');
+  const terminal = priorEvents.find(
+    (event) => event.status === 'blocker-resolved' || event.status === 'blocker-abandoned'
+  );
+
+  if (type === 'blocker-opened') {
+    if (opened) throw new Error(`blocker ${blockerId} is already recorded`);
+    const category = requiredOption(options, 'category', type);
+    if (!BLOCKER_CATEGORIES.has(category)) {
+      throw new Error(
+        `unsupported blocker category: ${category}; expected one of ${[...BLOCKER_CATEGORIES].join(', ')}`
+      );
+    }
+    const humanIntervention = parseBooleanOption(
+      options['human-intervention'],
+      'human-intervention'
+    );
+    if (humanIntervention === undefined) {
+      throw new Error('--human-intervention is required for blocker-opened');
+    }
+    return {
+      blockerId,
+      category,
+      summary: requiredOption(options, 'summary', type),
+      humanIntervention
+    };
+  }
+
+  if (!opened) throw new Error(`blocker ${blockerId} has not been opened`);
+  if (terminal) throw new Error(`blocker ${blockerId} is already ${terminal.status}`);
+
+  if (type === 'blocker-attempted') {
+    const strategyKind = requiredOption(options, 'strategy-kind', type);
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(strategyKind)) {
+      throw new Error('--strategy-kind must be a lowercase kebab-case label up to 64 characters');
+    }
+    const outcome = requiredOption(options, 'outcome', type);
+    if (!BLOCKER_ATTEMPT_OUTCOMES.has(outcome)) {
+      throw new Error(
+        `unsupported blocker attempt outcome: ${outcome}; expected one of ${[
+          ...BLOCKER_ATTEMPT_OUTCOMES
+        ].join(', ')}`
+      );
+    }
+    const automated = parseBooleanOption(options.automated, 'automated');
+    if (automated === undefined) {
+      throw new Error('--automated is required for blocker-attempted');
+    }
+    return {
+      blockerId,
+      strategy: requiredOption(options, 'strategy', type),
+      strategyKind,
+      outcome,
+      automated
+    };
+  }
+
+  const resolutionKind = requiredOption(options, 'resolution-kind', type);
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(resolutionKind)) {
+    throw new Error('--resolution-kind must be a lowercase kebab-case label up to 64 characters');
+  }
+  const automated = parseBooleanOption(options.automated, 'automated');
+  if (automated === undefined) {
+    throw new Error(`--automated is required for ${type}`);
+  }
+  return {
+    blockerId,
+    resolution: requiredOption(options, 'resolution', type),
+    resolutionKind,
+    automated
+  };
+}
+
 function requestIntent(sessionDir, state, messageFile, eventId) {
   const content = fs.readFileSync(path.resolve(messageFile), 'utf8');
   const historyPath = path.join(sessionDir, 'request-history.ndjson');
@@ -789,6 +922,9 @@ export function updateRunState(sessionDir, type, options = {}) {
       state.status = 'completed';
       state.phase = 'complete';
       ensureTimingState(state, eventTimestamp).completedAt = eventTimestamp;
+    } else if (BLOCKER_EVENT_TYPES.has(type)) {
+      settleActiveTiming(state, eventTimestamp);
+      requestEvidence = blockerEventDetails(sessionDir, state, type, options);
     } else if (type === 'note') {
       settleActiveTiming(state, eventTimestamp);
       requestEvidence = saveRequest(sessionDir, state, type, options.messageFile, eventId);
@@ -815,6 +951,10 @@ export function updateRunState(sessionDir, type, options = {}) {
       resume: `▶️ Run resumed — revision ${state.revision}, phase ${state.phase}`,
       phase: `🧭 Durable phase — ${state.phase}`,
       completed: `✅ Durable run state completed — ${formatTimingSummary(timingSummary)}`,
+      'blocker-opened': `⛔ Blocker opened — ${requestEvidence?.blockerId}: ${requestEvidence?.category}`,
+      'blocker-attempted': `🧪 Blocker attempt — ${requestEvidence?.blockerId}: ${requestEvidence?.outcome}`,
+      'blocker-resolved': `✅ Blocker resolved — ${requestEvidence?.blockerId}: ${requestEvidence?.resolutionKind}`,
+      'blocker-abandoned': `⚠️ Blocker abandoned — ${requestEvidence?.blockerId}: ${requestEvidence?.resolutionKind}`,
       note: '💬 Follow-up recorded'
     };
     const progressMarker = eventId ? `event:${eventId}` : undefined;
@@ -936,7 +1076,17 @@ function main() {
           reason: options.reason,
           messageFile: options['message-file'],
           eventId: options['event-id'],
-          profile: options.profile
+          profile: options.profile,
+          'blocker-id': options['blocker-id'],
+          category: options.category,
+          summary: options.summary,
+          strategy: options.strategy,
+          'strategy-kind': options['strategy-kind'],
+          outcome: options.outcome,
+          resolution: options.resolution,
+          'resolution-kind': options['resolution-kind'],
+          automated: options.automated,
+          'human-intervention': options['human-intervention']
         })
       )
     );
