@@ -50,7 +50,8 @@ agentOW is a routing/execution layer. Feature-specific rules and execution guard
 Each run writes a `.aero/<session>/` tree containing:
 
 - `run-state.json`, request/lifecycle journals, checkpoints, and timing;
-- privacy-filtered run insights, generated locally and shared only after explicit per-report consent;
+- privacy-filtered HTML and JSON run insights, generated locally and shared only after explicit
+  per-report consent;
 - planner mode, plan, implementation, evaluator, review, and final artifacts;
 - content-hashed artifact index and report recovery journal;
 - linked-context routing, evidence, candidates, and apply results;

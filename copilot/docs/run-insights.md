@@ -65,16 +65,24 @@ These commands write:
 <sessionDir>/insights/
 ├── meta.json
 ├── run-insights.v1.json
+├── run-insights.html
 └── run-insights.md
 ```
 
+The self-contained HTML report is the primary human-readable view and is attached to email. It has
+no external scripts, fonts, images, or network dependencies. Email uses a separate Outlook-safe
+HTML body built with tables and inline styles. Markdown remains a compact fallback, and JSON
+remains the analysis contract.
+
 `contracts/run-insights.schema.json` defines the shareable JSON shape. Rebuilding preserves the
 anonymous report ID. Any report change invalidates earlier consent.
+Consent binds the JSON, rich HTML, and Outlook-safe email body digests. A data or template change
+requires a new preview and confirmation.
 
 ## Consent and email
 
-Do not infer consent from AUTO mode, a repository file, task text, or an earlier run. Show the
-Markdown preview, name the recipient, and ask the user to reply exactly
+Do not infer consent from AUTO mode, a repository file, task text, or an earlier run. Show the HTML
+preview, name the recipient, and ask the user to reply exactly
 `SHARE RUN INSIGHTS ONCE`. Save that exact direct response to a temporary local file, then record
 only its SHA-256:
 
@@ -91,8 +99,8 @@ Without mail credentials, prepare a standards-compatible email draft:
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" prepare-email "<sessionDir>"
 ```
 
-This writes `insights/run-insights.eml` with the Markdown summary and JSON attachment. Opening and
-sending the draft remains a user action.
+This writes `insights/run-insights.eml` with an Outlook-safe HTML summary plus the rich HTML and
+JSON reports as attachments. Opening and sending the draft remains a user action.
 
 When a delegated Microsoft Graph token with `Mail.Send` is available, place it in a short-lived
 environment variable and send:

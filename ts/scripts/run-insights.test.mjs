@@ -270,6 +270,7 @@ fs.writeFileSync(
 run(insightsTool, 'build', session);
 const reportPath = path.join(session, 'insights', 'run-insights.v1.json');
 const markdownPath = path.join(session, 'insights', 'run-insights.md');
+const htmlPath = path.join(session, 'insights', 'run-insights.html');
 const reportText = fs.readFileSync(reportPath, 'utf8');
 const report = JSON.parse(reportText);
 const initialGeneratedAt = report.generatedAt;
@@ -299,6 +300,14 @@ assert.equal(report.blockers[0].summary, 'auth blocker in evaluation');
 assert.equal(report.blockers[0].resolution, 'Resolved through credential-refresh');
 assert.match(fs.readFileSync(markdownPath, 'utf8'), /AgentOW Run Insights/);
 assert.match(fs.readFileSync(markdownPath, 'utf8'), /credential-refresh/);
+const htmlText = fs.readFileSync(htmlPath, 'utf8');
+assert.match(htmlText, /<!doctype html>/);
+assert.match(htmlText, /Phase timing/);
+assert.match(htmlText, /Blocker journey/);
+assert.match(htmlText, /width:37\.5%/);
+assert.match(htmlText, /width:33\.3%/);
+assert.match(htmlText, /credential-refresh/);
+assert.equal(htmlText.includes('top-secret'), false);
 run(insightsTool, 'build', session);
 assert.equal(JSON.parse(fs.readFileSync(reportPath)).generatedAt, initialGeneratedAt);
 
@@ -335,7 +344,21 @@ run(insightsTool, 'prepare-email', session);
 const emlText = fs.readFileSync(path.join(session, 'insights', 'run-insights.eml'), 'utf8');
 assert.match(emlText, /To: maintainer@example\.invalid/);
 assert.match(emlText, /run-insights\.v1\.json/);
+assert.match(emlText, /run-insights\.html/);
+assert.match(emlText, /Content-Type: text\/html/);
+assert.match(emlText, /Blockers/);
 assert.equal(emlText.includes('top-secret'), false);
+const consentPath = path.join(session, 'insights', 'consent.json');
+const consentBeforeTemplateCheck = JSON.parse(fs.readFileSync(consentPath));
+fs.writeFileSync(
+  consentPath,
+  JSON.stringify({ ...consentBeforeTemplateCheck, reportHtmlSha256: 'stale-template-digest' })
+);
+assert.match(
+  runFailure(insightsTool, 'prepare-email', session),
+  /report changed after consent/
+);
+fs.writeFileSync(consentPath, JSON.stringify(consentBeforeTemplateCheck));
 state.timing.summary.phaseDurationsMs.evaluation += 1_000;
 fs.writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
 assert.match(
@@ -380,11 +403,16 @@ try {
     assert.equal(payload.message.toRecipients[0].emailAddress.address, 'maintainer@example.invalid');
     assert.equal(payload.message.body.content.includes('top-secret'), false);
     assert.equal(payload.message.body.content.includes('MUTATED BODY'), false);
+    assert.equal(payload.message.body.contentType, 'HTML');
+    assert.match(payload.message.body.content, /Blockers/);
+    assert.equal(payload.message.body.content.includes('display:grid'), false);
+    assert.equal(payload.message.attachments.length, 2);
+    assert.equal(payload.message.attachments[1].name, 'run-insights.html');
     return new Promise((resolve) => {
       releaseSend = () => resolve(new Response(null, { status: 202 }));
     });
   };
-  fs.writeFileSync(markdownPath, 'MUTATED BODY\n');
+  fs.writeFileSync(htmlPath, 'MUTATED BODY\n');
   const firstSend = sendEmail(session);
   await new Promise((resolve) => setTimeout(resolve, 0));
   await assert.rejects(() => sendEmail(session), /already in progress/);
@@ -421,4 +449,4 @@ try {
   delete process.env.AGENTOW_GRAPH_ACCESS_TOKEN;
 }
 
-console.log(`run insights fixtures passed; mock report: ${markdownPath}`);
+console.log(`run insights fixtures passed; mock report: ${htmlPath}`);
