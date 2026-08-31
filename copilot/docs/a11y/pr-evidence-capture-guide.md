@@ -146,6 +146,8 @@ target rect 只能有渲染抖动允许范围内的小误差。任一无关状�
 标注不得：
 
 - 遮住被证明的 UI；
+- 覆盖正在验证的像素、边框、focus indicator、文本或颜色；callout 必须放在 target
+  外部并用引线指向，同时保留同尺寸的无遮挡 crop；
 - 添加产品中并不存在的 focus ring、文本或状态；
 - 用红/绿颜色作为唯一信息通道；
 - 宣称截图本身无法证明的朗读、顺序或动态行为。
@@ -296,6 +298,7 @@ API 上传成功、HTTP 200 或 markdown 文本正确都不能替代真实 PR �
 - [ ] 最终媒体没有 debug/test/error 污染。
 - [ ] 同时保留 full viewport、target crop 和机器证据。
 - [ ] 标注图直接说明 defect、change 和 acceptance criteria。
+- [ ] 标注未覆盖被验证的像素/边框，并提供无遮挡的同尺寸 target crop。
 - [ ] 动态/焦点/朗读缺陷使用真实连续视频。
 - [ ] Heading level 来自完整页面 parent/sibling outline，而非视觉或假设。
 - [ ] 所有 screen reader 缺陷均提供修复后真实连续 AFTER 录屏。

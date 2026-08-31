@@ -227,6 +227,9 @@ locally; when no external bridge exists, retain the matching `skipped-environmen
 For every screen-reader bug, strict PASS also requires an exact-HEAD continuous AFTER recording
 with synchronized real AT audio and visible focus/cursor movement. Transcript, ETW, AX/UIA,
 screenshots, and tests can support but never replace this recording.
+Reviewer annotations must not cover the pixels, border, focus indicator, text, or color being
+validated. Put callouts outside the target, use leader lines, and retain an unobstructed equal-scale
+target crop.
 Dispatch
 `@agentow-copilot:a11y-evaluator` with phase `verify`, the immutable baseline request/result paths,
 then run:
