@@ -35,6 +35,8 @@ source title/URL when shareable, and evidence needed by a reviewer.
 
 - NVDA + captured speech for repeatable daily screen-reader regression.
 - Narrator + Narrator/UIAutomationCore/Speech-TTS ETW for Narrator-specific behavior.
+- Unattended NVDA/Narrator recordings use the composed Windows desktop, persistent VB-CABLE/WASAPI
+  audio, speech-aware focus timing, and validated MP4/focus-frame quality after one-time host setup.
 - Voice Access + virtual audio capture + visible state proof for real voice-command behavior.
 - Real OS-level keyboard input for screen-reader focus/navigation. CDP keyboard injection is not
   equivalent evidence because it may not generate the Win32/UIA events consumed by screen readers.

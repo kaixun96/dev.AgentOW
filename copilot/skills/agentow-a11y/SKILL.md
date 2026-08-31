@@ -25,11 +25,11 @@ Record `executionEnvironment`, the detection signal, and `repoRoot` in `a11y/int
 provided.
 
 In a Codespace, agentOW never installs or launches NVDA, Narrator, Voice Access, ETW, VB-CABLE,
-audio routing, Windows UI Automation, or OS-level input. Twinbot or another dispatcher-provided
-external evaluator may produce that evidence. If no external route exists, record each applicable
-host-only test as `skipped-environment`, explain that it requires a Windows host, and continue
-through the existing unverified fallback. A deliberate environment skip is not a failed test and
-must not be retried three times.
+audio routing, Windows UI Automation, OS-level input, console-session transfer, or unattended
+screen-reader recording. Twinbot or another dispatcher-provided external evaluator may produce that
+evidence. If no external route exists, record each applicable host-only test as `skipped-environment`,
+explain that it requires a Windows host, and continue through the existing unverified fallback.
+A deliberate environment skip is not a failed test and must not be retried three times.
 
 On an independently controlled Windows host, the main session may run real AT only through the
 procedures in `${CLAUDE_PLUGIN_ROOT}/docs/a11y/windows-host-testing.md`. That guide is self-contained;
@@ -101,6 +101,8 @@ The request must name required evidence types. Examples:
 
 - NVDA speech defect: screenshot + NVDA transcript + UI Automation/focus state + genuine AFTER video.
 - Narrator-only defect: screenshot + Narrator ETW + UI Automation state + genuine AFTER video.
+- Unattended screen-reader recording: validated MP4 with real speech and visible focus, recording
+  quality metrics, extracted focus frame, and the applicable NVDA transcript or Narrator ETW.
 - Voice Access defect: screenshot + result JSON + captured audio/volume evidence.
 - Keyboard/focus defect: screenshot + focus sequence + OS-input log.
 - Contrast/reflow defect: screenshot + measurement or viewport evidence.
@@ -118,13 +120,15 @@ Route evidence collection by `executionEnvironment`:
 
 - In a Codespace, use a dispatcher-provided external evidence bridge when one exists. Otherwise
   record the applicable Windows-only procedures as `skipped-environment`, including NVDA speech,
-  Narrator ETW, Voice Access/audio, Windows UI Automation, and real OS input. Do not install or
-  launch their dependencies in the Codespace.
+  Narrator ETW, unattended screen-reader recording, Voice Access/audio, Windows UI Automation, and
+  real OS input. Do not install or launch their dependencies in the Codespace.
 - On an independently controlled Windows host, run the prerequisite preflight from
   `windows-host-testing.md`. Install missing safe scriptable dependencies, then run the applicable
-  keyboard, browser, WCAG, NVDA, Narrator, or Voice Access procedure directly. Convert the produced
-  artifacts to the `evidence-contract.md` request/result shape before validation. On a Twin-managed
-  DevBox, use its Twin evidence bridge instead of this direct route.
+  keyboard, browser, WCAG, NVDA, Narrator, unattended recording, or Voice Access procedure directly.
+  Unattended recording is available only after its one-time machine setup passes preflight; a run
+  must not create an elevated task, install a driver, approve UAC, or improvise session transfer.
+  Convert the produced artifacts to the `evidence-contract.md` request/result shape before
+  validation. On a Twin-managed DevBox, use its Twin evidence bridge instead of this direct route.
 - On an unsupported host, mark Windows-only procedures `skipped-environment` and run only supported
   checks.
 

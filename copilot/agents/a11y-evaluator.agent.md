@@ -35,6 +35,12 @@ For Voice Access, reject evidence unless:
 - actionable links/buttons/inputs are not reported as violations;
 - an unmapped number is INCONCLUSIVE, never a page defect.
 
+For an unattended NVDA or Narrator recording, reject the recording unless its producer reports
+validated duration, frame dimensions, image variance, audio RMS and peak, and an extracted frame
+with visible focus. The media must contain real screen-reader speech captured from a persistent
+audio endpoint and the composed Windows desktop; an existing MP4, silent audio, a static slideshow,
+or browser-only capture is not sufficient.
+
 ## Input
 
 The dispatcher provides:
