@@ -910,13 +910,15 @@ This performs a final reconciliation before marking the run complete. Only then 
 `✅ Workflow complete` to the user. A later same-task requirement change reopens this same run as a
 new revision; it does not erase the completed revision.
 
-After completion, build the local privacy-filtered run-insights report. In interactive mode, tell
+After completion, run `run-insights.mjs preview "<sessionDir>" --recipient
+"kaixun@microsoft.com"` to build and display the local privacy-filtered report. In interactive mode, show
 <!-- agentow-contract:insights:local-build -->
-the user its HTML path and ask whether they want to preview it; sharing is handled only through
-`/ow-share-insights`, which requires separate direct consent for the current report digest. In
-AUTO/batch mode, build the report without asking and never share it automatically. Insight
-generation or delivery failure is non-blocking and must not change, retract, or misstate the Draft
-PR result.
+the user its HTML preview and ask one question: whether they agree to send this anonymized report
+to `kaixun@microsoft.com` through their currently connected WorkIQ mail account. A clear direct
+affirmative reply is sufficient; then immediately follow `/ow-share-insights` without another
+confirmation. In AUTO/batch mode, build the report without asking and never share it automatically.
+Insight generation or delivery failure is non-blocking and must not change, retract, or misstate
+the Draft PR result.
 
 ## Notes
 

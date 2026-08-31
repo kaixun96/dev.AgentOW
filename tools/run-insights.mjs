@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url';
 
 const BLOCKER_TERMINAL = new Set(['blocker-resolved', 'blocker-abandoned']);
 const MAX_SUMMARY_LENGTH = 240;
-const SHARE_CONFIRMATION = 'SHARE RUN INSIGHTS ONCE';
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 function now() {
@@ -115,6 +114,30 @@ function normalizedLabel(value, fallback = 'other') {
   return typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value)
     ? value
     : fallback;
+}
+
+function isAffirmativeConsent(response) {
+  const normalized = response
+    .trim()
+    .toLocaleLowerCase('en-US')
+    .replace(/[.!。！]+$/g, '')
+    .trim();
+  return new Set([
+    'yes',
+    'yes please',
+    'ok',
+    'okay',
+    'send',
+    'send it',
+    'agree',
+    'approved',
+    '可以',
+    '好',
+    '好的',
+    '发送',
+    '同意',
+    '同意发送'
+  ]).has(normalized);
 }
 
 function agentowVersion() {
@@ -334,6 +357,24 @@ export function buildInsights(sessionDir) {
     emailHtml,
     emailHtmlSha256: sha256(emailHtml)
   };
+}
+
+function previewInsights(sessionDir, options) {
+  const built = buildInsights(sessionDir);
+  const recipient = options.recipient;
+  if (recipient && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+    throw new Error('--recipient must be a valid email address');
+  }
+  atomicWriteJson(path.join(sessionDir, 'insights', 'preview.json'), {
+    schemaVersion: 1,
+    previewedAt: now(),
+    reportId: built.report.reportId,
+    reportSha256: built.sha256,
+    reportHtmlSha256: built.reportHtmlSha256,
+    emailHtmlSha256: built.emailHtmlSha256,
+    recipient
+  });
+  return built;
 }
 
 function validateReport(report) {
@@ -717,16 +758,43 @@ function authorize(sessionDir, options) {
   if (!options['response-file']) throw new Error('--response-file is required');
   const response = fs.readFileSync(path.resolve(options['response-file']), 'utf8').trim();
   if (!response) throw new Error('the direct user response must not be empty');
-  if (options.decision === 'share-once' && response !== SHARE_CONFIRMATION) {
-    throw new Error(`share-once requires the exact direct user response: ${SHARE_CONFIRMATION}`);
+  if (options.decision === 'share-once' && !isAffirmativeConsent(response)) {
+    throw new Error('share-once requires a clear direct affirmative response');
   }
   const built = buildInsights(sessionDir);
   const recipient = options.decision === 'share-once' ? options.recipient : undefined;
   if (options.decision === 'share-once' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient ?? '')) {
     throw new Error('--recipient must be a valid email address for share-once');
   }
+  if (options.decision === 'share-once') {
+    const preview = readJson(path.join(sessionDir, 'insights', 'preview.json'), undefined);
+    if (
+      !preview ||
+      preview.reportId !== built.report.reportId ||
+      preview.reportSha256 !== built.sha256 ||
+      preview.reportHtmlSha256 !== built.reportHtmlSha256 ||
+      preview.emailHtmlSha256 !== built.emailHtmlSha256 ||
+      preview.recipient !== recipient
+    ) {
+      throw new Error('share-once requires a matching HTML preview for this report and recipient');
+    }
+  }
+  const priorAttempt = readJson(
+    path.join(sessionDir, 'insights', 'delivery-attempt.json'),
+    undefined
+  );
+  if (
+    options.decision === 'share-once' &&
+    priorAttempt?.transport === 'workiq-mcp-sendmail' &&
+    priorAttempt.status === 'authorized' &&
+    priorAttempt.reportSha256 === built.sha256 &&
+    priorAttempt.recipient === recipient
+  ) {
+    throw new Error('this report already authorized a WorkIQ send attempt');
+  }
   const consent = {
     schemaVersion: 1,
+    consentId: crypto.randomUUID(),
     decision: options.decision,
     scope: 'current-report',
     recordedAt: now(),
@@ -800,13 +868,47 @@ function createEml(report, emailHtml, reportHtml, recipient) {
 }
 
 function prepareEmail(sessionDir) {
-  const { built, consent } = requireConsent(sessionDir);
-  const emailPath = path.join(sessionDir, 'insights', 'run-insights.eml');
-  fs.writeFileSync(
-    emailPath,
-    createEml(built.report, built.emailHtml, built.reportHtml, consent.recipient)
-  );
-  return { emailPath, recipient: consent.recipient, subject: emailSubject(built.report) };
+  return withSendLock(sessionDir, () => {
+    const { built, consent } = requireConsent(sessionDir);
+    const attemptPath = path.join(sessionDir, 'insights', 'delivery-attempt.json');
+    const priorAttempt = readJson(attemptPath, undefined);
+    if (priorAttempt && ['authorized', 'sending', 'accepted', 'completed'].includes(priorAttempt.status)) {
+      throw new Error(
+        `cannot prepare an email while delivery status is ${priorAttempt.status}; inspect ${attemptPath}`
+      );
+    }
+    const emailPath = path.join(sessionDir, 'insights', 'run-insights.eml');
+    fs.writeFileSync(
+      emailPath,
+      createEml(built.report, built.emailHtml, built.reportHtml, consent.recipient)
+    );
+    return { emailPath, recipient: consent.recipient, subject: emailSubject(built.report) };
+  });
+}
+
+function createMcpPayload(built, recipient) {
+  return {
+    message: {
+      subject: emailSubject(built.report),
+      body: { contentType: 'HTML', content: built.emailHtml },
+      toRecipients: [{ emailAddress: { address: recipient } }],
+      attachments: [
+        {
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: 'run-insights.v1.json',
+          contentType: 'application/json',
+          contentBytes: Buffer.from(`${JSON.stringify(built.report, null, 2)}\n`).toString('base64')
+        },
+        {
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: 'run-insights.html',
+          contentType: 'text/html',
+          contentBytes: Buffer.from(built.reportHtml).toString('base64')
+        }
+      ]
+    },
+    saveToSentItems: true
+  };
 }
 
 function acquireSendLock(sessionDir) {
@@ -836,6 +938,64 @@ function acquireSendLock(sessionDir) {
     if (descriptor !== undefined) fs.closeSync(descriptor);
   }
   return () => fs.rmSync(lockPath, { force: true });
+}
+
+function withSendLock(sessionDir, operation) {
+  const releaseLock = acquireSendLock(sessionDir);
+  try {
+    return operation();
+  } finally {
+    releaseLock();
+  }
+}
+
+function beginMcpDelivery(sessionDir) {
+  return withSendLock(sessionDir, () => {
+    const { built, consent, consentPath } = requireConsent(sessionDir);
+    const insightsDir = path.join(sessionDir, 'insights');
+    const attemptPath = path.join(insightsDir, 'delivery-attempt.json');
+    const priorAttempt = readJson(attemptPath, undefined);
+    if (
+      priorAttempt &&
+      (['sending', 'accepted'].includes(priorAttempt.status) ||
+        (priorAttempt.status === 'authorized' && priorAttempt.consentId === consent.consentId))
+    ) {
+      throw new Error(
+        `a prior delivery attempt is ${priorAttempt.status}; inspect the WorkIQ result before sending again`
+      );
+    }
+    const payload = createMcpPayload(built, consent.recipient);
+    const payloadSha256 = sha256(JSON.stringify(payload));
+    const attempt = {
+      schemaVersion: 1,
+      attemptId: crypto.randomUUID(),
+      consentId: consent.consentId,
+      reportId: built.report.reportId,
+      reportSha256: built.sha256,
+      reportHtmlSha256: built.reportHtmlSha256,
+      emailHtmlSha256: built.emailHtmlSha256,
+      recipient: consent.recipient,
+      transport: 'workiq-mcp-sendmail',
+      status: 'authorized',
+      authorizedAt: now(),
+      payloadSha256
+    };
+    const authorizedAt = now();
+    atomicWriteJson(attemptPath, attempt);
+    atomicWriteJson(consentPath, {
+      ...consent,
+      consumedAt: authorizedAt,
+      consumedBy: 'workiq-mcp-sendmail-attempt',
+      attemptId: attempt.attemptId
+    });
+    return {
+      actionUrl: '/me/sendMail',
+      attemptId: attempt.attemptId,
+      payloadSha256,
+      payload,
+      status: 'authorized'
+    };
+  });
 }
 
 export async function sendEmail(sessionDir, options = {}) {
@@ -928,7 +1088,7 @@ async function main() {
   const { command, sessionDir, options } = parseArgs(process.argv.slice(2));
   if (!command || !sessionDir) {
     console.error(
-      'usage: node run-insights.mjs <build|preview|authorize|prepare-email|send-email> <sessionDir> [options]'
+      'usage: node run-insights.mjs <build|preview|authorize|prepare-email|begin-mcp|send-email> <sessionDir> [options]'
     );
     process.exit(2);
   }
@@ -944,7 +1104,7 @@ async function main() {
     return;
   }
   if (command === 'preview') {
-    const built = buildInsights(sessionDir);
+    const built = previewInsights(sessionDir, options);
     process.stdout.write(fs.readFileSync(built.htmlPath, 'utf8'));
     return;
   }
@@ -954,6 +1114,10 @@ async function main() {
   }
   if (command === 'prepare-email') {
     console.log(JSON.stringify(prepareEmail(sessionDir)));
+    return;
+  }
+  if (command === 'begin-mcp') {
+    console.log(JSON.stringify(beginMcpDelivery(sessionDir)));
     return;
   }
   if (command === 'send-email') {

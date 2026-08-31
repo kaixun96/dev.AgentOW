@@ -1194,17 +1194,23 @@ const checks = [
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
-      "build the local privacy-filtered run-insights report",
+      "to build and display the local privacy-filtered report",
       "AUTO/batch mode, build the report without asking and never share it automatically"
     ]
   },
   {
     file: "copilot/skills/ow-share-insights/SKILL.md",
     snippets: [
-      "SHARE RUN INSIGHTS ONCE",
+      "ask that one direct",
+      "`可以`, or `同意发送`",
       "an earlier opt-in",
-      "are never consent",
-      "If the report changed after consent"
+      "consent. A clear direct reply",
+      "reuse",
+      "do not build or display the report again",
+      "If the report changed after consent",
+      "WorkIQ/Microsoft 365 mail MCP",
+      "call the WorkIQ action tool for `/me/sendMail`",
+      "must not trigger another login or EULA flow"
     ]
   },
   {

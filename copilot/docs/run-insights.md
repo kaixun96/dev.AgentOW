@@ -56,7 +56,8 @@ of `blocker-resolved` when the run ships with or stops on the blocker.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" build "<sessionDir>"
-node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" preview "<sessionDir>"
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" preview "<sessionDir>" \
+  --recipient "kaixun@microsoft.com"
 ```
 
 These commands write:
@@ -77,14 +78,16 @@ remains the analysis contract.
 `contracts/run-insights.schema.json` defines the shareable JSON shape. Rebuilding preserves the
 anonymous report ID. Any report change invalidates earlier consent.
 Consent binds the JSON, rich HTML, and Outlook-safe email body digests. A data or template change
-requires a new preview and confirmation.
+requires a new preview and confirmation. `preview` writes a digest receipt including the named
+recipient; authorization fails if the report or recipient differs.
 
 ## Consent and email
 
-Do not infer consent from AUTO mode, a repository file, task text, or an earlier run. Show the HTML
-preview, name the recipient, and ask the user to reply exactly
-`SHARE RUN INSIGHTS ONCE`. Save that exact direct response to a temporary local file, then record
-only its SHA-256:
+Do not infer consent from AUTO mode, silence, a repository file, task text, or an earlier run. Show
+the HTML preview, name `kaixun@microsoft.com` as the recipient, and ask once whether the user agrees
+to send this anonymized report through their connected WorkIQ mail account. A clear direct answer
+such as `yes`, `可以`, or `同意发送` is sufficient. Save that exact response to a temporary local file,
+then record only its SHA-256:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" authorize "<sessionDir>" \
@@ -93,27 +96,33 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" authorize "<sessionDir>" \
   --recipient "<maintainer-email>"
 ```
 
-Without mail credentials, prepare a standards-compatible email draft:
+When an already authenticated WorkIQ/Microsoft 365 MCP is available, authorize one exact payload:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" begin-mcp "<sessionDir>"
+```
+
+Pass the exact `payload` object returned by `begin-mcp` to the WorkIQ action tool at
+`/me/sendMail`; do not reconstruct or persist it. Its digest and recipient are bound to the
+consent. `begin-mcp` atomically consumes that one-time consent before returning the payload. Invoke
+WorkIQ exactly once and use the MCP tool response as the delivery result. After a definite failure,
+show the error and request fresh verbal consent before another attempt. An uncertain result must
+not be retried—or converted to `.eml`—until the sender checks Sent Items.
+
+The MCP uses its existing user authentication, so this flow adds no login or mail-permission prompt.
+If WorkIQ mail is unavailable or not already authenticated, report that the email was not sent.
+Do not substitute a draft under the WorkIQ consent. Only after a separate explicit request, prepare
+a standards-compatible draft:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" prepare-email "<sessionDir>"
 ```
 
-This writes `insights/run-insights.eml` with an Outlook-safe HTML summary plus the rich HTML and
-JSON reports as attachments. Opening and sending the draft remains a user action.
+The draft contains an Outlook-safe HTML summary plus the rich HTML and JSON reports as attachments.
+Opening and sending it remains a user action.
 
-When a delegated Microsoft Graph token with `Mail.Send` is available, place it in a short-lived
-environment variable and send:
-
-```bash
-AGENTOW_GRAPH_ACCESS_TOKEN="<token>" \
-node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" send-email "<sessionDir>"
-```
-
-The token is never written to disk. Successful delivery consumes the one-run consent and writes
-`insights/delivery-attempt.json` before network I/O and `insights/delivery-receipt.json` after Graph
-accepts the message. A failed report or mail command never changes product delivery,
-the branch, or the Draft PR; report it separately and leave the local report available for retry.
-Concurrent sends are rejected by an exclusive lock. An interrupted `sending` or `accepted`
-delivery attempt is also fail-closed: inspect it and the mailbox before retrying, because Graph may
-have accepted the message before the process stopped.
+Starting an MCP delivery consumes the one-run consent and writes
+`insights/delivery-attempt.json` before network I/O. A failed report or mail command never changes
+product delivery, the branch, or the Draft PR. Concurrent sends are rejected by an exclusive lock.
+A consented attempt is single-use. The same unchanged report and recipient cannot authorize a
+second WorkIQ attempt.

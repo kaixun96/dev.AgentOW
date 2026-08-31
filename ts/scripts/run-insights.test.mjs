@@ -310,6 +310,7 @@ assert.match(htmlText, /credential-refresh/);
 assert.equal(htmlText.includes('top-secret'), false);
 run(insightsTool, 'build', session);
 assert.equal(JSON.parse(fs.readFileSync(reportPath)).generatedAt, initialGeneratedAt);
+run(insightsTool, 'preview', session, '--recipient', 'maintainer@example.invalid');
 
 assert.match(runFailure(insightsTool, 'prepare-email', session), /share-once consent is required/);
 const responseFile = path.join(root, 'response.txt');
@@ -326,9 +327,9 @@ assert.match(
     '--recipient',
     'maintainer@example.invalid'
   ),
-  /exact direct user response/
+  /clear direct affirmative response/
 );
-fs.writeFileSync(responseFile, 'SHARE RUN INSIGHTS ONCE');
+fs.writeFileSync(responseFile, '同意发送');
 run(
   insightsTool,
   'authorize',
@@ -348,6 +349,57 @@ assert.match(emlText, /run-insights\.html/);
 assert.match(emlText, /Content-Type: text\/html/);
 assert.match(emlText, /Blockers/);
 assert.equal(emlText.includes('top-secret'), false);
+const mcpSession = path.join(root, '.aero', 'mcp-run');
+fs.cpSync(session, mcpSession, { recursive: true });
+const begunMcp = JSON.parse(run(insightsTool, 'begin-mcp', mcpSession));
+assert.equal(begunMcp.status, 'authorized');
+assert.equal(
+  begunMcp.payload.message.toRecipients[0].emailAddress.address,
+  'maintainer@example.invalid'
+);
+assert.equal(begunMcp.payload.message.body.contentType, 'HTML');
+assert.equal(begunMcp.payload.message.attachments.length, 2);
+assert.equal(JSON.stringify(begunMcp.payload).includes('top-secret'), false);
+assert.ok(
+  JSON.parse(fs.readFileSync(path.join(mcpSession, 'insights', 'consent.json'))).consumedAt
+);
+assert.equal(
+  JSON.parse(fs.readFileSync(path.join(mcpSession, 'insights', 'delivery-attempt.json'))).status,
+  'authorized'
+);
+assert.match(
+  runFailure(insightsTool, 'prepare-email', mcpSession),
+  /share-once consent has already been consumed/
+);
+assert.match(
+  runFailure(insightsTool, 'begin-mcp', mcpSession),
+  /share-once consent has already been consumed/
+);
+fs.writeFileSync(responseFile, 'yes');
+assert.match(
+  runFailure(
+    insightsTool,
+    'authorize',
+    mcpSession,
+    '--decision',
+    'share-once',
+    '--response-file',
+    responseFile,
+    '--recipient',
+    'maintainer@example.invalid'
+  ),
+  /already authorized a WorkIQ send attempt/
+);
+const blockedMcpSession = path.join(root, '.aero', 'blocked-mcp-run');
+fs.cpSync(session, blockedMcpSession, { recursive: true });
+fs.writeFileSync(
+  path.join(blockedMcpSession, 'insights', 'delivery-attempt.json'),
+  JSON.stringify({ status: 'sending', transport: 'microsoft-graph-sendmail' })
+);
+assert.match(
+  runFailure(insightsTool, 'begin-mcp', blockedMcpSession),
+  /prior delivery attempt is sending/
+);
 const consentPath = path.join(session, 'insights', 'consent.json');
 const consentBeforeTemplateCheck = JSON.parse(fs.readFileSync(consentPath));
 fs.writeFileSync(
@@ -367,6 +419,7 @@ assert.match(
 );
 assert.notEqual(JSON.parse(fs.readFileSync(reportPath)).generatedAt, initialGeneratedAt);
 
+run(insightsTool, 'preview', session, '--recipient', 'maintainer@example.invalid');
 run(
   insightsTool,
   'authorize',
