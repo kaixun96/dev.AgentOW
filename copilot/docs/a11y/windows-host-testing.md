@@ -24,6 +24,10 @@ setup below incorporates Jimu team guidance and the ADO `odsp-automation-test-to
 
 ## Safe scriptable installation
 
+Use `/ow-a11y-host-setup` for one-time Windows evaluator provisioning. It installs the scriptable
+dependencies, stages the pinned signed VB-CABLE package, opens the vendor installer, opens Voice
+Access first-run setup, and writes a capability report.
+
 Install a missing dependency only when the selected scenario needs it:
 
 ```powershell
@@ -36,8 +40,9 @@ Re-run the preflight after installation. A successful installer exit is not proo
 driver, audio endpoint, language model, console session, or evidence capture works.
 
 Do not automate installation of VB-CABLE, a Voice Access language model, Windows Performance
-Analyzer, or anything that needs an administrator/security/consent prompt or restart. Report the
-exact missing prerequisite and wait for the required user action when that route is necessary.
+Analyzer, or other one-time prerequisites during an Accessibility test run. Complete those host
+steps through `/ow-a11y-host-setup`, restart Windows when the VB-CABLE installer requires it, and
+rerun the capability probe before collecting evidence.
 
 ## Unattended screen-reader recording
 
