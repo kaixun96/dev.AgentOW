@@ -42,6 +42,20 @@ Treat a rendered UI change that lacks this analysis, contradicts its own evidenc
 17. Keep custom components focused and reusable. Do not reproduce a standard design-system control solely for visual customization.
 18. Verify the chosen implementation preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience.
 
+## Fluent V9 Input border contract
+
+For the default outline appearance, preserve the native Fluent V9 visual hierarchy: the full
+perimeter uses the normal neutral input stroke, and the bottom edge uses the darker accessible
+stroke. Do not apply `colorNeutralStrokeAccessible` through a `border` or `borderColor` shorthand,
+because that darkens all four edges and no longer matches the standard Input.
+
+This also applies when a Fluent V8 `TextField` is rendered through the V9 migration shim. The shim
+preserves the V8 `fieldGroup` styling API, so a consumer override must express the two layers
+separately: keep `borderColor` on the normal neutral stroke and set only `borderBottomColor` to the
+accessible stroke. Read the version-pinned native Input and shim styles before choosing token names
+or style slots. Preserve the component's native hover, focus, error, disabled, forced-colors, and
+non-default appearance rules; a base-state contrast fix must not replace those state styles.
+
 ## Review questions
 
 - Can SPDS meet this requirement?
@@ -50,6 +64,8 @@ Treat a rendered UI change that lacks this analysis, contradicts its own evidenc
 - Is the code treating a compound component as a semantic API with valid child components and slots, rather than injecting unrelated content into its internal structure?
 - If custom HTML/CSS is proposed, why can neither `@msinternal/sharepoint-ui-react` nor Fluent V9 meet it?
 - Are existing components, tokens, typography, slots, or wrappers being bypassed?
+- Does a default Input preserve the normal four-edge stroke plus the darker accessible bottom edge,
+  including when a V8 `TextField` uses the V9 shim?
 - Does the chosen implementation preserve design-system semantics, accessibility, theming, and upgrade resilience?
 
 ## Examples
