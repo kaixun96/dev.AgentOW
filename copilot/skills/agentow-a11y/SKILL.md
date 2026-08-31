@@ -99,8 +99,8 @@ Do not dispatch the planner. Perform only bounded intake:
 
 The request must name required evidence types. Examples:
 
-- NVDA speech defect: screenshot + NVDA transcript + UI Automation/focus state.
-- Narrator-only defect: screenshot + Narrator ETW + UI Automation state.
+- NVDA speech defect: screenshot + NVDA transcript + UI Automation/focus state + genuine AFTER video.
+- Narrator-only defect: screenshot + Narrator ETW + UI Automation state + genuine AFTER video.
 - Unattended screen-reader recording: validated MP4 with real speech and visible focus, recording
   quality metrics, extracted focus frame, and the applicable NVDA transcript or Narrator ETW.
 - Voice Access defect: screenshot + result JSON + captured audio/volume evidence.
@@ -179,9 +179,12 @@ After strict reproduction PASS or entry into `unverified-fallback`:
 1. Trace the failing element/event to its implementation.
 2. Read the predecessor/native SPDS or Fluent implementation before hand-writing ARIA, focus,
    keyboard, live-region, or announcement behavior.
-3. Read directly applicable routed project instructions.
-4. Identify the smallest source change that addresses the reproduced behavior.
-5. Write a short implementation note, not a long general plan:
+3. For a heading change, capture the complete live heading outline and derive the target level from
+   verified parent and sibling headings. Never infer it from visual styling, a component name, or an
+   assumed hierarchy; missing surrounding context makes the conclusion inconclusive.
+4. Read directly applicable routed project instructions.
+5. Identify the smallest source change that addresses the reproduced behavior.
+6. Write a short implementation note, not a long general plan:
 
    ```markdown
    # A11y implementation note
@@ -225,6 +228,12 @@ Create `a11y/verify/evaluator-request.json` by copying the canonical reproductio
 Use the same environment route and evidence producer selected for reproduction to replay the
 scenario and write `evaluator-result.json`. Codespaces must not attempt host-only Windows AT
 locally; when no external bridge exists, retain the matching `skipped-environment` entries.
+For every screen-reader bug, strict PASS also requires an exact-HEAD continuous AFTER recording
+with synchronized real AT audio and visible focus/cursor movement. Transcript, ETW, AX/UIA,
+screenshots, and tests can support but never replace this recording.
+Reviewer annotations must not cover the pixels, border, focus indicator, text, or color being
+validated. Put callouts outside the target, use leader lines, and retain an unobstructed equal-scale
+target crop.
 Dispatch
 `@agentow-copilot:a11y-evaluator` with phase `verify`, the immutable baseline request/result paths,
 then run:
