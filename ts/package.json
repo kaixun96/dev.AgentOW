@@ -6,7 +6,7 @@
     "agentow": "./dist/ow/index.js"
   },
   "scripts": {
-    "build": "npm run validate-harness-contract && npm run validate-prompts && npm run validate-a11y && npm run validate-review-contract && npm run validate-graduation-review-contract && npm run validate-review-ledger && npm run validate-rule-inventory && npm run validate-class-sweep && npm run validate-prior-art && npm run validate-run-state && npm run validate-pr-description && tsup && npm run sync-artifacts",
+    "build": "npm run validate-harness-contract && npm run validate-prompts && npm run validate-a11y && npm run validate-review-contract && npm run validate-graduation-review-contract && npm run validate-review-ledger && npm run validate-rule-inventory && npm run validate-class-sweep && npm run validate-prior-art && npm run validate-run-state && npm run validate-run-insights && npm run validate-pr-description && tsup && npm run sync-artifacts",
     "validate-harness-contract": "node scripts/harness-contract.test.mjs && node scripts/validate-harness-contract.mjs",
     "validate-a11y": "node scripts/a11y-evidence.test.mjs",
     "sync-artifacts": "node scripts/sync-build-artifacts.mjs",
@@ -19,6 +19,7 @@
     "validate-prior-art": "node scripts/prior-art.test.mjs",
     "validate-pr-description": "node scripts/pr-description-budget.test.mjs",
     "validate-run-state": "node scripts/run-state.test.mjs",
+    "validate-run-insights": "node scripts/run-insights.test.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/ow/index.ts mcp"
   },

@@ -1191,6 +1191,36 @@ const checks = [
       "The developer may instead choose minimum surviving-behavior tests"
     ]
   },
+  {
+    file: "copilot/skills/agentow/SKILL.md",
+    snippets: [
+      "to build and display the local privacy-filtered report",
+      "AUTO/batch mode, build the report without asking and never share it automatically"
+    ]
+  },
+  {
+    file: "copilot/skills/ow-share-insights/SKILL.md",
+    snippets: [
+      "ask that one direct",
+      "`可以`, or `同意发送`",
+      "an earlier opt-in",
+      "consent. A clear direct reply",
+      "reuse",
+      "do not build or display the report again",
+      "If the report changed after consent",
+      "WorkIQ/Microsoft 365 mail MCP",
+      "call the WorkIQ action tool for `/me/sendMail`",
+      "must not trigger another login or EULA flow"
+    ]
+  },
+  {
+    file: "docs/run-insights.md",
+    snippets: [
+      "Nothing is shared without a direct user response",
+      "user-authored free text",
+      "Concurrent sends are rejected by an exclusive lock"
+    ]
+  },
 
 
 
@@ -1281,6 +1311,8 @@ const mirroredChecks = [
   ["docs/capability-bootstrap.md", "copilot/docs/capability-bootstrap.md"],
   ["docs/review-contract.md", "copilot/docs/review-contract.md"],
   ["docs/review-misses.md", "copilot/docs/review-misses.md"],
+  ["docs/run-insights.md", "copilot/docs/run-insights.md"],
+  ["contracts/run-insights.schema.json", "copilot/contracts/run-insights.schema.json"],
   ["skills/ow-review/references/accessibility.md", "copilot/skills/ow-review/references/accessibility.md"],
   ["skills/ow-review/references/common-review-issues.md", "copilot/skills/ow-review/references/common-review-issues.md"],
   ["skills/ow-review/references/graduation.md", "copilot/skills/ow-review/references/graduation.md"],

@@ -14,6 +14,8 @@ compacted, or continued after completion without being the only copy of run stat
   reconciliation never truncates the report.
 - `artifact-index.json`: content-hashed inventory rebuilt from files on disk.
 - `checkpoints/revision-*/`: mutable plan/review/final artifacts saved before a revision.
+- `insights/`: privacy-filtered operational report, consent receipt, optional email draft, and
+  delivery receipt. It is local by default and never contains source, prompts, raw logs, or paths.
 
 `report.json` remains the machine-readable execution report. The artifact reconciler adds an
 idempotent `artifact-reconciler` record for every discovered artifact. `progress.log` receives a
@@ -36,3 +38,14 @@ before the evaluator writes its final report event.
 per-phase durations in milliseconds. Active time excludes explicit user interruptions. Run
 `node tools/run-state.mjs timing <sessionDir>` for the compact machine-readable summary. Durable
 completion also writes a human-readable timing breakdown to `progress.log`.
+
+## Blockers and run insights
+
+Record a blocker when work first stops, every materially different recovery attempt, and its
+resolution or abandonment. These records use `blocker-opened`, `blocker-attempted`,
+`blocker-resolved`, and `blocker-abandoned` lifecycle events. They are paired by a unique
+`blockerId`; terminal events without an open event and events after a terminal event are rejected.
+
+`node tools/run-insights.mjs build <sessionDir>` combines these events with timing state into
+`insights/run-insights.v1.json` and `insights/run-insights.md`. Sharing requires a direct,
+digest-bound, one-run consent record. See [Run insights](run-insights.md).

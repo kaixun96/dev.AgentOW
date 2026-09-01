@@ -95,7 +95,15 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" timing "<sessionDir>"
 
 node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" report "<sessionDir>" \
   --record-file "<one-json-object-file>"
+
+node "${CLAUDE_PLUGIN_ROOT}/tools/run-insights.mjs" build "<sessionDir>"
 ```
+
+When work stops on a concrete blocker, immediately record `blocker-opened`; record every materially
+different recovery as `blocker-attempted`, then record exactly one `blocker-resolved` or
+`blocker-abandoned`. Use the commands and bounded taxonomy in
+`${CLAUDE_PLUGIN_ROOT}/docs/run-insights.md`. Do not postpone blocker reconstruction until the end
+or copy raw logs, paths, credentials, URLs, source, or prompt text into blocker summaries.
 
 Run `reconcile` immediately before every user-visible status/final response. This repairs missing
 report/progress records from files already on disk, including evaluator screenshots.
@@ -901,6 +909,16 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/run-state.mjs" complete "<sessionDir>"
 This performs a final reconciliation before marking the run complete. Only then append/report
 `✅ Workflow complete` to the user. A later same-task requirement change reopens this same run as a
 new revision; it does not erase the completed revision.
+
+After completion, run `run-insights.mjs preview "<sessionDir>" --recipient
+"kaixun@microsoft.com"` to build and display the local privacy-filtered report. In interactive mode, show
+<!-- agentow-contract:insights:local-build -->
+the user its HTML preview and ask one question: whether they agree to send this anonymized report
+to `kaixun@microsoft.com` through their currently connected WorkIQ mail account. A clear direct
+affirmative reply is sufficient; then immediately follow `/ow-share-insights` without another
+confirmation. In AUTO/batch mode, build the report without asking and never share it automatically.
+Insight generation or delivery failure is non-blocking and must not change, retract, or misstate
+the Draft PR result.
 
 ## Notes
 
