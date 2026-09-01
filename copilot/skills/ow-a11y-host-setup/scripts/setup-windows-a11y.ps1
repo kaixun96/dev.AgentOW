@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Probe', 'InstallSafeDependencies', 'StageVbCable', 'LaunchVbCableInstaller', 'OpenVoiceAccess')]
+    [ValidateSet('Probe', 'InstallSafeDependencies', 'StageVbCable', 'LaunchVbCableInstaller', 'OpenVoiceAccess', 'InstallConsoleTransferTask', 'RunConsoleTransfer')]
     [string]$Action,
 
     [string]$OutputPath
@@ -12,6 +12,7 @@ $vbCableUrl = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack4
 $vbCableSha256 = 'B950E39F01AF1D04EA623C8F6D8EB9B6EA5C477C637295FABF20631C85116BFB'
 $setupRoot = Join-Path $env:LOCALAPPDATA 'agentow\a11y-host'
 $vbCableRoot = Join-Path $setupRoot 'vb-cable-pack45'
+$consoleTaskName = 'AgentOW-A11Y-TransferToConsole'
 
 function Get-ExistingPath {
     param([string[]]$Candidates)
@@ -91,14 +92,72 @@ function Get-CommandInfo {
 }
 
 function Get-SessionType {
-    $sessionName = [string]$env:SESSIONNAME
-    if ($sessionName -eq 'Console') {
-        return 'Console'
-    }
-    if ($sessionName -match '^RDP-') {
-        return 'RDP'
+    $userName = [Environment]::UserName
+    $line = query.exe session 2>$null |
+        Where-Object { $_ -match "\b$([regex]::Escape($userName))\b" } |
+        Select-Object -First 1
+    if ($line) {
+        $tokens = @((($line -replace '^\s*>', '').Trim() -split '\s+') | Where-Object { $_ })
+        if ($tokens[0] -eq 'console') {
+            return 'Console'
+        }
+        if ($tokens[0] -match '^rdp-') {
+            return 'RDP'
+        }
     }
     return 'unknown'
+}
+
+function Get-ConsoleTransferScript {
+    return @'
+$ErrorActionPreference = 'Stop'
+$driver = Get-CimInstance Win32_SystemDriver -Filter "Name='VBAudioVACMME'"
+if (-not $driver) {
+    throw 'VBAudioVACMME driver was not found.'
+}
+if ($driver.State -ne 'Running') {
+    Start-Service VBAudioVACMME
+}
+foreach ($serviceName in 'AudioEndpointBuilder', 'Audiosrv') {
+    $service = Get-Service $serviceName
+    if ($service.Status -ne 'Running') {
+        Start-Service $serviceName
+    }
+}
+Start-Sleep -Seconds 5
+$sessionId = Get-Process explorer |
+    Where-Object SessionId -ne 0 |
+    Sort-Object StartTime -Descending |
+    Select-Object -First 1 -ExpandProperty SessionId
+if ($null -eq $sessionId) {
+    throw 'No interactive Explorer session was found.'
+}
+& "$env:WINDIR\System32\tscon.exe" $sessionId /dest:console
+if ($LASTEXITCODE -ne 0) {
+    throw "tscon failed with exit code $LASTEXITCODE."
+}
+'@
+}
+
+function Install-ConsoleTransferTask {
+    $taskScript = Get-ConsoleTransferScript
+    $encodedTask = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($taskScript))
+    $action = New-ScheduledTaskAction `
+        -Execute 'powershell.exe' `
+        -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encodedTask"
+    $principal = New-ScheduledTaskPrincipal `
+        -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) `
+        -LogonType Interactive `
+        -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew
+    Register-ScheduledTask `
+        -TaskName $consoleTaskName `
+        -Action $action `
+        -Principal $principal `
+        -Settings $settings `
+        -Description 'Prepares audio and transfers the interactive A11Y evaluator session to the console.' `
+        -Force |
+        Out-Null
 }
 
 function Get-AudioEndpoints {
@@ -412,5 +471,20 @@ switch ($Action) {
         Start-Process -FilePath $voiceAccess
         Start-Sleep -Seconds 3
         Write-Capabilities
+    }
+    'InstallConsoleTransferTask' {
+        Install-ConsoleTransferTask
+        Get-ScheduledTask -TaskName $consoleTaskName |
+            Select-Object TaskName, State, @{ Name = 'Principal'; Expression = { $_.Principal.UserId } },
+                @{ Name = 'LogonType'; Expression = { $_.Principal.LogonType } },
+                @{ Name = 'RunLevel'; Expression = { $_.Principal.RunLevel } }
+    }
+    'RunConsoleTransfer' {
+        $task = Get-ScheduledTask -TaskName $consoleTaskName -ErrorAction Stop
+        if ($task.Principal.LogonType -ne 'Interactive') {
+            throw "$consoleTaskName is not configured with InteractiveToken"
+        }
+        Start-ScheduledTask -TaskName $consoleTaskName
+        Write-Output "$consoleTaskName started. The RDP session will disconnect."
     }
 }

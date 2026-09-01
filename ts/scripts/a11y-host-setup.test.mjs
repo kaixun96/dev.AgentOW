@@ -26,6 +26,8 @@ for (const action of [
   "StageVbCable",
   "LaunchVbCableInstaller",
   "OpenVoiceAccess",
+  "InstallConsoleTransferTask",
+  "RunConsoleTransfer",
 ]) {
   assert.match(skill, new RegExp(`-Action ${action}\\b`));
   assert.match(script, new RegExp(`'${action}'`));
@@ -35,6 +37,9 @@ assert.match(script, /https:\/\/download\.vb-audio\.com\/Download_CABLE\/VBCABLE
 assert.match(script, /B950E39F01AF1D04EA623C8F6D8EB9B6EA5C477C637295FABF20631C85116BFB/);
 assert.match(script, /Get-AuthenticodeSignature/);
 assert.match(script, /CN=BUREL VINCENT/);
+assert.match(script, /-LogonType Interactive/);
+assert.match(script, /-EncodedCommand \$encodedTask/);
+assert.match(script, /Get-Process explorer/);
 assert.doesNotMatch(script, /Restart-Computer/);
 
 if (process.platform === "win32") {

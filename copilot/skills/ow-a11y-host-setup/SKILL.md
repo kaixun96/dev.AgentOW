@@ -70,7 +70,30 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
    the current language, first-run completion, consent, and model-update markers. A real Voice
    Access scenario must still prove recognition and captured audio.
 
-7. Re-run `Probe` after every restart or manual setup step. Report:
+7. Install the one-time Console transfer task when unattended recording or Voice Access evidence is
+   required:
+
+   ```powershell
+   $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$setup`" -Action InstallConsoleTransferTask"
+   Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList $arguments
+   ```
+
+   The task runs as the current interactive user with `InteractiveToken + Highest`. Its fixed
+   service-start and `tscon` logic is embedded in the protected task definition; it does not execute
+   a user-writable elevated script. The owner completes the one-time elevation.
+
+8. Before a real audio or desktop-capture run, invoke:
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
+     -Action RunConsoleTransfer
+   ```
+
+   The RDP client disconnects. Wait for the task to finish, then prove the session is Console,
+   capture a non-static MSS frame, and verify that PyAudioWPatch exposes `CABLE Input`,
+   `CABLE Output`, and the loopback endpoint.
+
+9. Re-run `Probe` after every restart or manual setup step. Report:
    - installed versions and command paths;
    - persisted VB-CABLE render/capture endpoints and whether the current session exposes them;
    - Voice Access executable and process state;
