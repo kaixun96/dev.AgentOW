@@ -480,6 +480,9 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
      `skills/ow-ref-replace-component/SKILL.md`. Select and record the migration shape, audit the
      old wrapper props and established shim behavior, preserve package dependency/lockfile
      discipline, and create Rush change files for affected publishable packages before push.
+     Every change file must originate from the repository-approved `rush change` command; never
+     manually create or hand-write `common/changes/**/*.json`. Edit only the generated file. A
+     failed or hanging generator is a blocker to repair or report, not permission to bypass it.
    - Do not implement rendered UI until the plan contains a grounded component-fit analysis.
      Confirm the selected component still satisfies every mapped requirement using its documented
      API and stable SPDS export. If source inspection changes the choice, update the matrix and
