@@ -13,7 +13,7 @@ const copilotMirrorFileSets = [
   {
     source: path.join(repoRoot, "tools"),
     destination: path.join(repoRoot, "copilot", "tools"),
-    predicate: (name) => name.endsWith(".mjs") || name === "package.json" || name === "package-lock.json",
+    predicate: (name) => name.endsWith(".mjs") || name.endsWith(".py") || name === "package.json" || name === "package-lock.json",
   },
 ];
 const copilotMirrorFiles = [

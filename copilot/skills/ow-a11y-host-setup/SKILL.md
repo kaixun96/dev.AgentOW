@@ -47,7 +47,28 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
    This installs NVDA, FFmpeg, AudioDeviceCmdlets, Python, Playwright, Chromium, MSS, and
    PyAudioWPatch only when missing.
 
-5. If the capability report does not contain both a VB-CABLE render endpoint (`CABLE Input`) and
+5. Install the compliant persistent evaluator browser:
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
+     -Action InstallPersonalEvaluatorBrowser -OutputPath $capabilities
+   ```
+
+   While connected to the Windows desktop, bootstrap its dedicated profile once:
+
+   ```powershell
+   $env:PERSONAL_EVALUATOR_OWNER_EMAIL = '<owner-email>'
+   $python = (Get-Content $capabilities -Raw | ConvertFrom-Json).prerequisites.python.path
+   $evaluator = (Get-Content $capabilities -Raw | ConvertFrom-Json).prerequisites.personalEvaluatorBrowser.scriptPath
+   & $python $evaluator bootstrap --timeout-minutes 30
+   Remove-Item Env:\PERSONAL_EVALUATOR_OWNER_EMAIL
+   ```
+
+   The email stays process-local. The owner completes any password, Windows Hello, MFA, certificate,
+   or consent prompt. Before each evaluator run, use `-Action CheckPersonalEvaluatorBrowser`; an
+   authenticated result is required for the personal-profile route.
+
+6. If the capability report does not contain both a VB-CABLE render endpoint (`CABLE Input`) and
    capture endpoint (`CABLE Output`), stage the fixed official package:
 
    ```powershell
@@ -67,7 +88,7 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
    restart. Do not claim the driver is ready until the host has restarted and both endpoints pass a
    new probe.
 
-6. If Voice Access has not completed first-run language setup, open it:
+7. If Voice Access has not completed first-run language setup, open it:
 
    ```powershell
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
@@ -76,9 +97,11 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
 
    The owner selects the required language and completes **Agree and continue**. The probe records
    the current language, first-run completion, consent, and model-update markers. A real Voice
-   Access scenario must still prove recognition and captured audio.
+   Access scenario must still prove recognition and captured audio. In Voice Access settings, select
+   `CABLE Output (VB-Audio Virtual Cable)` as the microphone. The Voice Access scenario is not ready
+   until the probe confirms that exact capture endpoint.
 
-7. Install the one-time Console transfer task when unattended recording or Voice Access evidence is
+8. Install the one-time Console transfer task when unattended recording or Voice Access evidence is
    required:
 
    ```powershell
@@ -90,20 +113,30 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
    service-start and `tscon` logic is embedded in the protected task definition; it does not execute
    a user-writable elevated script. The owner completes the one-time elevation.
 
-8. Before a real audio or desktop-capture run, invoke:
+9. Before a real audio or desktop-capture run, invoke:
 
    ```powershell
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
      -Action RunConsoleTransfer
    ```
 
-   The RDP client disconnects. Wait for the task to finish, then prove the session is Console,
-   capture a non-static MSS frame, and verify that PyAudioWPatch exposes `CABLE Input`,
-   `CABLE Output`, and the loopback endpoint.
+   The RDP client disconnects. The command waits for the task's final result and fails if the
+   transfer did not complete.
 
-9. Re-run `Probe` after every restart or manual setup step. Report:
+10. Run the deterministic host validation after the session becomes Console:
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
+     -Action ValidateHost -OutputPath ".aero\ow-a11y-host-setup-<timestamp>\validation.json"
+   ```
+
+   This captures a composed desktop frame and requires non-zero image variance, then plays a fixed
+   tone into `CABLE Input`, records `CABLE Output`, and requires non-silent RMS and peak values.
+
+11. Re-run `Probe` after every restart or manual setup step. Report:
    - installed versions and command paths;
    - persisted VB-CABLE render/capture endpoints and whether the current session exposes them;
+   - personal evaluator script/profile presence and authentication check result;
    - Voice Access executable and process state;
    - session type (`Console`, `RDP`, or unknown);
    - which scenario groups are ready;

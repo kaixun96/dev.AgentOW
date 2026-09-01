@@ -14,6 +14,8 @@ setup below incorporates Jimu team guidance and the ADO `odsp-automation-test-to
 
 1. Confirm the current host is Windows and record whether the session is `Console` or RDP.
 2. Confirm Microsoft Edge and the commands required by the selected procedure are available.
+   For authenticated SharePoint browser evidence, install and check the dedicated personal evaluator
+   profile through `/ow-a11y-host-setup`; never copy a normal Edge/Chrome cookie database.
 3. Select only the AT required by the bug. Never run NVDA and Narrator simultaneously.
 4. Check the required commands, devices, language packs, elevation, browser login, and evidence
    output directory before launching AT.
@@ -25,8 +27,8 @@ setup below incorporates Jimu team guidance and the ADO `odsp-automation-test-to
 ## Safe scriptable installation
 
 Use `/ow-a11y-host-setup` for one-time Windows evaluator provisioning. It installs the scriptable
-dependencies, stages the pinned signed VB-CABLE package, opens the vendor installer, opens Voice
-Access first-run setup, and writes a capability report.
+dependencies and dedicated personal evaluator browser, stages the pinned signed VB-CABLE package,
+opens the vendor installer, opens Voice Access first-run setup, and writes a capability report.
 
 Install a missing dependency only when the selected scenario needs it:
 

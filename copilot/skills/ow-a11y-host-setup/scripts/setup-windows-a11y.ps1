@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Probe', 'InstallSafeDependencies', 'StageVbCable', 'LaunchVbCableInstaller', 'OpenVoiceAccess', 'InstallConsoleTransferTask', 'RunConsoleTransfer')]
+    [ValidateSet('Probe', 'InstallSafeDependencies', 'InstallPersonalEvaluatorBrowser', 'CheckPersonalEvaluatorBrowser', 'StageVbCable', 'LaunchVbCableInstaller', 'OpenVoiceAccess', 'InstallConsoleTransferTask', 'RunConsoleTransfer', 'ValidateHost')]
     [string]$Action,
 
     [string]$OutputPath
@@ -13,6 +13,12 @@ $vbCableSha256 = 'B950E39F01AF1D04EA623C8F6D8EB9B6EA5C477C637295FABF20631C85116B
 $setupRoot = Join-Path $env:LOCALAPPDATA 'agentow\a11y-host'
 $vbCableRoot = Join-Path $setupRoot 'vb-cable-pack45'
 $consoleTaskName = 'AgentOW-A11Y-TransferToConsole'
+$personalEvaluatorSources = @(
+    (Join-Path $PSScriptRoot '..\..\..\tools\personal-evaluator-browser.py'),
+    (Join-Path $PSScriptRoot '..\..\..\..\tools\personal-evaluator-browser.py')
+)
+$personalEvaluatorPath = Join-Path $setupRoot 'personal-evaluator-browser.py'
+$personalEvaluatorProfile = Join-Path $HOME '.playwright\personal-evaluator-profile'
 
 if ($env:CODESPACES -eq 'true' -or -not [string]::IsNullOrWhiteSpace($env:CODESPACE_NAME)) {
     throw '/ow-a11y-host-setup is not supported in a Codespace. Run it on the Windows evaluator host.'
@@ -168,6 +174,63 @@ function Install-ConsoleTransferTask {
         Out-Null
 }
 
+function Get-ConsoleTransferState {
+    $task = Get-ScheduledTask -TaskName $consoleTaskName -ErrorAction SilentlyContinue
+    if (-not $task) {
+        return [ordered]@{
+            installed = $false
+            state = $null
+            lastRunTime = $null
+            lastTaskResult = $null
+        }
+    }
+
+    $info = Get-ScheduledTaskInfo -TaskName $consoleTaskName
+    return [ordered]@{
+        installed = $true
+        state = [string]$task.State
+        lastRunTime = if ($info.LastRunTime.Year -gt 2000) {
+            $info.LastRunTime.ToUniversalTime().ToString('o')
+        } else {
+            $null
+        }
+        lastTaskResult = [int]$info.LastTaskResult
+    }
+}
+
+function Get-PersonalEvaluatorState {
+    return [ordered]@{
+        installed = Test-Path -LiteralPath $personalEvaluatorPath
+        scriptPath = $personalEvaluatorPath
+        profileExists = Test-Path -LiteralPath $personalEvaluatorProfile
+        profilePath = $personalEvaluatorProfile
+    }
+}
+
+function Install-PersonalEvaluatorBrowser {
+    $source = Get-ExistingPath $personalEvaluatorSources
+    if (-not $source) {
+        throw "Personal evaluator source was not found at: $($personalEvaluatorSources -join ', ')"
+    }
+    New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null
+    Copy-Item -LiteralPath $source -Destination $personalEvaluatorPath -Force
+    Write-Output $personalEvaluatorPath
+}
+
+function Check-PersonalEvaluatorBrowser {
+    if (-not (Test-Path -LiteralPath $personalEvaluatorPath)) {
+        throw 'InstallPersonalEvaluatorBrowser must run before CheckPersonalEvaluatorBrowser'
+    }
+    $python = Get-PythonPath
+    if (-not $python) {
+        throw 'Python is required for the personal evaluator browser'
+    }
+    & $python $personalEvaluatorPath check
+    if ($LASTEXITCODE -ne 0) {
+        throw "Personal evaluator browser authentication check failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Get-AudioEndpoints {
     $devices = @(Get-PnpDevice -Class AudioEndpoint -PresentOnly -ErrorAction SilentlyContinue)
     return @($devices | ForEach-Object {
@@ -205,7 +268,77 @@ function Get-PersistedAudioEndpoints {
     return @($endpoints)
 }
 
+function Get-NvdaSpeechViewerState {
+    $iniPath = Join-Path $env:APPDATA 'nvda\nvda.ini'
+    if (-not (Test-Path -LiteralPath $iniPath)) {
+        return [ordered]@{ configured = $false; path = $iniPath }
+    }
+
+    $content = Get-Content -LiteralPath $iniPath -Raw
+    $configured = $content -match '(?ims)^\[speechViewer\]\s*$.*?^\s*showSpeechViewerAtStartup\s*=\s*True\s*$'
+    return [ordered]@{ configured = [bool]$configured; path = $iniPath }
+}
+
+function Set-NvdaSpeechViewer {
+    $state = Get-NvdaSpeechViewerState
+    if ($state.configured) {
+        return
+    }
+
+    $iniPath = $state.path
+    $parent = Split-Path -Parent $iniPath
+    New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    $lines = if (Test-Path -LiteralPath $iniPath) {
+        @(Get-Content -LiteralPath $iniPath)
+    } else {
+        @()
+    }
+    $sectionIndex = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i].Trim() -eq '[speechViewer]') {
+            $sectionIndex = $i
+            break
+        }
+    }
+    if ($sectionIndex -lt 0) {
+        if ($lines.Count -gt 0 -and $lines[-1].Trim()) {
+            $lines += ''
+        }
+        $lines += '[speechViewer]'
+        $lines += 'showSpeechViewerAtStartup = True'
+    } else {
+        $sectionEnd = $lines.Count
+        for ($i = $sectionIndex + 1; $i -lt $lines.Count; $i++) {
+            if ($lines[$i].Trim() -match '^\[.+\]$') {
+                $sectionEnd = $i
+                break
+            }
+        }
+        $keyIndex = -1
+        for ($i = $sectionIndex + 1; $i -lt $sectionEnd; $i++) {
+            if ($lines[$i] -match '^\s*showSpeechViewerAtStartup\s*=') {
+                $keyIndex = $i
+                break
+            }
+        }
+        if ($keyIndex -ge 0) {
+            $lines[$keyIndex] = 'showSpeechViewerAtStartup = True'
+        } else {
+            $before = @($lines[0..$sectionIndex])
+            $after = if ($sectionIndex + 1 -lt $lines.Count) {
+                @($lines[($sectionIndex + 1)..($lines.Count - 1)])
+            } else {
+                @()
+            }
+            $lines = @($before + 'showSpeechViewerAtStartup = True' + $after)
+        }
+    }
+    Set-Content -LiteralPath $iniPath -Value $lines -Encoding UTF8
+}
+
 function Get-VoiceAccessState {
+    param([object[]]$CableCaptureEndpoints)
+
     $voiceAccessPath = Join-Path $env:WINDIR 'System32\VoiceAccess.exe'
     $settingsPath = 'HKCU:\Software\Microsoft\VoiceAccess'
     $speechPath = Join-Path $settingsPath 'SpeechToText'
@@ -222,6 +355,10 @@ function Get-VoiceAccessState {
     $firstRunCompleted = $settings -and [int]$settings.FirstRunCompleted -eq 1
     $consentCompleted = $settings -and [int]$settings.VoiceAccessUserConsent -eq 1
     $modelsUpdated = $speech -and [int]$speech.AreModelsUpdated -gt 0
+    $microphoneId = if ($settings) { [string]$settings.VoiceAccessMicrophoneId } else { $null }
+    $microphoneReady = @($CableCaptureEndpoints | Where-Object {
+        $microphoneId -and $microphoneId.IndexOf($_.id, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    }).Count -gt 0
 
     return [ordered]@{
         available = Test-Path -LiteralPath $voiceAccessPath
@@ -230,6 +367,8 @@ function Get-VoiceAccessState {
         currentLanguage = if ($settings) { [string]$settings.CurrentLanguage } else { $null }
         firstRunCompleted = [bool]$firstRunCompleted
         consentCompleted = [bool]$consentCompleted
+        microphoneId = $microphoneId
+        microphoneReady = [bool]$microphoneReady
         languageModel = if ($firstRunCompleted -and $consentCompleted -and $modelsUpdated) {
             'ready'
         } else {
@@ -286,6 +425,7 @@ function Get-Capabilities {
             available = [bool]$nvda
             path = $nvda
             version = if ($nvda) { [string](Get-Item -LiteralPath $nvda).VersionInfo.ProductVersion } else { $null }
+            speechViewer = Get-NvdaSpeechViewerState
         }
         ffmpeg = $ffmpeg
         audioDeviceCmdlets = [ordered]@{
@@ -301,7 +441,8 @@ function Get-Capabilities {
         }
         windowsPerformanceRecorder = $wpr
         windowsPerformanceAnalyzer = $wpa
-        voiceAccess = Get-VoiceAccessState
+        personalEvaluatorBrowser = Get-PersonalEvaluatorState
+        voiceAccess = Get-VoiceAccessState $cableOutput
         vbCable = [ordered]@{
             renderEndpointReady = $cableInput.Count -gt 0
             captureEndpointReady = $cableOutput.Count -gt 0
@@ -312,6 +453,7 @@ function Get-Capabilities {
         session = [ordered]@{
             type = $sessionType
             persistentConsoleReady = $sessionType -eq 'Console'
+            consoleTransfer = Get-ConsoleTransferState
         }
     }
 
@@ -328,8 +470,10 @@ function Get-Capabilities {
         host = 'windows'
         prerequisites = $prerequisites
         scenarios = [ordered]@{
-            browserKeyboard = [bool]$prerequisites.edge.available
-            nvda = [bool]($prerequisites.edge.available -and $prerequisites.nvda.available)
+            browserKeyboard = [bool]($prerequisites.edge.available -and
+                $prerequisites.personalEvaluatorBrowser.installed)
+            nvda = [bool]($prerequisites.edge.available -and $prerequisites.nvda.available -and
+                $prerequisites.nvda.speechViewer.configured)
             narratorEtw = [bool]($prerequisites.edge.available -and
                 $prerequisites.windowsPerformanceRecorder.available -and
                 $prerequisites.windowsPerformanceAnalyzer.available)
@@ -337,6 +481,7 @@ function Get-Capabilities {
                 $vbCableReady -and $prerequisites.session.persistentConsoleReady)
             voiceAccess = [bool]($prerequisites.voiceAccess.available -and
                 $prerequisites.voiceAccess.languageModel -eq 'ready' -and
+                $prerequisites.voiceAccess.microphoneReady -and
                 $prerequisites.audioDeviceCmdlets.available -and $ffmpeg.available -and
                 $vbCableReady -and $prerequisites.session.persistentConsoleReady)
         }
@@ -412,6 +557,7 @@ function Install-SafeDependencies {
         throw 'Python installation completed but python.exe was not found'
     }
 
+    Set-NvdaSpeechViewer
     & $python -m pip install --disable-pip-version-check playwright mss PyAudioWPatch
     if ($LASTEXITCODE -ne 0) {
         throw "Python dependency installation failed with exit code $LASTEXITCODE"
@@ -450,6 +596,169 @@ function Stage-VbCable {
     return $installer
 }
 
+function Invoke-HostValidation {
+    if ((Get-SessionType) -ne 'Console') {
+        throw 'Host validation requires an active Console session'
+    }
+    $python = Get-PythonPath
+    if (-not $python) {
+        throw 'Python is required for host validation'
+    }
+
+    $validationScript = @'
+import json
+import math
+import statistics
+import struct
+import threading
+import time
+import mss
+import pyaudiowpatch as pyaudio
+
+result = {"schemaVersion": 1}
+with mss.MSS() as capture:
+    monitor = capture.monitors[0]
+    frame = capture.grab(monitor)
+    sample = bytes(frame.rgb)[::97]
+    result["screen"] = {
+        "width": frame.width,
+        "height": frame.height,
+        "mean": round(statistics.fmean(sample), 2),
+        "std": round(statistics.pstdev(sample), 2),
+    }
+
+channels = 2
+audio = pyaudio.PyAudio()
+try:
+    devices = [audio.get_device_info_by_index(i) for i in range(audio.get_device_count())]
+    outputs = [
+        (i, d) for i, d in enumerate(devices)
+        if d["name"].startswith("CABLE Input")
+        and d["maxOutputChannels"] >= channels
+        and not d.get("isLoopbackDevice", False)
+    ]
+    inputs = [
+        (i, d) for i, d in enumerate(devices)
+        if d["name"].startswith("CABLE Output") and d["maxInputChannels"] >= channels
+    ]
+    outputs.sort(key=lambda pair: pair[1]["hostApi"] != 2)
+    inputs.sort(key=lambda pair: pair[1]["hostApi"] != 2)
+    if not outputs or not inputs:
+        raise RuntimeError("CABLE Input/Output devices are not available to PyAudio")
+    output_index, output_device = outputs[0]
+    input_index, input_device = inputs[0]
+    candidate_rates = []
+    for candidate in (
+        output_device.get("defaultSampleRate"),
+        input_device.get("defaultSampleRate"),
+        48000,
+        44100,
+    ):
+        rate = int(candidate)
+        if rate not in candidate_rates:
+            candidate_rates.append(rate)
+    rate = None
+    for candidate in candidate_rates:
+        try:
+            audio.is_format_supported(
+                candidate,
+                output_device=output_index,
+                output_channels=channels,
+                output_format=pyaudio.paInt16,
+            )
+            audio.is_format_supported(
+                candidate,
+                input_device=input_index,
+                input_channels=channels,
+                input_format=pyaudio.paInt16,
+            )
+            rate = candidate
+            break
+        except ValueError:
+            continue
+    if rate is None:
+        raise RuntimeError("CABLE Input/Output do not share a supported sample rate")
+    play_frames = rate
+    capture_frames = int(rate * 1.5)
+    captured = []
+
+    def record():
+        stream = audio.open(
+            format=pyaudio.paInt16,
+            channels=channels,
+            rate=rate,
+            input=True,
+            input_device_index=input_index,
+            frames_per_buffer=1024,
+        )
+        try:
+            remaining = capture_frames
+            while remaining > 0:
+                count = min(1024, remaining)
+                captured.append(stream.read(count, exception_on_overflow=False))
+                remaining -= count
+        finally:
+            stream.close()
+
+    recorder = threading.Thread(target=record)
+    recorder.start()
+    time.sleep(0.2)
+    stream = audio.open(
+        format=pyaudio.paInt16,
+        channels=channels,
+        rate=rate,
+        output=True,
+        output_device_index=output_index,
+        frames_per_buffer=1024,
+    )
+    try:
+        sent = 0
+        while sent < play_frames:
+            count = min(1024, play_frames - sent)
+            data = bytearray()
+            for offset in range(count):
+                value = int(12000 * math.sin(2 * math.pi * 1000 * (sent + offset) / rate))
+                data.extend(struct.pack("<hh", value, value))
+            stream.write(bytes(data))
+            sent += count
+    finally:
+        stream.close()
+    recorder.join(timeout=5)
+    if recorder.is_alive():
+        raise RuntimeError("Audio capture did not complete")
+    raw = b"".join(captured)
+    values = struct.unpack("<" + "h" * (len(raw) // 2), raw)
+    rms = math.sqrt(sum(value * value for value in values) / max(1, len(values)))
+    peak = max(abs(value) for value in values) if values else 0
+    result["audio"] = {
+        "rms": round(rms, 2),
+        "peak": peak,
+        "sampleRate": rate,
+        "capturedSamples": len(values),
+        "outputDevice": output_device["name"],
+        "inputDevice": input_device["name"],
+    }
+finally:
+    audio.terminate()
+
+result["passed"] = (
+    result["screen"]["std"] > 1
+    and result["audio"]["rms"] > 500
+    and result["audio"]["peak"] > 1000
+)
+print(json.dumps(result))
+'@
+    $output = $validationScript | & $python -
+    if ($LASTEXITCODE -ne 0) {
+        throw "Host validation failed with exit code $LASTEXITCODE"
+    }
+    $result = $output | Select-Object -Last 1 | ConvertFrom-Json
+    if (-not $result.passed) {
+        throw "Host validation did not meet image variance or audio thresholds: $output"
+    }
+    return $result
+}
+
 switch ($Action) {
     'Probe' {
         Write-Capabilities
@@ -457,6 +766,13 @@ switch ($Action) {
     'InstallSafeDependencies' {
         Install-SafeDependencies
         Write-Capabilities
+    }
+    'InstallPersonalEvaluatorBrowser' {
+        Install-PersonalEvaluatorBrowser
+        Write-Capabilities
+    }
+    'CheckPersonalEvaluatorBrowser' {
+        Check-PersonalEvaluatorBrowser
     }
     'StageVbCable' {
         Write-Output (Stage-VbCable)
@@ -488,7 +804,39 @@ switch ($Action) {
         if ($task.Principal.LogonType -ne 'Interactive') {
             throw "$consoleTaskName is not configured with InteractiveToken"
         }
+        $before = Get-ScheduledTaskInfo -TaskName $consoleTaskName
         Start-ScheduledTask -TaskName $consoleTaskName
-        Write-Output "$consoleTaskName started. The RDP session will disconnect."
+        $deadline = (Get-Date).AddSeconds(90)
+        do {
+            Start-Sleep -Seconds 2
+            $currentTask = Get-ScheduledTask -TaskName $consoleTaskName
+            $currentInfo = Get-ScheduledTaskInfo -TaskName $consoleTaskName
+            $newRunStarted = $currentInfo.LastRunTime -gt $before.LastRunTime
+        } while (
+            (Get-Date) -lt $deadline -and
+            (-not $newRunStarted -or $currentTask.State -eq 'Running')
+        )
+        if (-not $newRunStarted) {
+            throw "$consoleTaskName did not start within 90 seconds"
+        }
+        if ($currentTask.State -eq 'Running') {
+            throw "$consoleTaskName did not finish within 90 seconds"
+        }
+        if ($currentInfo.LastTaskResult -ne 0) {
+            throw "$consoleTaskName failed with result $($currentInfo.LastTaskResult)"
+        }
+        Write-Output "$consoleTaskName completed successfully."
+    }
+    'ValidateHost' {
+        $validation = Invoke-HostValidation
+        $json = $validation | ConvertTo-Json -Depth 5
+        if ($OutputPath) {
+            $parent = Split-Path -Parent $OutputPath
+            if ($parent) {
+                New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            }
+            Set-Content -LiteralPath $OutputPath -Value $json -Encoding UTF8
+        }
+        Write-Output $json
     }
 }

@@ -23,11 +23,14 @@ const script = fs.readFileSync(scriptPath, "utf8");
 for (const action of [
   "Probe",
   "InstallSafeDependencies",
+  "InstallPersonalEvaluatorBrowser",
+  "CheckPersonalEvaluatorBrowser",
   "StageVbCable",
   "LaunchVbCableInstaller",
   "OpenVoiceAccess",
   "InstallConsoleTransferTask",
   "RunConsoleTransfer",
+  "ValidateHost",
 ]) {
   assert.match(skill, new RegExp(`-Action ${action}\\b`));
   assert.match(script, new RegExp(`'${action}'`));
@@ -43,6 +46,16 @@ assert.match(skill, /not supported in a Codespace/);
 assert.match(script, /-LogonType Interactive/);
 assert.match(script, /-EncodedCommand \$encodedTask/);
 assert.match(script, /Get-Process explorer/);
+assert.match(script, /showSpeechViewerAtStartup = True/);
+assert.match(script, /VoiceAccessMicrophoneId/);
+assert.match(script, /personal-evaluator-browser\.py/);
+assert.match(skill, /PERSONAL_EVALUATOR_OWNER_EMAIL/);
+assert.match(script, /Audio capture did not complete/);
+assert.match(script, /audio\.is_format_supported/);
+assert.match(script, /do not share a supported sample rate/);
+assert.match(script, /result\["screen"\]\["std"\] > 1/);
+assert.match(script, /result\["audio"\]\["rms"\] > 500/);
+assert.match(script, /LastTaskResult -ne 0/);
 assert.doesNotMatch(script, /Restart-Computer/);
 
 if (process.platform === "win32") {
