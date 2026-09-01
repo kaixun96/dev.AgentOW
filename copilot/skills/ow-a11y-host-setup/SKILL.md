@@ -72,7 +72,7 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
 
 7. Re-run `Probe` after every restart or manual setup step. Report:
    - installed versions and command paths;
-   - VB-CABLE render/capture endpoint presence;
+   - persisted VB-CABLE render/capture endpoints and whether the current session exposes them;
    - Voice Access executable and process state;
    - session type (`Console`, `RDP`, or unknown);
    - which scenario groups are ready;

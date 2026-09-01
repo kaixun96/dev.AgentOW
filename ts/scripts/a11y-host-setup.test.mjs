@@ -59,6 +59,7 @@ if (process.platform === "win32") {
     assert.equal(capability.schemaVersion, 1);
     assert.equal(capability.host, "windows");
     assert.equal(typeof capability.scenarios.browserKeyboard, "boolean");
+    assert.equal(typeof capability.prerequisites.vbCable.currentSessionAvailable, "boolean");
     assert.match(capability.prerequisites.voiceAccess.languageModel, /^(ready|setup-required)$/);
   } finally {
     fs.rmSync(outputPath, { force: true });

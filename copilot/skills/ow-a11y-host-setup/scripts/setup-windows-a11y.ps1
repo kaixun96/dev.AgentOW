@@ -112,6 +112,32 @@ function Get-AudioEndpoints {
     })
 }
 
+function Get-PersistedAudioEndpoints {
+    $roots = [ordered]@{
+        Render = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render'
+        Capture = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture'
+    }
+    $endpoints = @()
+    foreach ($entry in $roots.GetEnumerator()) {
+        if (-not (Test-Path -LiteralPath $entry.Value)) {
+            continue
+        }
+        foreach ($endpoint in Get-ChildItem -LiteralPath $entry.Value) {
+            $device = Get-ItemProperty -LiteralPath $endpoint.PSPath
+            $properties = Get-ItemProperty `
+                -LiteralPath (Join-Path $endpoint.PSPath 'Properties') `
+                -ErrorAction SilentlyContinue
+            $endpoints += [ordered]@{
+                type = $entry.Key
+                name = [string]$properties.'{a45c254e-df1c-4efd-8020-67d146a850e0},2'
+                state = [int]$device.DeviceState
+                id = $endpoint.PSChildName
+            }
+        }
+    }
+    return @($endpoints)
+}
+
 function Get-VoiceAccessState {
     $voiceAccessPath = Join-Path $env:WINDIR 'System32\VoiceAccess.exe'
     $settingsPath = 'HKCU:\Software\Microsoft\VoiceAccess'
@@ -128,7 +154,7 @@ function Get-VoiceAccessState {
     }
     $firstRunCompleted = $settings -and [int]$settings.FirstRunCompleted -eq 1
     $consentCompleted = $settings -and [int]$settings.VoiceAccessUserConsent -eq 1
-    $modelsUpdated = $speech -and [int]$speech.AreModelsUpdated -eq 1
+    $modelsUpdated = $speech -and [int]$speech.AreModelsUpdated -gt 0
 
     return [ordered]@{
         available = Test-Path -LiteralPath $voiceAccessPath
@@ -156,8 +182,12 @@ function Get-Capabilities {
         (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe')
     )
     $audioEndpoints = @(Get-AudioEndpoints)
-    $cableInput = @($audioEndpoints | Where-Object { $_.name -match 'CABLE Input' })
-    $cableOutput = @($audioEndpoints | Where-Object { $_.name -match 'CABLE Output' })
+    $persistedAudioEndpoints = @(Get-PersistedAudioEndpoints)
+    $cableInput = @($persistedAudioEndpoints |
+        Where-Object { $_.type -eq 'Render' -and $_.name -match '^CABLE Input' -and $_.state -eq 1 })
+    $cableOutput = @($persistedAudioEndpoints |
+        Where-Object { $_.type -eq 'Capture' -and $_.name -match '^CABLE Output' -and $_.state -eq 1 })
+    $activeCableEndpoints = @($audioEndpoints | Where-Object { $_.name -match '^CABLE (Input|Output)' })
     $audioModule = Get-Module -ListAvailable AudioDeviceCmdlets |
         Sort-Object Version -Descending |
         Select-Object -First 1
@@ -208,7 +238,9 @@ function Get-Capabilities {
         vbCable = [ordered]@{
             renderEndpointReady = $cableInput.Count -gt 0
             captureEndpointReady = $cableOutput.Count -gt 0
-            endpoints = $audioEndpoints
+            currentSessionAvailable = $activeCableEndpoints.Count -ge 2
+            persistedEndpoints = $persistedAudioEndpoints
+            currentSessionEndpoints = $audioEndpoints
         }
         session = [ordered]@{
             type = $sessionType
@@ -220,7 +252,8 @@ function Get-Capabilities {
         $prerequisites.python.mss -and
         $prerequisites.python.pyAudioWPatch
     $vbCableReady = $prerequisites.vbCable.renderEndpointReady -and
-        $prerequisites.vbCable.captureEndpointReady
+        $prerequisites.vbCable.captureEndpointReady -and
+        $prerequisites.vbCable.currentSessionAvailable
 
     return [ordered]@{
         schemaVersion = 1
