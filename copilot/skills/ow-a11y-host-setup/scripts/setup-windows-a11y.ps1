@@ -14,6 +14,14 @@ $setupRoot = Join-Path $env:LOCALAPPDATA 'agentow\a11y-host'
 $vbCableRoot = Join-Path $setupRoot 'vb-cable-pack45'
 $consoleTaskName = 'AgentOW-A11Y-TransferToConsole'
 
+if ($env:CODESPACES -eq 'true' -or -not [string]::IsNullOrWhiteSpace($env:CODESPACE_NAME)) {
+    throw '/ow-a11y-host-setup is not supported in a Codespace. Run it on the Windows evaluator host.'
+}
+
+if ($env:OS -ne 'Windows_NT') {
+    throw 'ow-a11y-host-setup must run on the Windows evaluator host'
+}
+
 function Get-ExistingPath {
     param([string[]]$Candidates)
 
@@ -440,10 +448,6 @@ function Stage-VbCable {
     }
 
     return $installer
-}
-
-if ($env:OS -ne 'Windows_NT') {
-    throw 'ow-a11y-host-setup must run on Windows'
 }
 
 switch ($Action) {

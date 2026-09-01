@@ -14,7 +14,15 @@ The setup script is:
 $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-a11y.ps1"
 ```
 
-1. Confirm the current host is Windows. Otherwise stop and report that this setup must run on the
+1. Detect the execution environment before doing anything else. If `CODESPACES == "true"` or
+   `CODESPACE_NAME` is non-empty, stop the entire setup and tell the user:
+
+   ```text
+   /ow-a11y-host-setup is not supported in a Codespace. Run it on the Windows evaluator host.
+   ```
+
+   Do not probe, install packages, download VB-CABLE, open Voice Access, or trigger elevation in a
+   Codespace. For every other non-Windows host, stop and report that this setup must run on the
    Windows evaluator host.
 2. Create `.aero/ow-a11y-host-setup-<timestamp>/` and set:
 
