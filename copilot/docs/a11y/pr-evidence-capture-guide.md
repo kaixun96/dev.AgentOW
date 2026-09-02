@@ -2,6 +2,7 @@
 
 本文是 agentOW A11y bug 修复中制作、验收和发布 PR 视觉/时序证据的**唯一规范性指南**。
 `agentow-a11y` 定义端到端流程；凡涉及截图、录屏、音频、标注和 PR 附件，必须以本文为准。
+Before creating or updating any A11y PR description, the operator must read this guide and complete every applicable item in the final publication checklist.
 其他笔记、历史 PR 或工具默认行为与本文冲突时，以本文为准。
 
 ## 1. 目标
@@ -243,7 +244,85 @@ AFTER 必须绑定实际 PR HEAD：
 BEFORE 使用 canonical target/deployed baseline；只有该改动本身引入 flight/KS 且 OFF 精确等于
 pre-change path 时，才可用同一 changed build 的 OFF/ON 作为 BEFORE/AFTER。
 
-## 10. PR 媒体制作与发布
+## 10. PR description, media production, and publication
+
+### 10.1 Required PR description structure
+
+An A11y PR description must be a reviewer-safe, self-contained deliverable. It must not depend on
+chat history, verbal explanations from the author, local artifacts, or PR comment threads. Whenever
+the description is created or updated, re-check it against the current bug, actual diff, killswitch,
+validation results, and final evidence artifacts. Do not copy an old PR and replace only its title.
+
+Include every applicable section in this order:
+
+1. **Summary**: State the user-visible defect and the result of the fix in one sentence.
+2. **Bug / acceptance criteria**: Link the bug and state the reasonable expected behavior,
+   applicable WCAG or product requirement, and canonical scenario. A work item ID alone is not
+   sufficient.
+3. **Change**: Describe the minimal behavioral change, adjacent behavior that remains unchanged,
+   and boundaries reviewers should examine.
+4. **Killswitch**: List the KS name and owner, the original path restored when OFF, and the ON/OFF
+   validation results.
+5. **Validation**: List the targeted tests, build/typecheck, and real browser/AT validation that
+   actually ran. Do not claim an unexecuted command passed.
+6. **Evidence**: Embed the final reviewer media and observable conclusions in the order defined
+   below.
+7. **Exact-HEAD provenance**: List the PR HEAD, AFTER build selector, affected-resource proof,
+   evidence run ID, and manifest/hash binding. Identify BEFORE explicitly as the canonical
+   deployed/target baseline.
+8. **Limitations**: Include only boundaries that the media genuinely cannot prove but that do not
+   affect acceptance. Do not present anything that makes the evidence invalid, inconclusive, or
+   blocked as a limitation.
+
+For any section that does not apply, write `N/A` and explain why instead of silently removing it.
+The final description must not contain `TODO`, `TBD`, local paths, temporary URLs, stale runs,
+failed evidence, debug instructions, or author-facing working notes.
+
+Use the following skeleton. Headings may follow repository conventions, but the information and
+ordering must remain intact:
+
+```markdown
+## Summary
+...
+
+## Bug and acceptance criteria
+- Bug: ...
+- Expected behavior / requirement: ...
+- Canonical scenario: ...
+
+## Change
+...
+
+## Killswitch
+- `...` (owner: `...`)
+- OFF: ...
+- ON: ...
+
+## Validation
+- ...
+
+## Evidence
+### BEFORE
+![...](https://onedrive.visualstudio.com/...)
+Observable result: ...
+
+### AFTER
+![...](https://onedrive.visualstudio.com/...)
+Observable result: ...
+
+### Annotated comparison / video
+...
+
+### Exact-HEAD provenance
+- PR HEAD: `...`
+- Build selector / affected resource: ...
+- Evidence run / manifest: ...
+
+## Limitations
+N/A - ...
+```
+
+### 10.2 Evidence section organization
 
 PR description 的 Evidence 区必须按 reviewer 阅读顺序组织：
 
@@ -254,12 +333,24 @@ PR description 的 Evidence 区必须按 reviewer 阅读顺序组织：
 5. 必要的机器证据摘要和 exact HEAD；
 6. 媒体无法直接证明的限制。
 
+Do not provide only evidence prose or artifact hashes while omitting the images or videos required
+for the defect type. Do not provide media without BEFORE/AFTER labels and a one-sentence observable
+conclusion.
+
+### 10.3 Attachment upload
+
+Creating or updating only a PR description or attachment does not require a Codespace lease. If the
+task involves odsp-web source changes, branching, builds, commits, or pushes, all code work must
+still happen in an allowed Codespace under an exclusive lease.
+
 附件必须：
 
 - 通过 ADO Git pull-request attachment endpoint 上传；
 - 使用最终的绝对 `https://onedrive.visualstudio.com/...` attachment URL；
 - 不依赖本地路径、session artifact、临时 server、`dev.azure.com` 重写或短期 token URL；
 - 不发 PR comment thread；全部 reviewer-safe 证据写入 PR description。
+
+### 10.4 Post-publication acceptance
 
 发布后必须在真实 PR 页面验收：
 
@@ -293,6 +384,13 @@ API 上传成功、HTTP 200 或 markdown 文本正确都不能替代真实 PR �
 ## 12. 最终发布清单
 
 - [ ] 已读取全部原 bug 附件并确认合理 Expected Behavior。
+- [ ] Re-read this guide before creating or updating the description.
+- [ ] The description contains every applicable required section; each inapplicable section has
+      `N/A` and a reason.
+- [ ] The description matches the current bug, diff, KS, validation results, PR HEAD, and evidence
+      artifacts.
+- [ ] The description contains no `TODO`, `TBD`, local paths, temporary URLs, stale runs, or failed
+      evidence.
 - [ ] 已选择能证明该缺陷的正确媒体类型。
 - [ ] BEFORE/AFTER capture state 完全匹配。
 - [ ] 最终媒体没有 debug/test/error 污染。
@@ -304,6 +402,8 @@ API 上传成功、HTTP 200 或 markdown 文本正确都不能替代真实 PR �
 - [ ] 所有 screen reader 缺陷均提供修复后真实连续 AFTER 录屏。
 - [ ] Screen reader 视频包含真实移动和真实音频/transcript。
 - [ ] AFTER 绑定并加载实际 PR HEAD。
+- [ ] The Evidence section embeds the images/videos required for the defect type rather than only
+      prose or hashes.
 - [ ] 附件使用 ADO PR attachment 和绝对 `visualstudio.com` URL。
 - [ ] 已在真实 PR 页面验证图片尺寸和视频播放。
 - [ ] 已删除旧的、错误的或误导性证据引用。
