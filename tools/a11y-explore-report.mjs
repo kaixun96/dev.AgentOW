@@ -2,6 +2,77 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+
+const CATEGORY_LABELS = {
+  "keyboard-focus": "Keyboard & Focus",
+  "screen-reader": "Screen Reader",
+  "structure-semantics": "Structure & Semantics",
+  "orientation-input-purpose": "Orientation & Input Purpose",
+  "visual-color": "Visual & Color",
+  "timing-motion": "Timing & Motion",
+  "dynamic-content": "Dynamic Content",
+  "touch-pointer": "Touch & Pointer",
+  "authentication-forms": "Authentication & Forms",
+};
+
+const WCAG_NAMES = {
+  "1.1.1": "Non-text Content",
+  "1.2.1": "Audio-only and Video-only (Prerecorded)",
+  "1.2.2": "Captions (Prerecorded)",
+  "1.2.3": "Audio Description or Media Alternative",
+  "1.2.4": "Captions (Live)",
+  "1.2.5": "Audio Description (Prerecorded)",
+  "1.3.1": "Info and Relationships",
+  "1.3.2": "Meaningful Sequence",
+  "1.3.3": "Sensory Characteristics",
+  "1.3.4": "Orientation",
+  "1.3.5": "Identify Input Purpose",
+  "1.4.1": "Use of Color",
+  "1.4.2": "Audio Control",
+  "1.4.3": "Contrast (Minimum)",
+  "1.4.4": "Resize Text",
+  "1.4.5": "Images of Text",
+  "1.4.10": "Reflow",
+  "1.4.11": "Non-text Contrast",
+  "1.4.12": "Text Spacing",
+  "1.4.13": "Content on Hover or Focus",
+  "2.1.1": "Keyboard",
+  "2.1.2": "No Keyboard Trap",
+  "2.1.4": "Character Key Shortcuts",
+  "2.2.1": "Timing Adjustable",
+  "2.2.2": "Pause, Stop, Hide",
+  "2.3.1": "Three Flashes or Below Threshold",
+  "2.4.1": "Bypass Blocks",
+  "2.4.2": "Page Titled",
+  "2.4.3": "Focus Order",
+  "2.4.4": "Link Purpose (In Context)",
+  "2.4.5": "Multiple Ways",
+  "2.4.6": "Headings and Labels",
+  "2.4.7": "Focus Visible",
+  "2.4.11": "Focus Not Obscured (Minimum)",
+  "2.5.1": "Pointer Gestures",
+  "2.5.2": "Pointer Cancellation",
+  "2.5.3": "Label in Name",
+  "2.5.4": "Motion Actuation",
+  "2.5.7": "Dragging Movements",
+  "2.5.8": "Target Size (Minimum)",
+  "3.1.1": "Language of Page",
+  "3.1.2": "Language of Parts",
+  "3.2.1": "On Focus",
+  "3.2.2": "On Input",
+  "3.2.3": "Consistent Navigation",
+  "3.2.4": "Consistent Identification",
+  "3.2.6": "Consistent Help",
+  "3.3.1": "Error Identification",
+  "3.3.2": "Labels or Instructions",
+  "3.3.3": "Error Suggestion",
+  "3.3.4": "Error Prevention",
+  "3.3.7": "Redundant Entry",
+  "3.3.8": "Accessible Authentication (Minimum)",
+  "4.1.2": "Name, Role, Value",
+  "4.1.3": "Status Messages",
+};
 
 function parseArgs(argv) {
   const args = {};
@@ -23,9 +94,13 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function relativeEvidence(runDir, uri) {
-  if (/^https?:\/\//i.test(uri)) return uri;
-  return path.relative(runDir, uri).split(path.sep).join("/");
+function safeHttpUrl(value) {
+  try {
+    const parsed = new URL(String(value));
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function isPathInside(root, candidate) {
@@ -40,6 +115,13 @@ function safeWriteFile(runDir, output, content) {
     throw new Error("Report output must remain inside --run-dir");
   }
   const parent = path.dirname(resolvedOutput);
+  let existingAncestor = parent;
+  while (!fs.existsSync(existingAncestor)) {
+    existingAncestor = path.dirname(existingAncestor);
+  }
+  if (!isPathInside(realRun, fs.realpathSync(existingAncestor))) {
+    throw new Error("Report output ancestor resolves outside --run-dir");
+  }
   fs.mkdirSync(parent, { recursive: true });
   const realParent = fs.realpathSync(parent);
   if (!isPathInside(realRun, realParent)) {
@@ -53,81 +135,371 @@ function safeWriteFile(runDir, output, content) {
   fs.renameSync(temporary, resolvedOutput);
 }
 
-function renderFinding(runDir, finding, bugs) {
-  const bug = bugs.get(finding.id);
-  const evidence = finding.evidenceUris
-    .map((uri) => {
-      const href = relativeEvidence(runDir, uri);
-      return `<li><a href="${escapeHtml(href)}">${escapeHtml(path.basename(uri))}</a></li>`;
+function relativeEvidence(runDir, uri) {
+  return path.relative(runDir, uri).split(path.sep).join("/");
+}
+
+function faviconData(seed) {
+  const digest = crypto.createHash("sha256").update(seed).digest();
+  const first = digest[0] % 360;
+  const second = (first + 120 + (digest[1] % 80)) % 360;
+  const third = (second + 120 + (digest[2] % 80)) % 360;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><radialGradient id="g"><stop stop-color="hsl(${first} 100% 70%)"/><stop offset=".48" stop-color="hsl(${second} 100% 52%)"/><stop offset="1" stop-color="hsl(${third} 100% 42%)"/></radialGradient></defs><rect width="64" height="64" rx="15" fill="url(#g)"/><path d="M36 3 12 37h17l-3 24 26-37H35z" fill="#fff" stroke="#111" stroke-width="4" stroke-linejoin="round"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function classificationCounts(findings) {
+  const counts = { VIOLATION: 0, "BEST-PRACTICE": 0, PASS: 0, "NEEDS-REVIEW": 0 };
+  for (const finding of findings) counts[finding.classification] += 1;
+  return counts;
+}
+
+function formatDuration(seconds) {
+  const value = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(value / 60);
+  const remainder = value % 60;
+  return minutes ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
+function readEvidenceJson(runDir, aggregate, type, category) {
+  const entry = aggregate.evidence.find(
+    (candidate) => candidate.type === type && candidate.category === category,
+  );
+  if (!entry) return null;
+  const realRun = fs.realpathSync(runDir);
+  const realPath = fs.realpathSync(entry.uri);
+  if (!isPathInside(realRun, realPath)) throw new Error(`${type} evidence escapes --run-dir`);
+  return JSON.parse(fs.readFileSync(realPath, "utf8"));
+}
+
+function renderScreenshots(runDir, finding, aggregate) {
+  const evidence = new Map(aggregate.evidence.map((entry) => [entry.uri, entry]));
+  return finding.evidenceUris
+    .filter((uri) => evidence.get(uri)?.type === "screenshot")
+    .map((uri, index) => {
+      const source = relativeEvidence(runDir, uri);
+      return `<a href="${escapeHtml(source)}"><img src="${escapeHtml(source)}" alt="${escapeHtml(
+        `${finding.title} evidence ${index + 1}`,
+      )}"></a>`;
     })
     .join("");
+}
+
+function renderEvidenceLinks(runDir, finding) {
+  return finding.evidenceUris
+    .map((uri) => {
+      const source = relativeEvidence(runDir, uri);
+      return `<li><a href="${escapeHtml(source)}">${escapeHtml(path.basename(uri))}</a></li>`;
+    })
+    .join("");
+}
+
+function renderFinding(runDir, finding, aggregate, bugs) {
+  const bug = bugs.get(finding.id);
+  const classification = finding.classification.toLowerCase();
+  const severity = finding.severity?.toLowerCase();
+  const cardClass =
+    finding.classification === "VIOLATION"
+      ? `finding-violation-${severity}`
+      : `finding-${classification}`;
+  const typeLabel =
+    finding.classification === "BEST-PRACTICE" ? "BEST PRACTICE" : finding.classification.replace("-", " ");
+  const severityBadge = finding.severity
+    ? `<span class="badge badge-${severity}">${escapeHtml(finding.severity)}</span>`
+    : "";
   const steps = finding.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("");
-  return `<article class="finding ${escapeHtml(finding.classification.toLowerCase())}">
-<h3>${escapeHtml(finding.id)} — ${escapeHtml(finding.title)}</h3>
+  const screenshots = renderScreenshots(runDir, finding, aggregate);
+  const screenshotRow = screenshots ? `<dt>Screenshot</dt><dd>${screenshots}</dd>` : "";
+  return `<article class="finding ${cardClass}">
+<h3><span class="badge badge-${classification}">${escapeHtml(typeLabel)}</span> ${severityBadge} ${escapeHtml(
+    finding.id,
+  )}: ${escapeHtml(finding.title)}</h3>
 <dl>
-<dt>Classification</dt><dd>${escapeHtml(finding.classification)}</dd>
-${finding.severity ? `<dt>Severity</dt><dd>${escapeHtml(finding.severity)}</dd>` : ""}
-<dt>WCAG</dt><dd>${escapeHtml(finding.wcagSc || "N/A")}</dd>
-<dt>Category</dt><dd>${escapeHtml(finding.category)}</dd>
-<dt>Selector</dt><dd><code>${escapeHtml(finding.selector || "page-level")}</code></dd>
-<dt>Steps</dt><dd><ol>${steps}</ol></dd>
+<dt>WCAG SC</dt><dd>${escapeHtml(finding.wcagSc || "N/A")} ${escapeHtml(
+    WCAG_NAMES[finding.wcagSc] || "",
+  )}</dd>
+<dt>Category</dt><dd>${escapeHtml(CATEGORY_LABELS[finding.category] || finding.category)}</dd>
+<dt>Element</dt><dd><code>${escapeHtml(finding.selector || "page-level")}</code></dd>
+<dt>Steps to reproduce</dt><dd><ol>${steps}</ol></dd>
 <dt>Expected</dt><dd>${escapeHtml(finding.expected)}</dd>
 <dt>Actual</dt><dd>${escapeHtml(finding.actual)}</dd>
-${bug ? `<dt>ADO bug</dt><dd><a href="${escapeHtml(bug.bugUrl)}">#${escapeHtml(bug.bugId)}</a></dd>` : ""}
-<dt>Evidence</dt><dd><ul>${evidence}</ul></dd>
+${bug ? `<dt>ADO Bug</dt><dd><a href="${escapeHtml(bug.bugUrl)}">#${escapeHtml(bug.bugId)}</a></dd>` : ""}
+${screenshotRow}
+<dt>Evidence</dt><dd><ul>${renderEvidenceLinks(runDir, finding)}</ul></dd>
 </dl>
 </article>`;
 }
 
-function renderReport(runDir, aggregate, metadata, bugEntries) {
-  const bugs = new Map(bugEntries.map((entry) => [entry.findingId, entry]));
-  const categoryRows = aggregate.categories
+function renderCategorySummary(aggregate, findings) {
+  const rows = aggregate.categories.map((category) => {
+    const categoryFindings = findings.filter((finding) => finding.category === category.category);
+    const counts = classificationCounts(categoryFindings);
+    return `<tr><td>${escapeHtml(CATEGORY_LABELS[category.category] || category.category)}</td>
+<td>${counts.VIOLATION}</td><td>${counts["BEST-PRACTICE"]}</td><td>${counts.PASS}</td>
+<td>${counts["NEEDS-REVIEW"]}</td></tr>`;
+  });
+  const totals = classificationCounts(findings);
+  rows.push(`<tr class="total"><td>Total</td><td>${totals.VIOLATION}</td><td>${
+    totals["BEST-PRACTICE"]
+  }</td><td>${totals.PASS}</td><td>${totals["NEEDS-REVIEW"]}</td></tr>`);
+  return rows.join("");
+}
+
+function renderWcagTable(plan, findings) {
+  const planned = new Set(plan.scCoverage);
+  return Object.keys(WCAG_NAMES)
+    .map((criterion) => {
+      const criterionFindings = planned.has(criterion)
+        ? findings.filter((finding) => finding.wcagSc === criterion)
+        : [];
+      const violation = criterionFindings.find((finding) => finding.classification === "VIOLATION");
+      const review = criterionFindings.find((finding) => finding.classification === "NEEDS-REVIEW");
+      const pass = criterionFindings.find((finding) => finding.classification === "PASS");
+      const status = !planned.has(criterion)
+        ? "NOT TESTED"
+        : violation
+          ? "FAIL"
+          : review
+            ? "NEEDS REVIEW"
+            : pass
+              ? "PASS"
+              : "NOT TESTED";
+      const rowClass = violation ? "sc-fail" : review ? "sc-review" : pass ? "sc-pass" : "sc-na";
+      const details =
+        violation?.title ||
+        review?.title ||
+        pass?.title ||
+        (planned.has(criterion) ? "Planned, but no scoped finding was recorded." : "Not planned.");
+      return `<tr class="${rowClass}"><td>${escapeHtml(criterion)} ${escapeHtml(
+        WCAG_NAMES[criterion] || "",
+      )}</td><td>${status}</td><td>${escapeHtml(details)}</td></tr>`;
+    })
+    .join("");
+}
+
+function renderTabOrder(runDir, aggregate) {
+  const sequence = readEvidenceJson(runDir, aggregate, "focus-sequence", "keyboard-focus");
+  if (!Array.isArray(sequence)) return "<p>Tab order was not captured.</p>";
+  const rows = sequence
+    .map((entry, index) => {
+      const value =
+        typeof entry === "string"
+          ? { tag: "", text: entry, id: "", outlineStyle: "", outlineWidth: "", boxShadow: "" }
+          : entry;
+      const obscured = value.obscured === true || value.focusObscured === true;
+      const indicator = obscured
+        ? "Obscured"
+        : value.outlineStyle && value.outlineStyle !== "none"
+          ? `${value.outlineStyle} ${value.outlineWidth || ""}`.trim()
+          : value.boxShadow && value.boxShadow !== "none"
+            ? "box-shadow"
+            : "Needs review";
+      const rowClass = ["Needs review", "Obscured"].includes(indicator) ? ' class="sc-fail"' : "";
+      return `<tr${rowClass}><td>${index + 1}</td><td>${escapeHtml(value.tag)}</td><td>${escapeHtml(
+        value.tag?.toLowerCase() || "",
+      )}</td><td>${escapeHtml(value.text || value.href || "")}</td><td>${escapeHtml(
+        indicator,
+      )}</td><td>${escapeHtml(value.id || "")}</td></tr>`;
+    })
+    .join("");
+  return `<table><thead><tr><th>#</th><th>Element</th><th>Role</th><th>Name</th><th>Focus Indicator</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderHeadingHierarchy(runDir, aggregate) {
+  const structure = readEvidenceJson(runDir, aggregate, "accessibility-tree", "structure-semantics");
+  const headings = structure?.inventory?.headings;
+  if (!Array.isArray(headings)) return "<p>Heading hierarchy was not captured.</p>";
+  let previous = 0;
+  return `<div class="heading-tree">${headings
+    .map((heading) => {
+      const issue = previous && heading.level > previous + 1;
+      previous = heading.level;
+      const value = `${"  ".repeat(Math.max(0, heading.level - 1))}h${heading.level}: ${heading.text}`;
+      return issue ? `<span class="issue">${escapeHtml(value)}</span>` : escapeHtml(value);
+    })
+    .join("\n")}</div>`;
+}
+
+function renderLandmarks(runDir, aggregate) {
+  const structure = readEvidenceJson(runDir, aggregate, "accessibility-tree", "structure-semantics");
+  const landmarks = structure?.inventory?.landmarks;
+  if (!Array.isArray(landmarks)) return "<p>Landmarks were not captured.</p>";
+  const rows = landmarks
     .map(
       (entry) =>
-        `<tr><td>${escapeHtml(entry.category)}</td><td>${escapeHtml(entry.status)}</td><td>${escapeHtml(
-          entry.producer,
-        )}</td><td>${escapeHtml(entry.durationSeconds ?? "N/A")}</td><td>${escapeHtml(
-          entry.claims.join(", ") || "none",
-        )}</td></tr>`,
+        `<tr class="sc-pass"><td>${escapeHtml(entry.role || entry.tag?.toLowerCase())}</td><td>${escapeHtml(
+          entry.name || "(none)",
+        )}</td><td>Yes</td></tr>`,
     )
     .join("");
-  const findingCards = aggregate.findings
-    .map((finding) => renderFinding(runDir, finding, bugs))
+  return `<table><thead><tr><th>Landmark</th><th>Label</th><th>Present</th></tr></thead><tbody>${
+    rows || '<tr class="sc-review"><td colspan="3">No landmark elements were captured.</td></tr>'
+  }</tbody></table>`;
+}
+
+function renderRuntime(aggregate) {
+  const rows = aggregate.categories.map(
+    (entry) =>
+      `<tr><td>${escapeHtml(CATEGORY_LABELS[entry.category] || entry.category)}</td><td>${formatDuration(
+        entry.durationSeconds,
+      )}</td></tr>`,
+  );
+  const total = aggregate.categories.reduce(
+    (sum, entry) => sum + (Number(entry.durationSeconds) || 0),
+    0,
+  );
+  rows.push(`<tr class="total"><td>Total</td><td>${formatDuration(total)}</td></tr>`);
+  return rows.join("");
+}
+
+function renderNvdaExcerpt(runDir, aggregate) {
+  const entry = aggregate.evidence.find(
+    (candidate) =>
+      candidate.category === "screen-reader" &&
+      ["nvda-transcript", "nvda-debug-log"].includes(candidate.type),
+  );
+  if (!entry) return "NVDA was not used or no transcript was captured.";
+  const realRun = fs.realpathSync(runDir);
+  const realPath = fs.realpathSync(entry.uri);
+  if (!isPathInside(realRun, realPath)) throw new Error("NVDA evidence escapes --run-dir");
+  const lines = fs
+    .readFileSync(realPath, "utf8")
+    .split(/\r?\n/)
+    .filter((line) => /Speaking \[|Input:|Lock Screen|pane/.test(line))
+    .slice(-60);
+  return lines.length ? lines.join("\n") : "NVDA evidence exists, but no speech excerpt was available.";
+}
+
+function screenReaderLabel(aggregate) {
+  const category = aggregate.categories.find((entry) => entry.category === "screen-reader");
+  if (!category) return "Not planned";
+  const evidenceTypes = new Set(
+    aggregate.evidence
+      .filter((entry) => entry.category === "screen-reader")
+      .map((entry) => entry.type),
+  );
+  const technology = category.claims.includes("narrator-tested") || evidenceTypes.has("narrator-etl")
+    ? "Narrator"
+    : category.claims.includes("nvda-tested") ||
+        evidenceTypes.has("nvda-transcript") ||
+        evidenceTypes.has("nvda-debug-log")
+      ? "NVDA"
+      : "Screen reader";
+  return `${technology} (${category.status})`;
+}
+
+function renderCoverageNotes(aggregate, plan, omittedFindings) {
+  const lines = aggregate.categories.map((entry) => {
+    const blockers = entry.blockers?.length ? ` — ${entry.blockers.join("; ")}` : "";
+    return `<li><strong>${escapeHtml(CATEGORY_LABELS[entry.category] || entry.category)}:</strong> ${escapeHtml(
+      entry.status,
+    )}${escapeHtml(blockers)}</li>`;
+  });
+  const planned = new Set(plan.categories.map((entry) => entry.category));
+  for (const category of Object.keys(CATEGORY_LABELS)) {
+    if (!planned.has(category)) {
+      lines.push(`<li><strong>${escapeHtml(CATEGORY_LABELS[category])}:</strong> not planned</li>`);
+    }
+  }
+  for (const finding of omittedFindings) {
+    lines.push(
+      `<li><strong>Omitted incomplete finding:</strong> ${escapeHtml(finding.id)} — no screenshot artifact.</li>`,
+    );
+  }
+  return `<ul>${lines.join("")}</ul><p>This exploratory run does not claim full WCAG conformance.</p>`;
+}
+
+function renderReport(runDir, aggregate, metadata, plan, bugEntries) {
+  const bugs = new Map(bugEntries.map((entry) => [entry.findingId, entry]));
+  const categoryStatus = new Map(
+    aggregate.categories.map((entry) => [entry.category, entry.status]),
+  );
+  const screenshotUris = new Set(
+    aggregate.evidence.filter((entry) => entry.type === "screenshot").map((entry) => entry.uri),
+  );
+  const reportableFindings = aggregate.findings.filter((finding) => {
+    const hasScreenshot = finding.evidenceUris.some((uri) => screenshotUris.has(uri));
+    const infrastructureException =
+      finding.classification === "NEEDS-REVIEW" &&
+      categoryStatus.get(finding.category) !== "completed";
+    return hasScreenshot || infrastructureException;
+  });
+  const omittedFindings = aggregate.findings.filter(
+    (finding) => !reportableFindings.includes(finding),
+  );
+  const counts = classificationCounts(reportableFindings);
+  const cards = reportableFindings
+    .map((finding) => renderFinding(runDir, finding, aggregate, bugs))
     .join("\n");
-  return `<!doctype html>
+  const favicon = faviconData(`${metadata.target || ""}|${aggregate.generatedAt}`);
+  const reportUrl = safeHttpUrl(metadata.url);
+  const renderedUrl = reportUrl
+    ? `<a href="${escapeHtml(reportUrl)}">${escapeHtml(metadata.url)}</a>`
+    : escapeHtml(metadata.url || "");
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Accessibility exploratory test report</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="${escapeHtml(favicon)}">
+<title>A11y Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</title>
 <style>
-body{font-family:Segoe UI,Arial,sans-serif;max-width:1200px;margin:32px auto;padding:0 20px;color:#242424}
-table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:8px;text-align:left;vertical-align:top}
-.finding{border:1px solid #bbb;border-left-width:6px;border-radius:4px;padding:16px;margin:18px 0}
-.violation{border-left-color:#c50f1f}.pass{border-left-color:#107c10}.needs-review{border-left-color:#ca5010}
-dt{font-weight:600;margin-top:8px}dd{margin-left:0}code{white-space:pre-wrap}
+:root{--critical:#d32f2f;--high:#e53935;--medium:#f57c00;--low:#ffa726;--best:#7b1fa2;--pass:#2e7d32;--review:#1565c0}
+*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#212121;max-width:1200px;margin:0 auto;padding:24px;background:#fafafa}
+h1{font-size:1.8rem;margin-bottom:8px}h2{font-size:1.4rem;margin:32px 0 16px;padding-bottom:8px;border-bottom:2px solid #e0e0e0}h3{font-size:1.1rem}
+table{width:100%;border-collapse:collapse;margin:16px 0}th,td{padding:10px 14px;text-align:left;border:1px solid #e0e0e0}th{background:#f5f5f5}.total{font-weight:700}
+a{color:#1565c0}code{background:#f5f5f5;padding:2px 6px;border-radius:3px}pre{background:#263238;color:#eeffff;padding:16px;border-radius:6px;overflow:auto}
+img{max-width:100%;border:1px solid #e0e0e0;border-radius:4px;margin:8px 0;cursor:zoom-in}.meta{color:#616161;margin-bottom:24px}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin:20px 0}.summary-card{padding:20px;border-radius:8px;text-align:center}.count{font-size:2.2rem;font-weight:700}.label{font-size:.85rem;text-transform:uppercase}
+.card-violations{background:#ffebee;color:var(--critical);border-left:4px solid var(--critical)}.card-best-practice{background:#f3e5f5;color:var(--best);border-left:4px solid var(--best)}.card-pass{background:#e8f5e9;color:var(--pass);border-left:4px solid var(--pass)}.card-needs-review{background:#e3f2fd;color:var(--review);border-left:4px solid var(--review)}
+.sc-fail{background:#ffebee}.sc-pass{background:#e8f5e9}.sc-review{background:#e3f2fd}.sc-na{background:#f5f5f5;color:#757575}.sc-fail td:nth-child(2),.sc-pass td:nth-child(2),.sc-review td:nth-child(2){font-weight:700}
+.finding{border-radius:8px;padding:20px;margin:20px 0;border-left:5px solid}.finding-violation-critical,.finding-violation-high{background:#ffebee;border-color:var(--critical)}.finding-violation-medium{background:#fff3e0;border-color:var(--medium)}.finding-violation-low{background:#fff8e1;border-color:var(--low)}.finding-best-practice{background:#f3e5f5;border-color:var(--best)}.finding-pass{background:#e8f5e9;border-color:var(--pass)}.finding-needs-review{background:#e3f2fd;border-color:var(--review)}
+.finding dt{font-weight:600;margin-top:8px}.finding dd{margin-left:0}.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.8rem;font-weight:600;color:#fff}.badge-violation,.badge-critical,.badge-high{background:var(--critical)}.badge-medium{background:var(--medium)}.badge-low{background:var(--low)}.badge-best-practice{background:var(--best)}.badge-pass{background:var(--pass)}.badge-needs-review{background:var(--review)}
+.structure-section{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin:16px 0}.heading-tree{font-family:monospace;white-space:pre-wrap;line-height:1.8}.heading-tree .issue{display:block;background:#ffebee;padding:2px 6px;border-radius:3px}
+details{margin:12px 0}summary{cursor:pointer;font-weight:600;padding:8px 0}
 </style>
 </head>
 <body>
-<h1>Accessibility exploratory test report</h1>
-<dl>
-<dt>Target</dt><dd>${escapeHtml(metadata.target ?? "Unspecified")}</dd>
-<dt>URL</dt><dd>${escapeHtml(metadata.url ?? "Unspecified")}</dd>
-<dt>Environment</dt><dd>${escapeHtml(metadata.executionEnvironment ?? "Unknown")}</dd>
-<dt>Generated</dt><dd>${escapeHtml(aggregate.generatedAt)}</dd>
-</dl>
+<h1>Accessibility Test Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</h1>
+<div class="meta">
+<p><strong>Run date:</strong> ${escapeHtml(aggregate.generatedAt)} | <strong>WCAG Level:</strong> 2.2 AA</p>
+<p><strong>Mode:</strong> ${escapeHtml(metadata.executionEnvironment || "unknown")} | <strong>Browser:</strong> Chromium | <strong>Screen reader:</strong> ${escapeHtml(
+    screenReaderLabel(aggregate),
+  )}</p>
+<p><strong>URL:</strong> ${renderedUrl}</p>
+<p><strong>Evidence root:</strong> <code>${escapeHtml(runDir)}</code></p>
+</div>
 <h2>Summary</h2>
-<p>Total findings: ${aggregate.counts.total}. Violations: ${
-    aggregate.counts.byClassification.VIOLATION ?? 0
-  }. Best practices: ${aggregate.counts.byClassification["BEST-PRACTICE"] ?? 0}. Needs review: ${
-    aggregate.counts.byClassification["NEEDS-REVIEW"] ?? 0
-  }. Passes: ${aggregate.counts.byClassification.PASS ?? 0}.</p>
-<p>This exploratory report does not claim full WCAG conformance.</p>
-<h2>Category execution</h2>
-<table><thead><tr><th>Category</th><th>Status</th><th>Producer</th><th>Seconds</th><th>Claims</th></tr></thead>
-<tbody>${categoryRows}</tbody></table>
+<div class="summary-grid">
+<div class="summary-card card-violations"><div class="count">${counts.VIOLATION}</div><div class="label">Violations</div></div>
+<div class="summary-card card-best-practice"><div class="count">${counts["BEST-PRACTICE"]}</div><div class="label">Best Practices</div></div>
+<div class="summary-card card-pass"><div class="count">${counts.PASS}</div><div class="label">Passed</div></div>
+<div class="summary-card card-needs-review"><div class="count">${counts["NEEDS-REVIEW"]}</div><div class="label">Needs Review</div></div>
+</div>
+<table><thead><tr><th>Category</th><th>Violations</th><th>Best Practices</th><th>Pass</th><th>Needs Review</th></tr></thead><tbody>${renderCategorySummary(
+    aggregate,
+    reportableFindings,
+  )}</tbody></table>
+<h2>WCAG 2.2 AA Conformance</h2>
+<table><thead><tr><th>Success Criterion</th><th>Status</th><th>Details</th></tr></thead><tbody>${renderWcagTable(
+    plan,
+    aggregate.findings,
+  )}</tbody></table>
 <h2>Findings</h2>
-${findingCards || "<p>No findings were recorded.</p>"}
+${cards || "<p>No findings were recorded.</p>"}
+<h2>Tab Order Map</h2><div class="structure-section">${renderTabOrder(runDir, aggregate)}</div>
+<h2>Heading Hierarchy</h2><div class="structure-section">${renderHeadingHierarchy(runDir, aggregate)}</div>
+<h2>Landmark Regions</h2><div class="structure-section">${renderLandmarks(runDir, aggregate)}</div>
+<h2>Task Runtime</h2>
+<table><thead><tr><th>Task</th><th>Duration</th></tr></thead><tbody>${renderRuntime(aggregate)}</tbody></table>
+<details><summary>NVDA Transcript (excerpts)</summary><pre>${escapeHtml(
+    renderNvdaExcerpt(runDir, aggregate),
+  )}</pre></details>
+<details><summary>Test Coverage Notes</summary>${renderCoverageNotes(
+    aggregate,
+    plan,
+    omittedFindings,
+  )}</details>
 </body>
 </html>
 `;
@@ -144,32 +516,29 @@ function main() {
   const outputHtml = path.resolve(args["out-html"]);
   for (const candidate of [findingsPath, outputJson, outputHtml]) {
     if (!isPathInside(runDir, candidate)) {
-      throw new Error("findings and report outputs must remain inside --run-dir");
+      throw new Error("Findings and report outputs must remain inside --run-dir");
     }
   }
-  const realRunDir = fs.realpathSync(runDir);
-  const realFindingsPath = fs.realpathSync(findingsPath);
-  if (!isPathInside(realRunDir, realFindingsPath)) {
-    throw new Error("Findings path resolves outside --run-dir");
-  }
-  const aggregate = JSON.parse(fs.readFileSync(realFindingsPath, "utf8"));
+  const realRun = fs.realpathSync(runDir);
+  const realFindings = fs.realpathSync(findingsPath);
+  if (!isPathInside(realRun, realFindings)) throw new Error("Findings path resolves outside --run-dir");
+  const aggregate = JSON.parse(fs.readFileSync(realFindings, "utf8"));
   const metadataPath = path.join(runDir, "run.json");
-  if (
-    fs.existsSync(metadataPath) &&
-    !isPathInside(realRunDir, fs.realpathSync(metadataPath))
-  ) {
-    throw new Error("run.json resolves outside --run-dir");
+  const planPath = path.join(runDir, "plan.json");
+  const bugsPath = path.join(runDir, "ado-bugs.json");
+  for (const candidate of [metadataPath, planPath, bugsPath]) {
+    if (fs.existsSync(candidate) && !isPathInside(realRun, fs.realpathSync(candidate))) {
+      throw new Error(`${path.basename(candidate)} resolves outside --run-dir`);
+    }
   }
   const metadata = fs.existsSync(metadataPath) ? JSON.parse(fs.readFileSync(metadataPath, "utf8")) : {};
-  const bugsPath = path.join(runDir, "ado-bugs.json");
-  if (fs.existsSync(bugsPath) && !isPathInside(realRunDir, fs.realpathSync(bugsPath))) {
-    throw new Error("ado-bugs.json resolves outside --run-dir");
-  }
+  if (!fs.existsSync(planPath)) throw new Error("plan.json is required for report rendering");
+  const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
   const bugs = fs.existsSync(bugsPath) ? JSON.parse(fs.readFileSync(bugsPath, "utf8")) : [];
   if (!Array.isArray(bugs)) throw new Error("ado-bugs.json must contain an array");
   const report = { ...aggregate, metadata, adoBugs: bugs };
   safeWriteFile(runDir, outputJson, `${JSON.stringify(report, null, 2)}\n`);
-  safeWriteFile(runDir, outputHtml, renderReport(runDir, aggregate, metadata, bugs));
+  safeWriteFile(runDir, outputHtml, renderReport(runDir, aggregate, metadata, plan, bugs));
   process.stdout.write(`${outputHtml}\n`);
 }
 

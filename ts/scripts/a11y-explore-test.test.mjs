@@ -20,26 +20,39 @@ const adoTool = path.join(repoRoot, "tools", "a11y-explore-ado.mjs");
 const skillRoot = path.join(repoRoot, "copilot", "skills", "agentow-a11y-explore-test");
 const plannerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-planner.agent.md");
 const testerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-category-tester.agent.md");
-const planCategory = (category) =>
-  category === "dynamic-content"
-    ? {
-        category,
-        executionClass: "serial-browser",
-        wcagSc: ["2.4.3"],
-        focusAreas: ["sample"],
-        requiredCapabilities: ["browser"],
-        requiredEvidenceTypes: ["screenshot", "interaction-log"],
-        maximumClaim: "browser-dynamic-tested",
-      }
-    : {
-        category,
-        executionClass: "serial-browser",
-        wcagSc: ["2.4.3"],
-        focusAreas: ["sample"],
-        requiredCapabilities: ["browser", "keyboard"],
-        requiredEvidenceTypes: ["screenshot", "focus-sequence"],
-        maximumClaim: "browser-keyboard-tested",
-      };
+const planCategory = (category) => {
+  if (category === "dynamic-content") {
+    return {
+      category,
+      executionClass: "serial-browser",
+      wcagSc: ["2.4.3"],
+      focusAreas: ["sample"],
+      requiredCapabilities: ["browser"],
+      requiredEvidenceTypes: ["screenshot", "interaction-log"],
+      maximumClaim: "browser-dynamic-tested",
+    };
+  }
+  if (category === "structure-semantics") {
+    return {
+      category,
+      executionClass: "serial-browser",
+      wcagSc: ["1.3.1"],
+      focusAreas: ["headings", "landmarks"],
+      requiredCapabilities: ["browser"],
+      requiredEvidenceTypes: ["screenshot", "accessibility-tree"],
+      maximumClaim: "browser-semantics-tested",
+    };
+  }
+  return {
+    category,
+    executionClass: "serial-browser",
+    wcagSc: ["2.4.3"],
+    focusAreas: ["sample"],
+    requiredCapabilities: ["browser", "keyboard"],
+    requiredEvidenceTypes: ["screenshot", "focus-sequence"],
+    maximumClaim: "browser-keyboard-tested",
+  };
+};
 const plan = (categories) => ({
   schemaVersion: 1,
   target: "Sample",
@@ -47,7 +60,7 @@ const plan = (categories) => ({
   executionEnvironment: "windows-host",
   requestedCategories: [],
   focusAreas: ["sample"],
-  scCoverage: categories.map(() => "2.4.3"),
+  scCoverage: [...new Set(categories.map((category) => (category === "structure-semantics" ? "1.3.1" : "2.4.3")))],
   categories: categories.map((category) => planCategory(category)),
 });
 
@@ -55,11 +68,13 @@ assert.equal(CATEGORIES.length, 9);
 const skillText = fs.readFileSync(path.join(skillRoot, "SKILL.md"), "utf8");
 assert.match(skillText, /```bash[\s\S]*a11y-explore-results\.mjs[\s\S]*\\\r?\n/);
 assert.match(skillText, /```powershell[\s\S]*a11y-explore-results\.mjs[\s\S]*`\r?\n/);
+assert.match(skillText, /references\/report-rules\.md/);
 for (const file of [
   path.join(skillRoot, "SKILL.md"),
   path.join(skillRoot, "references", "category-execution.md"),
   path.join(skillRoot, "references", "severity-guidelines.md"),
   path.join(skillRoot, "references", "wcag-criteria.md"),
+  path.join(skillRoot, "references", "report-rules.md"),
   plannerAgent,
   testerAgent,
 ]) {
@@ -80,7 +95,21 @@ try {
   const screenshot = path.join(categoryDir, "focus.png");
   const focusSequence = path.join(categoryDir, "focus-sequence.json");
   fs.writeFileSync(screenshot, "image fixture");
-  fs.writeFileSync(focusSequence, JSON.stringify(["body", "#save"]));
+  fs.writeFileSync(
+    focusSequence,
+    JSON.stringify([
+      "body",
+      {
+        tag: "A",
+        text: "Save",
+        id: "save",
+        outlineStyle: "solid",
+        outlineWidth: "2px",
+        boxShadow: "none",
+        obscured: true,
+      },
+    ]),
+  );
   const hash = crypto.createHash("sha256").update(fs.readFileSync(screenshot)).digest("hex");
   const focusHash = crypto.createHash("sha256").update(fs.readFileSync(focusSequence)).digest("hex");
   const result = {
@@ -308,6 +337,57 @@ try {
     ],
   };
   fs.writeFileSync(path.join(dynamicDir, "result.json"), JSON.stringify(dynamicResult));
+  const structureDir = path.join(runDir, "categories", "structure-semantics");
+  fs.mkdirSync(structureDir, { recursive: true });
+  const structureScreenshot = path.join(structureDir, "structure.png");
+  const structureTree = path.join(structureDir, "accessibility-tree.json");
+  fs.writeFileSync(structureScreenshot, "structure screenshot");
+  fs.writeFileSync(
+    structureTree,
+    JSON.stringify({
+      inventory: {
+        headings: [
+          { level: 1, text: "Page title" },
+          { level: 3, text: "Skipped heading" },
+        ],
+        landmarks: [{ tag: "MAIN", role: "main", name: "Main content" }],
+      },
+    }),
+  );
+  const structureResult = {
+    ...result,
+    category: "structure-semantics",
+    capabilitiesUsed: ["browser"],
+    claims: ["browser-semantics-tested"],
+    evidence: [
+      {
+        type: "screenshot",
+        uri: structureScreenshot,
+        sha256: crypto.createHash("sha256").update(fs.readFileSync(structureScreenshot)).digest("hex"),
+        producer: "copilot-browser",
+      },
+      {
+        type: "accessibility-tree",
+        uri: structureTree,
+        sha256: crypto.createHash("sha256").update(fs.readFileSync(structureTree)).digest("hex"),
+        producer: "copilot-browser",
+      },
+    ],
+    findings: [
+      {
+        id: "PASS-1",
+        classification: "PASS",
+        wcagSc: "1.3.1",
+        title: "Structure captured",
+        selector: "main",
+        steps: ["Inspect headings and landmarks"],
+        expected: "Structure is exposed.",
+        actual: "Headings and main landmark were captured.",
+        evidenceUris: [structureScreenshot, structureTree],
+      },
+    ],
+  };
+  fs.writeFileSync(path.join(structureDir, "result.json"), JSON.stringify(structureResult));
   const duplicateIsolationPlan = plan(["keyboard-focus", "dynamic-content"]);
   duplicateIsolationPlan.categories = duplicateIsolationPlan.categories.map((entry) => ({
     ...entry,
@@ -327,12 +407,24 @@ try {
   fs.writeFileSync(path.join(dynamicDir, "result.json"), JSON.stringify(dynamicResult));
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
-    JSON.stringify(plan(["keyboard-focus", "dynamic-content"])),
+    JSON.stringify(plan(["keyboard-focus", "dynamic-content", "structure-semantics"])),
   );
   const deduplicated = aggregateResults(runDir);
-  assert.equal(deduplicated.findings.length, 1);
+  assert.equal(deduplicated.findings.length, 2);
   assert.equal(deduplicated.findings[0].severity, "Critical");
   assert.equal(deduplicated.findings[0].sourceResults.length, 2);
+  deduplicated.findings.push({
+    id: "keyboard-focus:NEEDS-REVIEW-99",
+    classification: "NEEDS-REVIEW",
+    wcagSc: "2.4.3",
+    title: "Incomplete fixture",
+    selector: "",
+    steps: ["Review"],
+    expected: "Screenshot evidence",
+    actual: "Only a focus sequence was captured.",
+    evidenceUris: [focusSequence],
+    category: "keyboard-focus",
+  });
 
   fs.writeFileSync(
     path.join(runDir, "run.json"),
@@ -363,6 +455,73 @@ try {
   assert.match(html, /&lt;script&gt;alert/);
   assert.doesNotMatch(html, /<script>alert/);
   assert.match(html, /does not claim full WCAG conformance/);
+  assert.match(html, /class="summary-grid"/);
+  assert.match(html, /<link rel="icon" href="data:image\/svg\+xml,/);
+  assert.match(html, /WCAG 2\.2 AA Conformance/);
+  assert.match(html, /<img src="categories\//);
+  assert.match(html, /Tab Order Map/);
+  assert.match(html, /Heading Hierarchy/);
+  assert.match(html, /Landmark Regions/);
+  assert.match(html, /Task Runtime/);
+  assert.match(html, /NVDA Transcript \(excerpts\)/);
+  assert.match(html, /Test Coverage Notes/);
+  assert.match(html, /Screen reader:<\/strong> Not planned/);
+  assert.match(html, />body<\/td>|>#save<\/td>/);
+  assert.match(html, /Obscured/);
+  assert.match(html, /h1: Page title/);
+  assert.match(html, /h3: Skipped heading/);
+  assert.match(html, /Main content/);
+  assert.equal((html.match(/Omitted incomplete finding/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /NEEDS-REVIEW-99: Incomplete fixture/);
+  assert.doesNotMatch(html, /No screenshot artifact/);
+  assert.doesNotMatch(html, /\{Page\/Feature Name\}|\{duration\}|\{status\}/);
+
+  fs.writeFileSync(
+    path.join(runDir, "run.json"),
+    JSON.stringify({
+      target: "Unsafe URL fixture",
+      url: "javascript:alert(1)",
+      executionEnvironment: "windows-host",
+    }),
+  );
+  execFileSync(process.execPath, [
+    reportTool,
+    "--run-dir",
+    runDir,
+    "--findings",
+    findings,
+    "--out-json",
+    outputJson,
+    "--out-html",
+    outputHtml,
+  ]);
+  const unsafeUrlHtml = fs.readFileSync(outputHtml, "utf8");
+  assert.doesNotMatch(unsafeUrlHtml, /href="javascript:/);
+  assert.match(unsafeUrlHtml, /javascript:alert\(1\)/);
+
+  const outsideReportDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentow-report-outside-"));
+  const linkedReportDir = path.join(runDir, "linked-report");
+  try {
+    fs.symlinkSync(outsideReportDir, linkedReportDir, "junction");
+    assert.throws(
+      () =>
+        execFileSync(process.execPath, [
+          reportTool,
+          "--run-dir",
+          runDir,
+          "--findings",
+          findings,
+          "--out-json",
+          outputJson,
+          "--out-html",
+          path.join(linkedReportDir, "report.html"),
+        ]),
+      /Report output ancestor resolves outside --run-dir/,
+    );
+  } finally {
+    fs.rmSync(linkedReportDir, { force: true });
+    fs.rmSync(outsideReportDir, { recursive: true, force: true });
+  }
 
   const adoConfig = path.join(runDir, "ado-config.json");
   fs.writeFileSync(

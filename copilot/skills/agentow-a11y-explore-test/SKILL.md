@@ -208,6 +208,10 @@ Always stop AT, traces, recorders, temporary audio routes, and test apps started
 
 ## Step 5: Aggregate and render deterministically
 
+Read `references/report-rules.md`. It defines the required summary cards, complete WCAG table,
+finding cards/badges, inline screenshots, structure maps, runtimes, transcript excerpts, coverage
+notes, ADO links, and the unique high-saturation inline SVG favicon.
+
 Codespace/Linux:
 
 ```bash

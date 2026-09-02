@@ -268,8 +268,66 @@ function validateEvidence(evidence, categoryDir, category, resultProducer, index
   if (actualHash !== evidence.sha256) {
     throw new Error(`${category}.evidence[${index}] hash mismatch`);
   }
+  validateEvidenceShape(realEvidence, evidence.type, category);
 }
 
+function validateEvidenceShape(filePath, type, category) {
+  if (type === "focus-sequence") {
+    const sequence = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (
+      !Array.isArray(sequence) ||
+      !sequence.every(
+        (entry) =>
+          typeof entry === "string" ||
+          (entry &&
+            typeof entry === "object" &&
+            typeof entry.tag === "string" &&
+            typeof entry.text === "string"),
+      )
+    ) {
+      throw new Error(`${category} focus-sequence evidence has an invalid schema`);
+    }
+  }
+  if (type !== "accessibility-tree") return;
+  const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  if (category === "structure-semantics") {
+    if (
+      !Array.isArray(value?.inventory?.headings) ||
+      !value.inventory.headings.every(
+        (entry) =>
+          Number.isInteger(entry.level) &&
+          entry.level >= 1 &&
+          entry.level <= 6 &&
+          typeof entry.text === "string",
+      ) ||
+      !Array.isArray(value?.inventory?.landmarks) ||
+      !value.inventory.landmarks.every(
+        (entry) =>
+          typeof entry.tag === "string" &&
+          typeof entry.role === "string" &&
+          typeof entry.name === "string",
+      )
+    ) {
+      throw new Error("structure-semantics accessibility-tree evidence has an invalid schema");
+    }
+  }
+  if (category === "orientation-input-purpose") {
+    if (
+      !Array.isArray(value?.inputs) ||
+      !value.inputs.every(
+        (entry) =>
+          typeof entry.tag === "string" &&
+          typeof entry.type === "string" &&
+          typeof entry.name === "string" &&
+          typeof entry.autocomplete === "string",
+      ) ||
+      !value.axTree ||
+      typeof value.axTree !== "object"
+    ) {
+      throw new Error("orientation-input-purpose accessibility-tree evidence has an invalid schema");
+    }
+  }
+}
 function validateFinding(finding, category, evidenceUris, status, index) {
   assertObject(finding, `${category}.findings[${index}]`);
   if (typeof finding.id !== "string" || !/^[A-Z-]+-\d+$/.test(finding.id)) {

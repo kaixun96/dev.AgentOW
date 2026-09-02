@@ -39,6 +39,16 @@ Evidence contains type, absolute real path, SHA-256, and producer. Every artifac
 external evidence, must be materialized under its category directory. A finding cites its evidence
 paths.
 
+`accessibility-tree` JSON has a category-specific stable summary in addition to any raw AX payload:
+
+- `structure-semantics`: `{ "inventory": { "headings": [{ "level": 1, "text": "..." }],
+  "landmarks": [{ "tag": "MAIN", "role": "main", "name": "..." }] } }`
+- `orientation-input-purpose`: `{ "inputs": [{ "tag": "INPUT", "type": "email",
+  "name": "Email", "autocomplete": "email" }], "axTree": { ... } }`
+
+Focus-sequence entries are either a compact string or an object with `tag`, `text`, `id`,
+`outlineStyle`, `outlineWidth`, `boxShadow`, and optional `obscured`/`focusObscured` boolean.
+
 Supporting DOM/tree/axe evidence cannot prove spoken output, OS focus behavior, Voice Access, or
 screen-reader interaction.
 
