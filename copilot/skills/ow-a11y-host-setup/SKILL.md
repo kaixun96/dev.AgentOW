@@ -97,9 +97,12 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
 
    The owner selects the required language and completes **Agree and continue**. The probe records
    the current language, first-run completion, consent, and model-update markers. A real Voice
-   Access scenario must still prove recognition and captured audio. In Voice Access settings, select
-   `CABLE Output (VB-Audio Virtual Cable)` as the microphone. The Voice Access scenario is not ready
-   until the probe confirms that exact capture endpoint.
+   Access scenario must still prove recognition and captured audio. A manual microphone selection is
+   not necessarily required: after Console transfer removes Remote Audio, Voice Access may use
+   `CABLE Output` through Windows default-input fallback. Treat `VoiceAccessMicrophoneId` as a
+   diagnostic only. The probe reports `explicit-cable`, `default-cable-fallback`,
+   `remote-audio-active`, or `unresolved`; final readiness still requires an end-to-end harmless
+   command played through `CABLE Input` and recognized by Voice Access after RDP disconnect.
 
 8. Install the one-time Console transfer task when unattended recording or Voice Access evidence is
    required:

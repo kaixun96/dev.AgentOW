@@ -337,7 +337,10 @@ function Set-NvdaSpeechViewer {
 }
 
 function Get-VoiceAccessState {
-    param([object[]]$CableCaptureEndpoints)
+    param(
+        [object[]]$CableCaptureEndpoints,
+        [object[]]$CurrentSessionEndpoints
+    )
 
     $voiceAccessPath = Join-Path $env:WINDIR 'System32\VoiceAccess.exe'
     $settingsPath = 'HKCU:\Software\Microsoft\VoiceAccess'
@@ -359,6 +362,21 @@ function Get-VoiceAccessState {
     $microphoneReady = @($CableCaptureEndpoints | Where-Object {
         $microphoneId -and $microphoneId.IndexOf($_.id, [StringComparison]::OrdinalIgnoreCase) -ge 0
     }).Count -gt 0
+    $remoteAudioPresent = @($CurrentSessionEndpoints | Where-Object {
+        $_.name -match '^Remote Audio'
+    }).Count -gt 0
+    $cableCapturePresent = @($CurrentSessionEndpoints | Where-Object {
+        $_.name -match '^CABLE Output'
+    }).Count -gt 0
+    $microphoneMode = if ($microphoneReady) {
+        'explicit-cable'
+    } elseif ($cableCapturePresent -and -not $remoteAudioPresent) {
+        'default-cable-fallback'
+    } elseif ($remoteAudioPresent) {
+        'remote-audio-active'
+    } else {
+        'unresolved'
+    }
 
     return [ordered]@{
         available = Test-Path -LiteralPath $voiceAccessPath
@@ -368,7 +386,8 @@ function Get-VoiceAccessState {
         firstRunCompleted = [bool]$firstRunCompleted
         consentCompleted = [bool]$consentCompleted
         microphoneId = $microphoneId
-        microphoneReady = [bool]$microphoneReady
+        microphoneMode = $microphoneMode
+        microphoneReady = $microphoneMode -in @('explicit-cable', 'default-cable-fallback')
         languageModel = if ($firstRunCompleted -and $consentCompleted -and $modelsUpdated) {
             'ready'
         } else {
@@ -442,7 +461,7 @@ function Get-Capabilities {
         windowsPerformanceRecorder = $wpr
         windowsPerformanceAnalyzer = $wpa
         personalEvaluatorBrowser = Get-PersonalEvaluatorState
-        voiceAccess = Get-VoiceAccessState $cableOutput
+        voiceAccess = Get-VoiceAccessState $cableOutput $audioEndpoints
         vbCable = [ordered]@{
             renderEndpointReady = $cableInput.Count -gt 0
             captureEndpointReady = $cableOutput.Count -gt 0
