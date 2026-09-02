@@ -89,6 +89,9 @@ if (process.platform === "win32") {
     fs.rmSync(outputPath, { force: true });
   }
 
+  const codespaceEnvironment = { ...process.env, CODESPACES: "true" };
+  delete codespaceEnvironment.LOCALAPPDATA;
+  delete codespaceEnvironment.USERPROFILE;
   assert.throws(
     () =>
       execFileSync(
@@ -105,7 +108,7 @@ if (process.platform === "win32") {
         {
           encoding: "utf8",
           stdio: "pipe",
-          env: { ...process.env, CODESPACES: "true" },
+          env: codespaceEnvironment,
         },
       ),
     (error) =>

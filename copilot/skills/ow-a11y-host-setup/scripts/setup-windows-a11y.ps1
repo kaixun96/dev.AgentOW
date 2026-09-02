@@ -8,6 +8,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($env:CODESPACES -eq 'true' -or -not [string]::IsNullOrWhiteSpace($env:CODESPACE_NAME)) {
+    throw '/ow-a11y-host-setup is not supported in a Codespace. Run it on the Windows evaluator host.'
+}
+
+if ($env:OS -ne 'Windows_NT') {
+    throw 'ow-a11y-host-setup must run on the Windows evaluator host'
+}
+
 $vbCableUrl = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip'
 $vbCableSha256 = 'B950E39F01AF1D04EA623C8F6D8EB9B6EA5C477C637295FABF20631C85116BFB'
 $setupRoot = Join-Path $env:LOCALAPPDATA 'agentow\a11y-host'
@@ -19,14 +28,8 @@ $personalEvaluatorSources = @(
 )
 $personalEvaluatorPath = Join-Path $setupRoot 'personal-evaluator-browser.py'
 $personalEvaluatorProfile = Join-Path $HOME '.playwright\personal-evaluator-profile'
-
-if ($env:CODESPACES -eq 'true' -or -not [string]::IsNullOrWhiteSpace($env:CODESPACE_NAME)) {
-    throw '/ow-a11y-host-setup is not supported in a Codespace. Run it on the Windows evaluator host.'
-}
-
-if ($env:OS -ne 'Windows_NT') {
-    throw 'ow-a11y-host-setup must run on the Windows evaluator host'
-}
+$personalEvaluatorAuthStatePath = Join-Path $setupRoot 'personal-evaluator-auth.json'
+$personalEvaluatorAuthMaxAge = [TimeSpan]::FromMinutes(30)
 
 function Get-ExistingPath {
     param([string[]]$Candidates)
@@ -62,6 +65,24 @@ function Test-PythonModule {
     }
     & $PythonPath -c "import $Module" 2>$null
     return $LASTEXITCODE -eq 0
+}
+
+function Get-Sha256 {
+    param([string]$Path)
+
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $sha256 = [Security.Cryptography.SHA256]::Create()
+        try {
+            return ([BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '')
+        }
+        finally {
+            $sha256.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
 }
 
 function Get-CommandInfo {
@@ -199,11 +220,38 @@ function Get-ConsoleTransferState {
 }
 
 function Get-PersonalEvaluatorState {
+    $installed = Test-Path -LiteralPath $personalEvaluatorPath
+    $profileExists = Test-Path -LiteralPath $personalEvaluatorProfile
+    $scriptHash = if ($installed) {
+        Get-Sha256 $personalEvaluatorPath
+    } else {
+        $null
+    }
+    $authenticated = $false
+    $lastCheckedAt = $null
+    if ($profileExists -and (Test-Path -LiteralPath $personalEvaluatorAuthStatePath)) {
+        try {
+            $authState = Get-Content -LiteralPath $personalEvaluatorAuthStatePath -Raw | ConvertFrom-Json
+            $checkedAt = [DateTimeOffset]::Parse([string]$authState.checkedAt)
+            $fresh = [DateTimeOffset]::UtcNow - $checkedAt.ToUniversalTime() -le $personalEvaluatorAuthMaxAge
+            $authenticated = $authState.state -eq 'authenticated' -and
+                $authState.scriptSha256 -eq $scriptHash -and
+                $fresh
+            $lastCheckedAt = $checkedAt.ToUniversalTime().ToString('o')
+        }
+        catch {
+            $authenticated = $false
+        }
+    }
+
     return [ordered]@{
-        installed = Test-Path -LiteralPath $personalEvaluatorPath
+        installed = $installed
         scriptPath = $personalEvaluatorPath
-        profileExists = Test-Path -LiteralPath $personalEvaluatorProfile
+        profileExists = $profileExists
         profilePath = $personalEvaluatorProfile
+        authenticated = [bool]$authenticated
+        lastCheckedAt = $lastCheckedAt
+        authenticationMaxAgeMinutes = [int]$personalEvaluatorAuthMaxAge.TotalMinutes
     }
 }
 
@@ -214,6 +262,7 @@ function Install-PersonalEvaluatorBrowser {
     }
     New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null
     Copy-Item -LiteralPath $source -Destination $personalEvaluatorPath -Force
+    Remove-Item -LiteralPath $personalEvaluatorAuthStatePath -Force -ErrorAction SilentlyContinue
     Write-Output $personalEvaluatorPath
 }
 
@@ -225,10 +274,28 @@ function Check-PersonalEvaluatorBrowser {
     if (-not $python) {
         throw 'Python is required for the personal evaluator browser'
     }
-    & $python $personalEvaluatorPath check
-    if ($LASTEXITCODE -ne 0) {
-        throw "Personal evaluator browser authentication check failed with exit code $LASTEXITCODE"
+    Remove-Item -LiteralPath $personalEvaluatorAuthStatePath -Force -ErrorAction SilentlyContinue
+    $output = @(& $python $personalEvaluatorPath check 2>&1)
+    $exitCode = $LASTEXITCODE
+    $jsonLine = $output |
+        ForEach-Object { [string]$_ } |
+        Where-Object { $_.Trim().StartsWith('{') } |
+        Select-Object -Last 1
+    $result = if ($jsonLine) {
+        $jsonLine | ConvertFrom-Json
+    } else {
+        $null
     }
+    $output | Write-Output
+    if ($exitCode -ne 0 -or -not $result -or $result.state -ne 'authenticated') {
+        throw "Personal evaluator browser authentication check failed with exit code $exitCode"
+    }
+    [ordered]@{
+        state = 'authenticated'
+        checkedAt = [DateTimeOffset]::UtcNow.ToString('o')
+        scriptSha256 = Get-Sha256 $personalEvaluatorPath
+        profilePath = $personalEvaluatorProfile
+    } | ConvertTo-Json | Set-Content -LiteralPath $personalEvaluatorAuthStatePath -Encoding UTF8
 }
 
 function Get-AudioEndpoints {
@@ -266,6 +333,32 @@ function Get-PersistedAudioEndpoints {
         }
     }
     return @($endpoints)
+}
+
+function Get-DefaultRecordingEndpoint {
+    param($AudioModule)
+
+    if (-not $AudioModule) {
+        return [ordered]@{ available = $false; name = $null; id = $null; error = 'AudioDeviceCmdlets unavailable' }
+    }
+    try {
+        Import-Module $AudioModule.Path -Force
+        $device = Get-AudioDevice -Recording
+        return [ordered]@{
+            available = [bool]$device
+            name = if ($device) { [string]$device.Name } else { $null }
+            id = if ($device) { [string]$device.ID } else { $null }
+            error = $null
+        }
+    }
+    catch {
+        return [ordered]@{
+            available = $false
+            name = $null
+            id = $null
+            error = $_.Exception.Message
+        }
+    }
 }
 
 function Get-NvdaSpeechViewerState {
@@ -339,7 +432,8 @@ function Set-NvdaSpeechViewer {
 function Get-VoiceAccessState {
     param(
         [object[]]$CableCaptureEndpoints,
-        [object[]]$CurrentSessionEndpoints
+        [object[]]$CurrentSessionEndpoints,
+        $DefaultRecordingEndpoint
     )
 
     $voiceAccessPath = Join-Path $env:WINDIR 'System32\VoiceAccess.exe'
@@ -368,9 +462,11 @@ function Get-VoiceAccessState {
     $cableCapturePresent = @($CurrentSessionEndpoints | Where-Object {
         $_.name -match '^CABLE Output'
     }).Count -gt 0
+    $defaultCableReady = $DefaultRecordingEndpoint.available -and
+        $DefaultRecordingEndpoint.name -match '^CABLE Output'
     $microphoneMode = if ($microphoneReady) {
         'explicit-cable'
-    } elseif ($cableCapturePresent -and -not $remoteAudioPresent) {
+    } elseif ($cableCapturePresent -and $defaultCableReady -and -not $remoteAudioPresent) {
         'default-cable-fallback'
     } elseif ($remoteAudioPresent) {
         'remote-audio-active'
@@ -433,6 +529,7 @@ function Get-Capabilities {
     $wpr = Get-CommandInfo 'wpr.exe'
     $wpa = Get-CommandInfo 'wpa.exe'
     $sessionType = Get-SessionType
+    $defaultRecordingEndpoint = Get-DefaultRecordingEndpoint $audioModule
 
     $prerequisites = [ordered]@{
         edge = [ordered]@{
@@ -450,6 +547,7 @@ function Get-Capabilities {
         audioDeviceCmdlets = [ordered]@{
             available = [bool]$audioModule
             version = if ($audioModule) { [string]$audioModule.Version } else { $null }
+            defaultRecordingEndpoint = $defaultRecordingEndpoint
         }
         python = [ordered]@{
             available = [bool]$python
@@ -461,7 +559,7 @@ function Get-Capabilities {
         windowsPerformanceRecorder = $wpr
         windowsPerformanceAnalyzer = $wpa
         personalEvaluatorBrowser = Get-PersonalEvaluatorState
-        voiceAccess = Get-VoiceAccessState $cableOutput $audioEndpoints
+        voiceAccess = Get-VoiceAccessState $cableOutput $audioEndpoints $defaultRecordingEndpoint
         vbCable = [ordered]@{
             renderEndpointReady = $cableInput.Count -gt 0
             captureEndpointReady = $cableOutput.Count -gt 0
@@ -490,7 +588,11 @@ function Get-Capabilities {
         prerequisites = $prerequisites
         scenarios = [ordered]@{
             browserKeyboard = [bool]($prerequisites.edge.available -and
-                $prerequisites.personalEvaluatorBrowser.installed)
+                $prerequisites.python.available -and
+                $prerequisites.python.playwright -and
+                $prerequisites.personalEvaluatorBrowser.installed -and
+                $prerequisites.personalEvaluatorBrowser.profileExists -and
+                $prerequisites.personalEvaluatorBrowser.authenticated)
             nvda = [bool]($prerequisites.edge.available -and $prerequisites.nvda.available -and
                 $prerequisites.nvda.speechViewer.configured)
             narratorEtw = [bool]($prerequisites.edge.available -and
@@ -592,7 +694,7 @@ function Stage-VbCable {
     $zipPath = Join-Path $setupRoot 'VBCABLE_Driver_Pack45.zip'
     Invoke-WebRequest -Uri $vbCableUrl -OutFile $zipPath
 
-    $actualHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
+    $actualHash = Get-Sha256 $zipPath
     if ($actualHash -ne $vbCableSha256) {
         throw "VB-CABLE package hash mismatch. Expected $vbCableSha256, received $actualHash"
     }
@@ -792,6 +894,7 @@ switch ($Action) {
     }
     'CheckPersonalEvaluatorBrowser' {
         Check-PersonalEvaluatorBrowser
+        Write-Capabilities
     }
     'StageVbCable' {
         Write-Output (Stage-VbCable)
