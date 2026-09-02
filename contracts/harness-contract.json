@@ -134,7 +134,7 @@
     {
       "source": "tools",
       "mirror": "copilot/tools",
-      "extensions": [".mjs"],
+      "extensions": [".mjs", ".py"],
       "names": ["package.json", "package-lock.json"]
     }
   ],

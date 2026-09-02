@@ -32,6 +32,7 @@ missing, run `CODESPACES=false az login` in the current Codespace terminal and r
 | `/agentow --auto` | Zero-interaction full pipeline |
 | `/agentow --poc` | Fast runnable proof of concept, not production-ready |
 | `/agentow-a11y` | Evidence-first Accessibility remediation |
+| `/ow-a11y-host-setup` | Prepare a Windows host for real-AT and audio evidence |
 | `/ow-batch` | Serial, checkpointed batch execution |
 | `/ow-review` | Review a branch or existing ADO PR without editing or shipping |
 | `/ow-context-feedback` | Update linked durable context from later feedback |
