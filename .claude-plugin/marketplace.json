@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "GitHub Copilot CLI harness for odsp-web development in Codespaces",
-    "version": "0.1.41"
+    "version": "0.1.42"
   },
   "plugins": [
     {
       "name": "agentow-copilot",
       "source": "./copilot",
       "description": "GitHub Copilot CLI agentOW harness with standard, POC, batch, review, and Accessibility workflows.",
-      "version": "0.1.41",
+      "version": "0.1.42",
       "author": {
         "name": "kaixun"
       },

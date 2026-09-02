@@ -32,6 +32,7 @@ missing, run `CODESPACES=false az login` in the current Codespace terminal and r
 | `/agentow --auto` | Zero-interaction full pipeline |
 | `/agentow --poc` | Fast runnable proof of concept, not production-ready |
 | `/agentow-a11y` | Evidence-first Accessibility remediation |
+| `/agentow-a11y-explore-test` | Exploratory WCAG testing and deterministic reporting |
 | `/ow-a11y-host-setup` | Prepare a Windows host for real-AT and audio evidence |
 | `/ow-batch` | Serial, checkpointed batch execution |
 | `/ow-review` | Review a branch or existing ADO PR without editing or shipping |
@@ -41,8 +42,8 @@ missing, run `CODESPACES=false az login` in the current Codespace terminal and r
 | `/ow-doctor` | Force environment diagnosis and repair |
 
 The main Copilot session owns orchestration and implementation so fix-cycle context is retained.
-Planner, evaluator, A11y evaluator, reviewer, and context-maintainer agents are bounded stateless
-verifiers.
+Planner, evaluator, A11y evaluator, A11y explore planner/category tester, reviewer, and
+context-maintainer agents are bounded stateless workers.
 
 agentOW is a routing/execution layer. Feature-specific rules and execution guards should live in the routed context docs rather than in generic harness prompts. Context maintenance never adds a user gate.
 

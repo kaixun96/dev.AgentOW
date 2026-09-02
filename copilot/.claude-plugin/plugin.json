@@ -1,7 +1,7 @@
 {
   "name": "agentow-copilot",
   "description": "GitHub Copilot CLI agentOW harness with standard, POC, batch, review, and Accessibility workflows.",
-  "version": "0.1.41",
+  "version": "0.1.42",
   "author": {
     "name": "kaixun"
   },

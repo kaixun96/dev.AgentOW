@@ -14,6 +14,8 @@ Subagents are **stateless verifiers** you dispatch as tools. They look, they rep
 |----------|------|-----------|
 | `@agentow-copilot:planner` | Research the codebase, return findings (root cause, files to change, surface trace) | Yes — pure research |
 | `@agentow-copilot:evaluator` | Verify the change via Playwright + code inspection, return PASS/FAIL + blockers | Yes — pure verification |
+| `@agentow-copilot:a11y-explore-planner` | Select WCAG exploratory categories, evidence, and execution isolation | Yes — pure planning |
+| `@agentow-copilot:a11y-explore-category-tester` | Execute or evaluate one bounded WCAG category | Yes — bounded testing |
 | `@agentow-copilot:reviewer` | Pre-PR code review against odsp-web conventions | Yes — pure review |
 
 You keep the work that needs continuity and user interaction: talking to the user, writing the plan, writing the code, driving the fix loop, creating the PR. Subagents do the bounded, context-heavy "look at a lot of code and report" work — which also keeps your own context lean.
