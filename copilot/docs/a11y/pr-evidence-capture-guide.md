@@ -22,13 +22,16 @@ Before creating or updating any A11y PR description, the operator must read this
 | 缺陷类型 | 必需 reviewer 证据 |
 |---|---|
 | 颜色、布局、可见文本、静态 focus indicator | 匹配的全页 BEFORE/AFTER + 清晰 target crop |
-| accessible name、role、state、heading、relationship | 全页 BEFORE/AFTER + 标注对比图 + AX/UIA/DOM 机器证据 |
+| accessible name、role、state、heading、relationship | Full-page BEFORE/AFTER + annotated comparison + AX/UIA/DOM machine evidence; when the user impact is AT speech, also require continuous AT video with synchronized real audio |
 | 键盘焦点顺序、焦点移动、动态更新 | 真实连续 BEFORE/AFTER 视频 |
 | Screen reader 朗读、重复/遗漏 announcement | 真实连续 BEFORE/AFTER 视频，包含同步真实音频；transcript 仅作辅助 |
 | Voice Access 编号/overlay | 全 overlay 截图 + 完整 overlay map；涉及交互时再加视频 |
 | reflow、zoom、responsive behavior | 固定 viewport/zoom 的匹配截图；动态变化时加视频 |
 
-静态语义不能只靠截图推断；时序行为不能用截图拼接成“视频”。同一 bug 可同时需要多种证据。
+Static semantics cannot be inferred from screenshots alone, and temporal behavior cannot be
+simulated by stitching screenshots into a "video." Visually byte-identical BEFORE/AFTER
+screenshots prove only that there is no visual regression; they do not prove that invisible
+semantics or AT output was fixed. One bug can require multiple evidence types.
 
 ## 3. 以原 bug 为验收合同
 
@@ -162,6 +165,8 @@ target rect 只能有渲染抖动允许范围内的小误差。任一无关状�
 - Tab/Arrow 焦点移动或 focus restore；
 - keyboard trap、skip link、menu/dialog traversal；
 - screen reader 朗读内容、次数、顺序或 live-region announcement；
+- an accessible name, description, role, state, or relationship fix whose reasonable user impact
+  or acceptance criterion is the actual screen-reader announcement;
 - dynamic content、loading、toast 或状态变化；
 - Voice Access voice command 到实际 action 的映射。
 
@@ -186,6 +191,9 @@ target rect 只能有渲染抖动允许范围内的小误差。任一无关状�
 
 Screen reader 证据必须同时证明“操作对象”和“实际输出”：
 
+- When a fix changes invisible semantics spoken by a screen reader, AX/UIA/DOM machine evidence
+  proves the underlying value and synchronized real-AT video proves the user-observed result; both
+  are required.
 - 所有 screen reader 缺陷都必须提供修复后真实连续 AFTER 录屏；截图、AX/UIA tree、
   transcript、ETW 或测试结果不能替代 AFTER 视频；
 - 录入真实 Narrator/NVDA 音频，不能由 TTS 后期重配；
