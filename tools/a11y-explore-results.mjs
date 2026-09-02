@@ -248,6 +248,16 @@ function validateEvidence(evidence, categoryDir, category, resultProducer, index
   if (evidence.producer !== resultProducer) {
     throw new Error(`${category}.evidence[${index}].producer does not match result producer`);
   }
+  if (evidence.annotation !== undefined) {
+    if (
+      !evidence.annotation ||
+      !["element", "page", "infrastructure"].includes(evidence.annotation.kind) ||
+      typeof evidence.annotation.label !== "string" ||
+      !evidence.annotation.label.trim()
+    ) {
+      throw new Error(`${category}.evidence[${index}].annotation is invalid`);
+    }
+  }
   if (/^https?:\/\//i.test(evidence.uri) || !path.isAbsolute(evidence.uri)) {
     throw new Error(`${category}.evidence[${index}].uri must be a materialized absolute local path`);
   }
@@ -328,7 +338,7 @@ function validateEvidenceShape(filePath, type, category) {
     }
   }
 }
-function validateFinding(finding, category, evidenceUris, status, index) {
+function validateFinding(finding, category, evidenceByUri, status, index) {
   assertObject(finding, `${category}.findings[${index}]`);
   if (typeof finding.id !== "string" || !/^[A-Z-]+-\d+$/.test(finding.id)) {
     throw new Error(`${category}.findings[${index}].id is invalid`);
@@ -379,9 +389,22 @@ function validateFinding(finding, category, evidenceUris, status, index) {
     throw new Error(`${category}.findings[${index}] has no evidence`);
   }
   for (const uri of finding.evidenceUris) {
-    if (!evidenceUris.has(uri)) {
+    if (!evidenceByUri.has(uri)) {
       throw new Error(`${category}.findings[${index}] references unknown evidence: ${uri}`);
     }
+  }
+  const linkedScreenshots = finding.evidenceUris
+    .map((uri) => evidenceByUri.get(uri))
+    .filter((entry) => entry.type === "screenshot");
+  if (!infrastructureException && linkedScreenshots.length === 0) {
+    throw new Error(`${category}.findings[${index}] has no screenshot evidence`);
+  }
+  if (
+    finding.classification !== "PASS" &&
+    linkedScreenshots.length > 0 &&
+    !linkedScreenshots.some((entry) => entry.annotation)
+  ) {
+    throw new Error(`${category}.findings[${index}] has no annotated screenshot`);
   }
 }
 
@@ -439,7 +462,7 @@ export function validateCategoryResult(result, runDir, expectedCategory) {
       }
     }
   }
-  const evidenceUris = new Set(result.evidence.map((entry) => entry.uri));
+  const evidenceByUri = new Map(result.evidence.map((entry) => [entry.uri, entry]));
   const findingIds = new Set();
   for (const finding of result.findings) {
     if (findingIds.has(finding.id)) {
@@ -448,7 +471,7 @@ export function validateCategoryResult(result, runDir, expectedCategory) {
     findingIds.add(finding.id);
   }
   result.findings.forEach((finding, index) =>
-    validateFinding(finding, expectedCategory, evidenceUris, result.status, index),
+    validateFinding(finding, expectedCategory, evidenceByUri, result.status, index),
   );
   return result;
 }

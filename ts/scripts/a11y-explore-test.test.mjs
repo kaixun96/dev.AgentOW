@@ -130,6 +130,10 @@ try {
         uri: screenshot,
         sha256: hash,
         producer: "copilot-browser",
+        annotation: {
+          kind: "element",
+          label: "VIOLATION-1 Focus missing",
+        },
       },
       {
         type: "focus-sequence",
@@ -318,6 +322,10 @@ try {
         uri: dynamicEvidence,
         sha256: dynamicHash,
         producer: "copilot-browser",
+        annotation: {
+          kind: "element",
+          label: "VIOLATION-1 Dynamic issue",
+        },
       },
       {
         type: "interaction-log",

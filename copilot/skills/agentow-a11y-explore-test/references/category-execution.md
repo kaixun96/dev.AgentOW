@@ -39,6 +39,22 @@ Evidence contains type, absolute real path, SHA-256, and producer. Every artifac
 external evidence, must be materialized under its category directory. A finding cites its evidence
 paths.
 
+Every reportable finding requires a screenshot. `VIOLATION`, `BEST-PRACTICE`, and `NEEDS-REVIEW`
+screenshots also require:
+
+```json
+{
+  "annotation": {
+    "kind": "element|page|infrastructure",
+    "label": "<finding ID and short issue>"
+  }
+}
+```
+
+Use a red element outline plus an external label. For missing-element, page-level, or infrastructure
+findings, use a red banner that does not obscure the evidence. Remove browser annotations after
+capture.
+
 `accessibility-tree` JSON has a category-specific stable summary in addition to any raw AX payload:
 
 - `structure-semantics`: `{ "inventory": { "headings": [{ "level": 1, "text": "..." }],

@@ -173,6 +173,11 @@ supplied concrete browser contract, restores state it changes, saves evidence on
 Every observed finding requires evidence. Infrastructure failures use category status `blocked` or
 `inconclusive`, never a fabricated product finding.
 
+Before capturing a non-PASS finding, add a red outline around the affected element and an external
+finding-ID label, capture the screenshot, then remove the annotation. For missing-element,
+page-level, or infrastructure findings, add a red diagnostic banner without covering relevant
+content. Record annotation kind and label in the screenshot evidence metadata.
+
 ## Step 4: Execute the serial real-AT tail
 
 Run only after all browser workers finish. Never overlap NVDA, Narrator, Voice Access, or another

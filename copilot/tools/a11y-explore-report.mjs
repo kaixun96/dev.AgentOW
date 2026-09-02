@@ -450,6 +450,7 @@ h1{font-size:1.8rem;margin-bottom:8px}h2{font-size:1.4rem;margin:32px 0 16px;pad
 table{width:100%;border-collapse:collapse;margin:16px 0}th,td{padding:10px 14px;text-align:left;border:1px solid #e0e0e0}th{background:#f5f5f5}.total{font-weight:700}
 a{color:#1565c0}code{background:#f5f5f5;padding:2px 6px;border-radius:3px}pre{background:#263238;color:#eeffff;padding:16px;border-radius:6px;overflow:auto}
 img{max-width:100%;border:1px solid #e0e0e0;border-radius:4px;margin:8px 0;cursor:zoom-in}.meta{color:#616161;margin-bottom:24px}
+.finding:not(.finding-pass) img{border:4px solid #d32f2f;box-shadow:0 0 0 3px #fff,0 0 0 6px #d32f2f}
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin:20px 0}.summary-card{padding:20px;border-radius:8px;text-align:center}.count{font-size:2.2rem;font-weight:700}.label{font-size:.85rem;text-transform:uppercase}
 .card-violations{background:#ffebee;color:var(--critical);border-left:4px solid var(--critical)}.card-best-practice{background:#f3e5f5;color:var(--best);border-left:4px solid var(--best)}.card-pass{background:#e8f5e9;color:var(--pass);border-left:4px solid var(--pass)}.card-needs-review{background:#e3f2fd;color:var(--review);border-left:4px solid var(--review)}
 .sc-fail{background:#ffebee}.sc-pass{background:#e8f5e9}.sc-review{background:#e3f2fd}.sc-na{background:#f5f5f5;color:#757575}.sc-fail td:nth-child(2),.sc-pass td:nth-child(2),.sc-review td:nth-child(2){font-weight:700}

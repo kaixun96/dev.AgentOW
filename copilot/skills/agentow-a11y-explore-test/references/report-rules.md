@@ -19,6 +19,10 @@ self-contained `report.html` with embedded CSS and no external runtime dependenc
 6. At least one inline screenshot per reportable finding, using a relative path. Omit incomplete
    completed-category findings and list them in coverage notes. A non-completed infrastructure
    `NEEDS-REVIEW` record may render without a screenshot.
+   - `VIOLATION`, `BEST-PRACTICE`, and `NEEDS-REVIEW` screenshots use a red outline and finding-ID
+     label.
+   - Missing-element/page-level/infrastructure issues use a red banner that does not cover relevant
+     pixels.
 7. Tab Order Map with failed-row styling for missing/obscured focus indicators.
 8. Heading Hierarchy with skipped levels highlighted.
 9. Landmark Regions with presence/label information.
@@ -36,6 +40,8 @@ network dependency.
 ## Safety and completeness
 
 - Escape all model/page content before inserting it into HTML.
+- Render non-PASS screenshot thumbnails with a strong red border as a secondary visual cue; this
+  does not replace the annotation inside the image.
 - Keep report reads and writes inside the real run directory and reject symlink escapes.
 - Do not leave template placeholders in the output.
 - Do not label the exploratory result as full WCAG conformance.
