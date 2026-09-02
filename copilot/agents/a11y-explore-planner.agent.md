@@ -28,9 +28,9 @@ Inputs:
 - `capabilitiesPath`
 - `artifactRoot`
 
-Default to all applicable categories. Omit `authentication-forms` only when no authentication,
-verification, or multi-step form exists. Omit `timing-motion` only for clearly static content.
-Never omit an uncertain category merely to shorten the run.
+Always include all nine categories. When a surface has no form, authentication, timing, media,
+motion, or other applicable behavior, run an applicability check and use `NOT_APPLICABLE` with
+evidence and rationale. Never omit a category to shorten the run.
 
 For each category, declare:
 
@@ -74,26 +74,118 @@ Return one JSON object and no surrounding prose:
 ```json
 {
   "schemaVersion": 1,
+  "fullCoverage": true,
   "target": "human-readable target",
   "url": "resolved URL or default",
-  "executionEnvironment": "codespace|windows-host|unsupported-host",
-  "requestedCategories": [],
+  "executionEnvironment": "windows-host",
+  "requestedCategories": [
+    "keyboard-focus",
+    "screen-reader",
+    "structure-semantics",
+    "orientation-input-purpose",
+    "visual-color",
+    "timing-motion",
+    "dynamic-content",
+    "touch-pointer",
+    "authentication-forms"
+  ],
   "focusAreas": ["..."],
-  "scCoverage": ["1.3.1", "2.1.1"],
+  "scCoverage": [
+    "1.1.1", "1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.5", "1.3.1",
+    "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.4.1", "1.4.2", "1.4.3",
+    "1.4.4", "1.4.5", "1.4.10", "1.4.11", "1.4.12", "1.4.13",
+    "2.1.1", "2.1.2", "2.1.4", "2.2.1", "2.2.2", "2.3.1", "2.4.1",
+    "2.4.2", "2.4.3", "2.4.4", "2.4.5", "2.4.6", "2.4.7", "2.4.11",
+    "2.5.1", "2.5.2", "2.5.3", "2.5.4", "2.5.7", "2.5.8", "3.1.1",
+    "3.1.2", "3.2.1", "3.2.2", "3.2.3", "3.2.4", "3.2.6", "3.3.1",
+    "3.3.2", "3.3.3", "3.3.4", "3.3.7", "3.3.8", "4.1.2", "4.1.3"
+  ],
   "categories": [
     {
       "category": "keyboard-focus",
       "executionClass": "serial-browser",
-      "wcagSc": ["2.1.1", "2.4.7"],
-      "focusAreas": ["tab order"],
+      "wcagSc": ["2.1.1", "2.1.2", "2.1.4", "2.4.3", "2.4.7", "2.4.11"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
       "requiredCapabilities": ["browser", "keyboard"],
       "requiredEvidenceTypes": ["screenshot", "focus-sequence"],
       "maximumClaim": "browser-keyboard-tested"
+    },
+    {
+      "category": "screen-reader",
+      "executionClass": "serial-real-at",
+      "wcagSc": ["1.1.1", "1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.5", "1.3.1", "1.3.2", "2.4.2", "2.4.4", "3.3.2", "4.1.2", "4.1.3"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
+      "requiredCapabilities": ["nvda", "real-os-input", "uia"],
+      "requiredEvidenceTypes": ["nvda-transcript", "screenshot", "uia-state"],
+      "maximumClaim": "nvda-tested"
+    },
+    {
+      "category": "structure-semantics",
+      "executionClass": "serial-browser",
+      "wcagSc": ["1.3.1", "1.3.2", "1.3.3", "1.3.5", "2.4.1", "2.4.5", "2.4.6", "3.1.1", "3.1.2"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
+      "requiredCapabilities": ["browser"],
+      "requiredEvidenceTypes": ["screenshot", "accessibility-tree"],
+      "maximumClaim": "browser-semantics-tested"
+    },
+    {
+      "category": "orientation-input-purpose",
+      "executionClass": "serial-browser",
+      "wcagSc": ["1.3.4", "1.3.5"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
+      "requiredCapabilities": ["browser"],
+      "requiredEvidenceTypes": ["screenshot", "accessibility-tree"],
+      "maximumClaim": "browser-semantics-tested"
+    },
+    {
+      "category": "visual-color",
+      "executionClass": "serial-browser",
+      "wcagSc": ["1.4.1", "1.4.2", "1.4.3", "1.4.4", "1.4.5", "1.4.10", "1.4.11", "1.4.12", "1.4.13"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
+      "requiredCapabilities": ["browser"],
+      "requiredEvidenceTypes": ["screenshot", "measurement"],
+      "maximumClaim": "browser-visual-tested"
+    },
+    {
+      "category": "timing-motion",
+      "executionClass": "serial-browser",
+      "wcagSc": ["2.2.1", "2.2.2", "2.3.1"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
+      "requiredCapabilities": ["browser"],
+      "requiredEvidenceTypes": ["screenshot", "interaction-log"],
+      "maximumClaim": "browser-dynamic-tested"
+    },
+    {
+      "category": "dynamic-content",
+      "executionClass": "serial-browser",
+      "wcagSc": ["1.3.2", "2.4.3", "3.2.1", "3.2.2", "3.2.3", "3.2.4", "3.2.6", "4.1.3"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
+      "requiredCapabilities": ["browser"],
+      "requiredEvidenceTypes": ["screenshot", "interaction-log"],
+      "maximumClaim": "browser-dynamic-tested"
+    },
+    {
+      "category": "touch-pointer",
+      "executionClass": "serial-browser",
+      "wcagSc": ["2.5.1", "2.5.2", "2.5.3", "2.5.4", "2.5.7", "2.5.8"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
+      "requiredCapabilities": ["browser"],
+      "requiredEvidenceTypes": ["screenshot", "measurement", "interaction-log"],
+      "maximumClaim": "browser-touch-pointer-tested"
+    },
+    {
+      "category": "authentication-forms",
+      "executionClass": "serial-browser",
+      "wcagSc": ["3.3.1", "3.3.2", "3.3.3", "3.3.4", "3.3.7", "3.3.8"],
+      "focusAreas": ["full WCAG 2.2 A/AA coverage"],
+      "requiredCapabilities": ["browser"],
+      "requiredEvidenceTypes": ["screenshot", "accessibility-tree"],
+      "maximumClaim": "browser-forms-tested"
     }
   ]
 }
 ```
 
-`requestedCategories` contains every explicit category requested by the user, or an empty array when
-the planner selected categories from the description. `scCoverage` must equal the sorted union of
-all category `wcagSc` arrays.
+`fullCoverage` is always `true`. `requestedCategories` contains all nine category slugs.
+`scCoverage` must equal the sorted union of
+all category `wcagSc` arrays and cover every supported WCAG 2.2 A/AA criterion.

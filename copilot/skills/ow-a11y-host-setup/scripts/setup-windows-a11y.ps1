@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Probe', 'InstallSafeDependencies', 'InstallPersonalEvaluatorBrowser', 'CheckPersonalEvaluatorBrowser', 'StageVbCable', 'LaunchVbCableInstaller', 'OpenVoiceAccess', 'InstallConsoleTransferTask', 'RunConsoleTransfer', 'ValidateHost')]
+    [ValidateSet('Probe', 'InstallSafeDependencies', 'InstallPersonalEvaluatorBrowser', 'CheckPersonalEvaluatorBrowser', 'StageVbCable', 'LaunchVbCableInstaller', 'OpenVoiceAccess', 'DisableVoiceAccessAutoStart', 'InstallSessionAutomation', 'RunSessionBootstrap', 'GetSessionReadiness', 'InstallConsoleTransferTask', 'RunConsoleTransfer', 'ValidateHost')]
     [string]$Action,
 
     [string]$OutputPath
@@ -22,6 +22,9 @@ $vbCableSha256 = 'B950E39F01AF1D04EA623C8F6D8EB9B6EA5C477C637295FABF20631C85116B
 $setupRoot = Join-Path $env:LOCALAPPDATA 'agentow\a11y-host'
 $vbCableRoot = Join-Path $setupRoot 'vb-cable-pack45'
 $consoleTaskName = 'AgentOW-A11Y-TransferToConsole'
+$workerTaskName = 'AgentOW-A11Y-UserWorker'
+$heartbeatPath = Join-Path $setupRoot 'readiness.json'
+$transferStatePath = Join-Path $env:ProgramData 'agentow\a11y-host\transfer.json'
 $personalEvaluatorSources = @(
     (Join-Path $PSScriptRoot '..\..\..\tools\personal-evaluator-browser.py'),
     (Join-Path $PSScriptRoot '..\..\..\..\tools\personal-evaluator-browser.py')
@@ -30,6 +33,11 @@ $personalEvaluatorPath = Join-Path $setupRoot 'personal-evaluator-browser.py'
 $personalEvaluatorProfile = Join-Path $HOME '.playwright\personal-evaluator-profile'
 $personalEvaluatorAuthStatePath = Join-Path $setupRoot 'personal-evaluator-auth.json'
 $personalEvaluatorAuthMaxAge = [TimeSpan]::FromMinutes(30)
+$sessionContractPath = Join-Path $PSScriptRoot 'session-readiness-contract.ps1'
+if (-not (Test-Path -LiteralPath $sessionContractPath)) {
+    throw "Session readiness contract was not found at $sessionContractPath"
+}
+. $sessionContractPath
 
 function Get-ExistingPath {
     param([string[]]$Candidates)
@@ -143,9 +151,108 @@ function Get-SessionType {
     return 'unknown'
 }
 
+function Get-UserWorkerScript {
+    $contract = Get-Content -LiteralPath $sessionContractPath -Raw
+    $worker = @"
+`$ErrorActionPreference = 'Stop'
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class AgentOWPowerState {
+    [DllImport("kernel32.dll")]
+    public static extern uint SetThreadExecutionState(uint flags);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint desiredAccess);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetUserObjectInformation(
+        IntPtr handle, int index, StringBuilder value, uint length, out uint required);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool CloseDesktop(IntPtr handle);
+    public static string GetInputDesktopName() {
+        IntPtr desktop = OpenInputDesktop(0, false, 0x0001);
+        if (desktop == IntPtr.Zero) return null;
+        try {
+            uint required;
+            var value = new StringBuilder(256);
+            return GetUserObjectInformation(desktop, 2, value, 512, out required)
+                ? value.ToString()
+                : null;
+        } finally {
+            CloseDesktop(desktop);
+        }
+    }
+}
+'@
+`$setupRoot = '$($setupRoot.Replace("'", "''"))'
+`$heartbeatPath = '$($heartbeatPath.Replace("'", "''"))'
+New-Item -ItemType Directory -Path `$setupRoot -Force | Out-Null
+while (`$true) {
+    `$executionFlags = [uint32]::Parse('80000003', [Globalization.NumberStyles]::HexNumber)
+    [void][AgentOWPowerState]::SetThreadExecutionState(`$executionFlags)
+    `$sessionId = (Get-Process -Id `$PID).SessionId
+    `$sessionLine = query.exe session 2>`$null |
+        Where-Object { `$_ -match "\s`$sessionId\s+(Active|Disc)\s*" } |
+        Select-Object -First 1
+    `$sessionRecord = if (`$sessionLine) {
+        Convert-AgentOWSessionLine -Line `$sessionLine -Format Session
+    } else {
+        `$null
+    }
+    `$sessionName = if (`$sessionRecord) { `$sessionRecord.sessionName } else { 'unknown' }
+    `$sessionState = if (`$sessionRecord) { `$sessionRecord.state } else { 'unknown' }
+    `$logonUi = @(Get-Process LogonUI -ErrorAction SilentlyContinue | Where-Object SessionId -eq `$sessionId)
+    `$lockApp = @(Get-Process LockApp -ErrorAction SilentlyContinue | Where-Object SessionId -eq `$sessionId)
+    `$consent = @(Get-Process consent -ErrorAction SilentlyContinue | Where-Object SessionId -eq `$sessionId)
+    `$credentialUi = @(Get-Process CredentialUIBroker -ErrorAction SilentlyContinue | Where-Object SessionId -eq `$sessionId)
+    `$voiceAccess = @(Get-Process VoiceAccess, VoiceAccessHost -ErrorAction SilentlyContinue |
+        Where-Object SessionId -eq `$sessionId)
+    `$explorer = @(Get-Process explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq `$sessionId)
+    `$nvda = Test-Path -LiteralPath (Join-Path `$env:ProgramFiles 'NVDA\nvda.exe')
+    `$edge = Test-Path -LiteralPath (Join-Path `${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe')
+    `$inputDesktop = [AgentOWPowerState]::GetInputDesktopName()
+    `$secureSurfacePresent = `$inputDesktop -ne 'Default' -or `$logonUi.Count -gt 0 -or
+        `$consent.Count -gt 0 -or `$credentialUi.Count -gt 0
+    `$state = [ordered]@{
+        schemaVersion = 1
+        heartbeatAt = [DateTimeOffset]::UtcNow.ToString('o')
+        workerPid = `$PID
+        user = [Environment]::UserName
+        sessionId = `$sessionId
+        sessionName = `$sessionName
+        sessionState = `$sessionState
+        consoleUnlocked = `$sessionName -eq 'console' -and -not `$secureSurfacePresent
+        atReady = `$nvda -and `$edge -and `$voiceAccess.Count -eq 0
+        authenticated = `$explorer.Count -gt 0 -and -not `$secureSurfacePresent
+        legacyLockPresent = `$secureSurfacePresent
+        secureSurfacePresent = `$secureSurfacePresent
+        inputDesktop = `$inputDesktop
+        lockAppProcessPresent = `$lockApp.Count -gt 0
+        voiceAccessStopped = `$voiceAccess.Count -eq 0
+    }
+    `$temporary = "`$heartbeatPath.tmp"
+    `$state | ConvertTo-Json | Set-Content -LiteralPath `$temporary -Encoding UTF8
+    Move-Item -LiteralPath `$temporary -Destination `$heartbeatPath -Force
+    Start-Sleep -Seconds 5
+}
+"@
+    return $contract + "`r`n" + $worker
+}
+
 function Get-ConsoleTransferScript {
-    return @'
+    param(
+        [string]$ExpectedUser,
+        [string]$ReadinessPath,
+        [string]$TransferPath
+    )
+
+    $contract = Get-Content -LiteralPath $sessionContractPath -Raw
+    $template = $contract + "`r`n" + @'
 $ErrorActionPreference = 'Stop'
+$expectedUser = '__EXPECTED_USER__'
+$readinessPath = '__READINESS_PATH__'
+$transferPath = '__TRANSFER_PATH__'
+$startedAt = [DateTimeOffset]::UtcNow
 $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='VBAudioVACMME'"
 if (-not $driver) {
     throw 'VBAudioVACMME driver was not found.'
@@ -160,39 +267,173 @@ foreach ($serviceName in 'AudioEndpointBuilder', 'Audiosrv') {
     }
 }
 Start-Sleep -Seconds 5
-$sessionId = Get-Process explorer |
-    Where-Object SessionId -ne 0 |
-    Sort-Object StartTime -Descending |
-    Select-Object -First 1 -ExpandProperty SessionId
-if ($null -eq $sessionId) {
-    throw 'No interactive Explorer session was found.'
-}
+$candidate = Select-AgentOWActiveRdpSession `
+    -Lines @(quser.exe $expectedUser 2>$null) `
+    -ExpectedUser $expectedUser
+$sessionId = $candidate.sessionId
 & "$env:WINDIR\System32\tscon.exe" $sessionId /dest:console
 if ($LASTEXITCODE -ne 0) {
     throw "tscon failed with exit code $LASTEXITCODE."
 }
+Start-Sleep -Seconds 5
+$consoleLine = query.exe session 2>$null |
+    Where-Object { $_ -match "^\s*>?console\s+$([regex]::Escape($expectedUser))\s+$sessionId\s+Active\b" } |
+    Select-Object -First 1
+if (-not $consoleLine) {
+    throw "Console is not owned by $expectedUser in session $sessionId after transfer."
+}
+$deadline = (Get-Date).AddSeconds(45)
+do {
+    Start-Sleep -Seconds 2
+    $heartbeat = if (Test-Path -LiteralPath $readinessPath) {
+        try { Get-Content -LiteralPath $readinessPath -Raw | ConvertFrom-Json } catch { $null }
+    } else {
+        $null
+    }
+    $ready = $heartbeat -and (Test-AgentOWReadinessHeartbeat `
+        -Heartbeat $heartbeat `
+        -ExpectedUser $expectedUser `
+        -ExpectedSessionId $sessionId `
+        -Phase Console `
+        -NotBefore $startedAt)
+} while ((Get-Date) -lt $deadline -and -not $ready)
+if (-not $ready) {
+    throw 'A fresh, unlocked, authenticated, AT-ready worker heartbeat was not observed after transfer.'
+}
+$state = [ordered]@{
+    schemaVersion = 1
+    completedAt = [DateTimeOffset]::UtcNow.ToString('o')
+    user = $expectedUser
+    sessionId = $sessionId
+    heartbeatAt = $heartbeat.heartbeatAt
+    ready = $true
+}
+$parent = Split-Path -Parent $transferPath
+New-Item -ItemType Directory -Path $parent -Force | Out-Null
+$state | ConvertTo-Json | Set-Content -LiteralPath $transferPath -Encoding UTF8
 '@
+    $template = $template.Replace('__EXPECTED_USER__', $ExpectedUser.Replace("'", "''"))
+    $template = $template.Replace('__READINESS_PATH__', $ReadinessPath.Replace("'", "''"))
+    $template = $template.Replace('__TRANSFER_PATH__', $TransferPath.Replace("'", "''"))
+    return $template
 }
 
-function Install-ConsoleTransferTask {
-    $taskScript = Get-ConsoleTransferScript
+function Install-SessionAutomation {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw 'InstallSessionAutomation requires an elevated PowerShell process.'
+    }
+
+    New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null
+    $workerScript = Get-UserWorkerScript
+    $encodedWorker = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($workerScript))
+    $workerAction = New-ScheduledTaskAction `
+        -Execute 'powershell.exe' `
+        -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encodedWorker"
+    $workerPrincipal = New-ScheduledTaskPrincipal `
+        -UserId $identity.Name `
+        -LogonType Interactive `
+        -RunLevel Limited
+    $workerTrigger = New-ScheduledTaskTrigger -AtLogOn -User $identity.Name
+    $workerSettings = New-ScheduledTaskSettingsSet `
+        -MultipleInstances IgnoreNew `
+        -ExecutionTimeLimit ([TimeSpan]::Zero) `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries
+    Register-ScheduledTask `
+        -TaskName $workerTaskName `
+        -Action $workerAction `
+        -Principal $workerPrincipal `
+        -Trigger $workerTrigger `
+        -Settings $workerSettings `
+        -Description 'Maintains the interactive A11Y user session and publishes readiness heartbeats.' `
+        -Force |
+        Out-Null
+
+    $expectedUser = [Environment]::UserName
+    $taskScript = Get-ConsoleTransferScript `
+        -ExpectedUser $expectedUser `
+        -ReadinessPath $heartbeatPath `
+        -TransferPath $transferStatePath
     $encodedTask = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($taskScript))
     $action = New-ScheduledTaskAction `
         -Execute 'powershell.exe' `
         -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encodedTask"
-    $principal = New-ScheduledTaskPrincipal `
-        -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) `
-        -LogonType Interactive `
+    $systemPrincipal = New-ScheduledTaskPrincipal `
+        -UserId 'SYSTEM' `
+        -LogonType ServiceAccount `
         -RunLevel Highest
     $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew
     Register-ScheduledTask `
         -TaskName $consoleTaskName `
         -Action $action `
-        -Principal $principal `
+        -Principal $systemPrincipal `
         -Settings $settings `
-        -Description 'Prepares audio and transfers the interactive A11Y evaluator session to the console.' `
+        -Description 'Transfers the validated active A11Y RDP session to Console and verifies readiness.' `
         -Force |
         Out-Null
+}
+
+function Invoke-SessionBootstrap {
+    $sessionId = (Get-Process -Id $PID).SessionId
+    $line = query.exe session 2>$null |
+        Where-Object { $_ -match "\s$sessionId\s+Active\s*" -and $_ -match 'rdp-sxs' } |
+        Select-Object -First 1
+    if (-not $line) {
+        throw 'RunSessionBootstrap requires a visible, active rdp-sxs user session.'
+    }
+    if (Get-Process LogonUI, consent, CredentialUIBroker -ErrorAction SilentlyContinue |
+        Where-Object SessionId -eq $sessionId) {
+        throw 'The active user session is still at a password, Windows Hello, MFA, or consent surface.'
+    }
+    Start-ScheduledTask -TaskName $workerTaskName -ErrorAction Stop
+    $deadline = (Get-Date).AddSeconds(30)
+    do {
+        Start-Sleep -Seconds 2
+        $state = Get-SessionReadinessState
+        $matchingHeartbeat = $state.heartbeatFresh -and (Test-AgentOWReadinessHeartbeat `
+            -Heartbeat $state `
+            -ExpectedUser ([Environment]::UserName) `
+            -ExpectedSessionId $sessionId `
+            -Phase Bootstrap `
+            -NotBefore ([DateTimeOffset]::UtcNow.Subtract([TimeSpan]::FromSeconds(20))))
+    } while ((Get-Date) -lt $deadline -and (-not $matchingHeartbeat -or -not $state.authenticated))
+    if (-not $matchingHeartbeat -or -not $state.authenticated -or -not $state.atReady) {
+        throw 'The user worker did not publish a fresh authenticated, AT-ready heartbeat.'
+    }
+    return $state
+}
+
+function Get-SessionReadinessState {
+    $heartbeat = if (Test-Path -LiteralPath $heartbeatPath) {
+        try { Get-Content -LiteralPath $heartbeatPath -Raw | ConvertFrom-Json } catch { $null }
+    } else {
+        $null
+    }
+    $heartbeatAt = if ($heartbeat) {
+        try { [DateTimeOffset]::Parse([string]$heartbeat.heartbeatAt) } catch { [DateTimeOffset]::MinValue }
+    } else {
+        [DateTimeOffset]::MinValue
+    }
+    $fresh = [DateTimeOffset]::UtcNow - $heartbeatAt -le [TimeSpan]::FromSeconds(20)
+    return [ordered]@{
+        schemaVersion = 1
+        checkedAt = [DateTimeOffset]::UtcNow.ToString('o')
+        installed = [bool](Get-ScheduledTask -TaskName $workerTaskName -ErrorAction SilentlyContinue)
+        heartbeatFresh = [bool]$fresh
+        heartbeatAt = if ($heartbeat) { [string]$heartbeat.heartbeatAt } else { $null }
+        user = if ($heartbeat) { [string]$heartbeat.user } else { $null }
+        sessionId = if ($heartbeat) { [int]$heartbeat.sessionId } else { $null }
+        sessionName = if ($heartbeat) { [string]$heartbeat.sessionName } else { $null }
+        sessionState = if ($heartbeat) { [string]$heartbeat.sessionState } else { $null }
+        consoleUnlocked = [bool]($fresh -and $heartbeat.consoleUnlocked)
+        atReady = [bool]($fresh -and $heartbeat.atReady)
+        authenticated = [bool]($fresh -and $heartbeat.authenticated)
+        legacyLockPresent = [bool](-not $fresh -or $heartbeat.legacyLockPresent)
+        secureSurfacePresent = [bool](-not $fresh -or $heartbeat.secureSurfacePresent)
+        voiceAccessStopped = [bool]($fresh -and $heartbeat.voiceAccessStopped)
+    }
 }
 
 function Get-ConsoleTransferState {
@@ -444,6 +685,7 @@ function Get-VoiceAccessState {
     } else {
         $null
     }
+
     $speech = if (Test-Path -LiteralPath $speechPath) {
         Get-ItemProperty -LiteralPath $speechPath
     } else {
@@ -492,6 +734,34 @@ function Get-VoiceAccessState {
     }
 }
 
+function Disable-VoiceAccessAutoStart {
+    $accessibilityPath = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Accessibility'
+    $voiceAccessPath = 'HKCU:\Software\Microsoft\VoiceAccess'
+    New-Item -Path $accessibilityPath -Force | Out-Null
+    New-Item -Path $voiceAccessPath -Force | Out-Null
+    $configuration = [string](Get-ItemProperty `
+        -LiteralPath $accessibilityPath `
+        -Name Configuration `
+        -ErrorAction SilentlyContinue).Configuration
+    $remaining = @($configuration -split ',' |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -and $_ -notmatch '^(?i:voiceaccess)$' })
+    Set-ItemProperty `
+        -LiteralPath $accessibilityPath `
+        -Name Configuration `
+        -Type String `
+        -Value ($remaining -join ',')
+    Set-ItemProperty -LiteralPath $voiceAccessPath -Name RunningState -Type DWord -Value 0
+    $processes = @(Get-Process VoiceAccess, VoiceAccessHost -ErrorAction SilentlyContinue)
+    foreach ($process in $processes) {
+        Stop-Process -Id $process.Id -Force
+    }
+    Start-Sleep -Seconds 3
+    if (Get-Process VoiceAccess, VoiceAccessHost -ErrorAction SilentlyContinue) {
+        throw 'Voice Access restarted after auto-start was disabled.'
+    }
+}
+
 function Get-Capabilities {
     $python = Get-PythonPath
     $nvda = Get-ExistingPath @(
@@ -529,6 +799,7 @@ function Get-Capabilities {
     $wpr = Get-CommandInfo 'wpr.exe'
     $wpa = Get-CommandInfo 'wpa.exe'
     $sessionType = Get-SessionType
+    $sessionReadiness = Get-SessionReadinessState
     $defaultRecordingEndpoint = Get-DefaultRecordingEndpoint $audioModule
 
     $prerequisites = [ordered]@{
@@ -569,7 +840,12 @@ function Get-Capabilities {
         }
         session = [ordered]@{
             type = $sessionType
-            persistentConsoleReady = $sessionType -eq 'Console'
+            persistentConsoleReady = [bool]($sessionReadiness.heartbeatFresh -and
+                $sessionReadiness.consoleUnlocked -and
+                $sessionReadiness.atReady -and
+                $sessionReadiness.authenticated -and
+                -not $sessionReadiness.legacyLockPresent)
+            readiness = $sessionReadiness
             consoleTransfer = Get-ConsoleTransferState
         }
     }
@@ -910,21 +1186,51 @@ switch ($Action) {
         if (-not (Test-Path -LiteralPath $voiceAccess)) {
             throw 'Voice Access is unavailable. Windows 11 version 22H2 or later is required.'
         }
+        Set-ItemProperty `
+            -LiteralPath 'HKCU:\Software\Microsoft\VoiceAccess' `
+            -Name RunningState `
+            -Type DWord `
+            -Value 1
         Start-Process -FilePath $voiceAccess
         Start-Sleep -Seconds 3
         Write-Capabilities
     }
+    'DisableVoiceAccessAutoStart' {
+        Disable-VoiceAccessAutoStart
+        Write-Capabilities
+    }
+    'InstallSessionAutomation' {
+        Install-SessionAutomation
+        Get-ScheduledTask -TaskName $workerTaskName, $consoleTaskName |
+            Select-Object TaskName, State, @{ Name = 'Principal'; Expression = { $_.Principal.UserId } },
+                @{ Name = 'LogonType'; Expression = { $_.Principal.LogonType } },
+                @{ Name = 'RunLevel'; Expression = { $_.Principal.RunLevel } }
+    }
+    'RunSessionBootstrap' {
+        Invoke-SessionBootstrap | ConvertTo-Json -Depth 5
+    }
+    'GetSessionReadiness' {
+        $json = Get-SessionReadinessState | ConvertTo-Json -Depth 5
+        if ($OutputPath) {
+            $parent = Split-Path -Parent $OutputPath
+            if ($parent) {
+                New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            }
+            Set-Content -LiteralPath $OutputPath -Value $json -Encoding UTF8
+        }
+        Write-Output $json
+    }
     'InstallConsoleTransferTask' {
-        Install-ConsoleTransferTask
-        Get-ScheduledTask -TaskName $consoleTaskName |
+        Install-SessionAutomation
+        Get-ScheduledTask -TaskName $workerTaskName, $consoleTaskName |
             Select-Object TaskName, State, @{ Name = 'Principal'; Expression = { $_.Principal.UserId } },
                 @{ Name = 'LogonType'; Expression = { $_.Principal.LogonType } },
                 @{ Name = 'RunLevel'; Expression = { $_.Principal.RunLevel } }
     }
     'RunConsoleTransfer' {
         $task = Get-ScheduledTask -TaskName $consoleTaskName -ErrorAction Stop
-        if ($task.Principal.LogonType -ne 'Interactive') {
-            throw "$consoleTaskName is not configured with InteractiveToken"
+        if ($task.Principal.UserId -notmatch 'SYSTEM' -or $task.Principal.LogonType -ne 'ServiceAccount') {
+            throw "$consoleTaskName is not configured as SYSTEM ServiceAccount"
         }
         $before = Get-ScheduledTaskInfo -TaskName $consoleTaskName
         Start-ScheduledTask -TaskName $consoleTaskName

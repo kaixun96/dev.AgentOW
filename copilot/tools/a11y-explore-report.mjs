@@ -3,6 +3,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { pathToFileURL } from "node:url";
+import { aggregateResults } from "./a11y-explore-results.mjs";
 
 const CATEGORY_LABELS = {
   "keyboard-focus": "Keyboard & Focus",
@@ -245,31 +247,44 @@ function renderCategorySummary(aggregate, findings) {
   return rows.join("");
 }
 
-function renderWcagTable(plan, findings) {
+export function summarizeScResults(results) {
+  const priority = ["FAIL", "NEEDS_REVIEW", "NOT_TESTED", "PASS", "NOT_APPLICABLE"];
+  let scResult = [...results].sort(
+    (left, right) => priority.indexOf(left.status) - priority.indexOf(right.status),
+  )[0];
+  if (
+    !results.some((entry) => entry.status === "FAIL") &&
+    results.some((entry) => entry.status === "NOT_TESTED") &&
+    results.some((entry) => !["NOT_TESTED", "NOT_APPLICABLE"].includes(entry.status))
+  ) {
+    scResult = {
+      status: "NEEDS_REVIEW",
+      details: `Partially tested across categories: ${results
+        .map((entry) => `${entry.category}: ${entry.status} (${entry.details})`)
+        .join("; ")}`,
+    };
+  }
+  return scResult;
+}
+
+function renderWcagTable(plan, aggregate) {
   const planned = new Set(plan.scCoverage);
   return Object.keys(WCAG_NAMES)
     .map((criterion) => {
-      const criterionFindings = planned.has(criterion)
-        ? findings.filter((finding) => finding.wcagSc === criterion)
+      const results = planned.has(criterion)
+        ? aggregate.scResults.filter((entry) => entry.wcagSc === criterion)
         : [];
-      const violation = criterionFindings.find((finding) => finding.classification === "VIOLATION");
-      const review = criterionFindings.find((finding) => finding.classification === "NEEDS-REVIEW");
-      const pass = criterionFindings.find((finding) => finding.classification === "PASS");
-      const status = !planned.has(criterion)
-        ? "NOT TESTED"
-        : violation
-          ? "FAIL"
-          : review
-            ? "NEEDS REVIEW"
-            : pass
-              ? "PASS"
-              : "NOT TESTED";
-      const rowClass = violation ? "sc-fail" : review ? "sc-review" : pass ? "sc-pass" : "sc-na";
-      const details =
-        violation?.title ||
-        review?.title ||
-        pass?.title ||
-        (planned.has(criterion) ? "Planned, but no scoped finding was recorded." : "Not planned.");
+      const scResult = summarizeScResults(results);
+      const status = scResult?.status?.replace("_", " ") || "NOT TESTED";
+      const rowClass =
+        scResult?.status === "FAIL"
+          ? "sc-fail"
+          : scResult?.status === "NEEDS_REVIEW"
+            ? "sc-review"
+            : scResult?.status === "PASS"
+              ? "sc-pass"
+              : "sc-na";
+      const details = scResult?.details || (planned.has(criterion) ? "No SC result." : "Not planned.");
       return `<tr class="${rowClass}"><td>${escapeHtml(criterion)} ${escapeHtml(
         WCAG_NAMES[criterion] || "",
       )}</td><td>${status}</td><td>${escapeHtml(details)}</td></tr>`;
@@ -484,7 +499,7 @@ details{margin:12px 0}summary{cursor:pointer;font-weight:600;padding:8px 0}
 <h2>WCAG 2.2 AA Conformance</h2>
 <table><thead><tr><th>Success Criterion</th><th>Status</th><th>Details</th></tr></thead><tbody>${renderWcagTable(
     plan,
-    aggregate.findings,
+    aggregate,
   )}</tbody></table>
 <h2>Findings</h2>
 ${cards || "<p>No findings were recorded.</p>"}
@@ -523,7 +538,8 @@ function main() {
   const realRun = fs.realpathSync(runDir);
   const realFindings = fs.realpathSync(findingsPath);
   if (!isPathInside(realRun, realFindings)) throw new Error("Findings path resolves outside --run-dir");
-  const aggregate = JSON.parse(fs.readFileSync(realFindings, "utf8"));
+  JSON.parse(fs.readFileSync(realFindings, "utf8"));
+  const aggregate = aggregateResults(runDir);
   const metadataPath = path.join(runDir, "run.json");
   const planPath = path.join(runDir, "plan.json");
   const bugsPath = path.join(runDir, "ado-bugs.json");
@@ -543,9 +559,11 @@ function main() {
   process.stdout.write(`${outputHtml}\n`);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(`[a11y-explore-report] ${error.message}`);
-  process.exitCode = 1;
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`[a11y-explore-report] ${error.message}`);
+    process.exitCode = 1;
+  }
 }

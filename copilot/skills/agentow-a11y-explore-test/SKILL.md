@@ -13,12 +13,13 @@ finding becomes a concrete bug.
 
 ```text
 /agentow-a11y-explore-test --url <starting-url> <surface description>
-/agentow-a11y-explore-test --categories keyboard-focus,structure-semantics <description>
 /agentow-a11y-explore-test --file-ado --ado-config <json-path> <description>
 ```
 
-`--url` is optional only when the description or routed context identifies a runnable fixture.
-`--file-ado` is opt-in and files only validated `VIOLATION` findings.
+`--url` is optional only when the description or routed context identifies a runnable fixture. A
+full run always covers all nine categories. Inapplicable criteria receive an evidence-backed
+`NOT_APPLICABLE` result; they are not silently omitted. `--file-ado` is opt-in and files only
+validated `VIOLATION` findings.
 
 ## Ownership boundaries
 
@@ -30,7 +31,9 @@ finding becomes a concrete bug.
 - Category agents never edit product code, install software, file bugs, or launch another agent.
 - NVDA, Narrator, Voice Access, Windows UI Automation, real OS input, Console transfer, and audio
   routing are serial machine-global resources. The main Windows host/Twin owns them.
-- Accessibility-tree, axe, DOM, and source evidence never substitute for real AT evidence.
+- Screen-reader testing requires real NVDA or Narrator interaction and matching AT evidence.
+  Accessibility-tree, axe, DOM, ARIA, and source evidence belong to structure/semantics checks;
+  never use them to test, substitute for, prove, or report a screen-reader result.
 
 ## Step 0: Detect environment and create the run
 
@@ -106,6 +109,9 @@ touch-pointer
 authentication-forms
 ```
 
+Require `fullCoverage: true`, all nine category objects, each category's complete A/AA mapping from
+`references/wcag-criteria.md`, and a `scCoverage` union containing every supported A/AA criterion.
+
 Do not ask for plan approval. Ask only when the URL/fixture or expected surface is too incomplete to
 run.
 
@@ -173,6 +179,12 @@ supplied concrete browser contract, restores state it changes, saves evidence on
 Every observed finding requires evidence. Infrastructure failures use category status `blocked` or
 `inconclusive`, never a fabricated product finding.
 
+Every category result contains exactly one `scResults` entry for every criterion in that category's
+plan. Allowed statuses are `PASS`, `FAIL`, `NEEDS_REVIEW`, `NOT_APPLICABLE`, and `NOT_TESTED`.
+Use `NOT_TESTED` only when a concrete environment/capability blocker remains after the available
+route was attempted. Record `blocker` and `attemptedRoute`, and include the same blocker in the
+category result. A missing or duplicate criterion blocks aggregation.
+
 Before capturing a non-PASS finding, add a red outline around the affected element and an external
 finding-ID label, capture the screenshot, then remove the annotation. For missing-element,
 page-level, or infrastructure findings, add a red diagnostic banner without covering relevant
@@ -195,9 +207,9 @@ On a Windows host:
    classifies only the observed behavior.
 
 In a Codespace, materialize supplied external Twin/Windows evidence under the category directory,
-preserving its producer and verified hash. Otherwise write a
-`skipped-environment` result listing every unavailable Windows-only evidence type. Do not retry a
-deliberate environment skip.
+preserving its producer and verified hash. Otherwise write an `inconclusive` result with justified
+`NOT_TESTED` criteria, the missing Windows-only evidence, a category blocker, and the attempted
+external route. Do not retry a deliberate environment skip.
 
 For screen-reader claims:
 
@@ -247,7 +259,8 @@ node "${CLAUDE_PLUGIN_ROOT}\tools\a11y-explore-report.mjs" `
 
 These commands validate category names/statuses, namespace finding IDs, reject path escape and false
 AT claims, require every planned category result, deduplicate deterministically while preserving the
-highest severity, escape report content, and compute counts/durations. External evidence must be
+highest severity, require complete per-SC coverage, escape report content, and compute
+counts/durations. External evidence must be
 materialized beneath its category directory before aggregation. Do not replace these commands with
 an AI-authored report.
 

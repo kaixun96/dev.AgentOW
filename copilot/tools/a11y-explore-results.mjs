@@ -18,11 +18,12 @@ export const CATEGORIES = [
 ];
 
 const STATUSES = new Set(["completed", "blocked", "inconclusive", "skipped-environment", "failed"]);
+const SC_STATUSES = new Set(["PASS", "FAIL", "NEEDS_REVIEW", "NOT_APPLICABLE", "NOT_TESTED"]);
 const PRODUCERS = new Set(["copilot-browser", "windows-host", "twin", "external"]);
 const CLASSIFICATIONS = new Set(["VIOLATION", "BEST-PRACTICE", "PASS", "NEEDS-REVIEW"]);
 const SEVERITIES = new Set(["Critical", "High", "Medium", "Low"]);
 const SHA256 = /^[a-f0-9]{64}$/;
-const CATEGORY_SC = {
+export const CATEGORY_SC = {
   "keyboard-focus": ["2.1.1", "2.1.2", "2.1.4", "2.4.3", "2.4.7", "2.4.11"],
   "screen-reader": [
     "1.1.1",
@@ -187,6 +188,14 @@ const CATEGORY_CLAIMS = {
   "touch-pointer": ["browser-touch-pointer-tested", "voice-access-tested"],
   "authentication-forms": ["browser-forms-tested"],
 };
+const SCREEN_READER_EVIDENCE_TYPES = new Set([
+  "nvda-transcript",
+  "narrator-etl",
+  "screenshot",
+  "uia-state",
+  "video",
+  "recording-metrics",
+]);
 
 function parseArgs(argv) {
   const args = {};
@@ -408,6 +417,38 @@ function validateFinding(finding, category, evidenceByUri, status, index) {
   }
 }
 
+function validateScResult(scResult, category, evidenceByUri, blockers, index) {
+  assertObject(scResult, `${category}.scResults[${index}]`);
+  if (
+    typeof scResult.wcagSc !== "string" ||
+    !A_AA_SC.has(scResult.wcagSc) ||
+    !SC_STATUSES.has(scResult.status) ||
+    typeof scResult.details !== "string" ||
+    !scResult.details.trim() ||
+    !Array.isArray(scResult.evidenceUris)
+  ) {
+    throw new Error(`${category}.scResults[${index}] is invalid`);
+  }
+  if (scResult.status !== "NOT_TESTED" && scResult.evidenceUris.length === 0) {
+    throw new Error(`${category}.scResults[${index}] requires evidence`);
+  }
+  if (
+    scResult.status === "NOT_TESTED" &&
+    (typeof scResult.blocker !== "string" ||
+      !scResult.blocker.trim() ||
+      !blockers.includes(scResult.blocker) ||
+      typeof scResult.attemptedRoute !== "string" ||
+      !scResult.attemptedRoute.trim())
+  ) {
+    throw new Error(`${category}.scResults[${index}] NOT_TESTED requires a recorded blocker and attempted route`);
+  }
+  for (const uri of scResult.evidenceUris) {
+    if (!evidenceByUri.has(uri)) {
+      throw new Error(`${category}.scResults[${index}] references unknown evidence: ${uri}`);
+    }
+  }
+}
+
 export function validateCategoryResult(result, runDir, expectedCategory) {
   assertObject(result, expectedCategory);
   if (result.schemaVersion !== 1) throw new Error(`${expectedCategory}.schemaVersion must be 1`);
@@ -437,14 +478,24 @@ export function validateCategoryResult(result, runDir, expectedCategory) {
   if (!Array.isArray(result.claims) || !result.claims.every((claim) => typeof claim === "string")) {
     throw new Error(`${expectedCategory}.claims must be strings`);
   }
-  if (!Array.isArray(result.evidence) || !Array.isArray(result.findings)) {
-    throw new Error(`${expectedCategory}.evidence and findings must be arrays`);
+  if (
+    !Array.isArray(result.evidence) ||
+    !Array.isArray(result.findings) ||
+    !Array.isArray(result.scResults)
+  ) {
+    throw new Error(`${expectedCategory}.evidence, findings, and scResults must be arrays`);
   }
   const categoryDir = path.join(runDir, "categories", expectedCategory);
   result.evidence.forEach((entry, index) =>
     validateEvidence(entry, categoryDir, expectedCategory, result.producer, index),
   );
   const evidenceTypes = new Set(result.evidence.map((entry) => entry.type));
+  if (
+    expectedCategory === "screen-reader" &&
+    [...evidenceTypes].some((type) => !SCREEN_READER_EVIDENCE_TYPES.has(type))
+  ) {
+    throw new Error("screen-reader can use only real NVDA or Narrator evidence");
+  }
   for (const claim of result.claims) {
     const rule = CLAIM_RULES[claim];
     if (!rule) {
@@ -473,6 +524,71 @@ export function validateCategoryResult(result, runDir, expectedCategory) {
   result.findings.forEach((finding, index) =>
     validateFinding(finding, expectedCategory, evidenceByUri, result.status, index),
   );
+  const scIds = new Set();
+  result.scResults.forEach((scResult, index) => {
+    validateScResult(scResult, expectedCategory, evidenceByUri, result.blockers, index);
+    if (
+      expectedCategory === "screen-reader" &&
+      ["PASS", "FAIL", "NEEDS_REVIEW"].includes(scResult.status)
+    ) {
+      const atClaims = result.claims.filter((claim) =>
+        ["nvda-tested", "narrator-tested"].includes(claim),
+      );
+      if (atClaims.length > 0) {
+        const linkedTypes = new Set(
+          scResult.evidenceUris.map((uri) => evidenceByUri.get(uri)?.type),
+        );
+        const requiredTypes = new Set(
+          atClaims.flatMap((claim) => CLAIM_RULES[claim].evidence),
+        );
+        for (const requiredType of requiredTypes) {
+          if (!linkedTypes.has(requiredType)) {
+            throw new Error(
+              `${expectedCategory}.scResults[${index}] ${scResult.status} is missing linked ${requiredType} evidence`,
+            );
+          }
+        }
+      }
+    }
+    if (scIds.has(scResult.wcagSc)) {
+      throw new Error(`${expectedCategory} contains duplicate SC result: ${scResult.wcagSc}`);
+    }
+    scIds.add(scResult.wcagSc);
+  });
+  if (
+    expectedCategory === "screen-reader" &&
+    result.scResults.some((scResult) => ["PASS", "FAIL", "NEEDS_REVIEW"].includes(scResult.status)) &&
+    !result.claims.some((claim) => ["nvda-tested", "narrator-tested"].includes(claim))
+  ) {
+    throw new Error("screen-reader tested success criteria require an NVDA or Narrator claim");
+  }
+  if (
+    result.scResults.some((scResult) => scResult.status === "NOT_TESTED") &&
+    result.status !== "inconclusive"
+  ) {
+    throw new Error(`${expectedCategory} with NOT_TESTED success criteria must be inconclusive`);
+  }
+  for (const scResult of result.scResults) {
+    if (
+      scResult.status === "FAIL" &&
+      !result.findings.some(
+        (finding) =>
+          finding.classification === "VIOLATION" && finding.wcagSc === scResult.wcagSc,
+      )
+    ) {
+      throw new Error(`${expectedCategory} FAIL ${scResult.wcagSc} lacks a violation finding`);
+    }
+    for (const finding of result.findings) {
+      if (
+        finding.classification === "VIOLATION" &&
+        !result.scResults.some(
+          (scResult) => scResult.status === "FAIL" && scResult.wcagSc === finding.wcagSc,
+        )
+      ) {
+        throw new Error(`${expectedCategory} violation ${finding.id} lacks a matching FAIL SC result`);
+      }
+    }
+  }
   return result;
 }
 
@@ -511,6 +627,7 @@ export function validatePlan(plan) {
   assertObject(plan, "plan.json");
   if (
     plan.schemaVersion !== 1 ||
+    plan.fullCoverage !== true ||
     typeof plan.target !== "string" ||
     !plan.target.trim() ||
     typeof plan.url !== "string" ||
@@ -573,6 +690,20 @@ export function validatePlan(plan) {
   if (plan.requestedCategories.some((category) => !seen.has(category))) {
     throw new Error("plan.json omits an explicitly requested category");
   }
+  if (
+    seen.size !== CATEGORIES.length ||
+    CATEGORIES.some((category) => !seen.has(category)) ||
+    new Set(plan.requestedCategories).size !== CATEGORIES.length
+  ) {
+    throw new Error("plan.json full coverage requires all nine categories");
+  }
+  for (const entry of plan.categories) {
+    const expected = [...CATEGORY_SC[entry.category]].sort();
+    const actual = [...entry.wcagSc].sort();
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(`plan.json ${entry.category} must cover its complete A/AA mapping`);
+    }
+  }
   const declaredCoverage = [...new Set(plan.scCoverage)].sort();
   const actualCoverage = [...categoryCoverage].sort();
   if (JSON.stringify(declaredCoverage) !== JSON.stringify(actualCoverage)) {
@@ -618,7 +749,21 @@ export function aggregateResults(runDir) {
       throw new Error(`${category}.environment does not match plan.json`);
     }
     const planned = plan.categories.find((entry) => entry.category === category);
-    if (result.status === "completed") {
+    const resultCriteria = [...result.scResults.map((entry) => entry.wcagSc)].sort();
+    const plannedCriteria = [...planned.wcagSc].sort();
+    if (JSON.stringify(resultCriteria) !== JSON.stringify(plannedCriteria)) {
+      throw new Error(`${category} scResults do not exactly match planned coverage`);
+    }
+    if (
+      result.status === "completed" &&
+      result.scResults.some((entry) => entry.status === "NOT_TESTED")
+    ) {
+      throw new Error(`${category} completed result contains NOT_TESTED success criteria`);
+    }
+    if (
+      result.status === "completed" ||
+      result.scResults.some((entry) => entry.status === "PASS")
+    ) {
       if (!result.claims.includes(planned.maximumClaim)) {
         throw new Error(`${category} did not satisfy its planned maximum claim`);
       }
@@ -723,6 +868,15 @@ export function aggregateResults(runDir) {
       blockers: record.blockers,
       resultPath: record.resultPath,
     })),
+    scResults: records
+      .flatMap((record) =>
+        record.scResults.map((entry) => ({ ...entry, category: record.category })),
+      )
+      .sort(
+        (left, right) =>
+          left.wcagSc.localeCompare(right.wcagSc) ||
+          CATEGORIES.indexOf(left.category) - CATEGORIES.indexOf(right.category),
+      ),
     counts: { total: findings.length, byClassification, bySeverity },
     evidence: records
       .flatMap((record) =>

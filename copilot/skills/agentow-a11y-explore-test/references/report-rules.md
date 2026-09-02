@@ -13,7 +13,8 @@ self-contained `report.html` with embedded CSS and no external runtime dependenc
    - red `FAIL`;
    - green `PASS`;
    - blue `NEEDS REVIEW`;
-   - gray `NOT TESTED`.
+   - gray `NOT APPLICABLE` or `NOT TESTED`.
+   `NOT_TESTED` is valid only with a concrete reason explaining why the test could not run.
 5. Findings ordered by severity/classification from the deterministic aggregate. Violation cards
    show both type and severity badges.
 6. At least one inline screenshot per reportable finding, using a relative path. Omit incomplete

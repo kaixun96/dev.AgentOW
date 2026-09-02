@@ -1,12 +1,13 @@
 # Screen reader
 
-1. Verify headings, landmarks, labels, descriptions, names, roles, states, values, reading order, and
-   status announcements with browser semantics.
-2. For an actual NVDA claim, use real OS input and preserve Speech Viewer transcript, screenshot,
+1. Use real NVDA or Narrator interaction for every result in this category. Do not use
+   Accessibility Tree, DOM, ARIA, axe, or browser accessibility snapshots as screen-reader tests.
+2. For an NVDA claim, use real OS input and preserve Speech Viewer transcript, screenshot,
    focused-element UIA state, and synchronized recording when required.
 3. For Narrator-specific behavior, stop NVDA first and preserve Narrator/UIAutomationCore/Speech-TTS
    ETW, screenshot, and UIA state.
 4. Repeat the task using the canonical steps and record exact announcements.
 
-If real AT is unavailable, report browser semantics separately and mark the AT portion
-`skipped-environment` or `inconclusive`; never report a screen-reader PASS.
+If real AT is unavailable, record the screen-reader category as `inconclusive` with justified
+`NOT_TESTED` criteria. Run browser semantics separately under `structure-semantics`; never place
+that evidence in this category or report a screen-reader PASS from it.

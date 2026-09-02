@@ -9,9 +9,11 @@ import { fileURLToPath } from "node:url";
 import {
   aggregateResults,
   CATEGORIES,
+  CATEGORY_SC,
   validateCategoryResult,
   validatePlan,
 } from "../../tools/a11y-explore-results.mjs";
+import { summarizeScResults } from "../../tools/a11y-explore-report.mjs";
 
 const tsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(tsDir, "..");
@@ -20,49 +22,89 @@ const adoTool = path.join(repoRoot, "tools", "a11y-explore-ado.mjs");
 const skillRoot = path.join(repoRoot, "copilot", "skills", "agentow-a11y-explore-test");
 const plannerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-planner.agent.md");
 const testerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-category-tester.agent.md");
+const PLAN_CONTRACT = {
+  "keyboard-focus": ["serial-browser", ["browser", "keyboard"], ["screenshot", "focus-sequence"], "browser-keyboard-tested"],
+  "screen-reader": ["serial-real-at", ["nvda", "real-os-input", "uia"], ["nvda-transcript", "screenshot", "uia-state"], "nvda-tested"],
+  "structure-semantics": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree"], "browser-semantics-tested"],
+  "orientation-input-purpose": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree"], "browser-semantics-tested"],
+  "visual-color": ["serial-browser", ["browser"], ["screenshot", "measurement"], "browser-visual-tested"],
+  "timing-motion": ["serial-browser", ["browser"], ["screenshot", "interaction-log"], "browser-dynamic-tested"],
+  "dynamic-content": ["serial-browser", ["browser"], ["screenshot", "interaction-log"], "browser-dynamic-tested"],
+  "touch-pointer": ["serial-browser", ["browser"], ["screenshot", "measurement", "interaction-log"], "browser-touch-pointer-tested"],
+  "authentication-forms": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree"], "browser-forms-tested"],
+};
 const planCategory = (category) => {
-  if (category === "dynamic-content") {
-    return {
-      category,
-      executionClass: "serial-browser",
-      wcagSc: ["2.4.3"],
-      focusAreas: ["sample"],
-      requiredCapabilities: ["browser"],
-      requiredEvidenceTypes: ["screenshot", "interaction-log"],
-      maximumClaim: "browser-dynamic-tested",
-    };
-  }
-  if (category === "structure-semantics") {
-    return {
-      category,
-      executionClass: "serial-browser",
-      wcagSc: ["1.3.1"],
-      focusAreas: ["headings", "landmarks"],
-      requiredCapabilities: ["browser"],
-      requiredEvidenceTypes: ["screenshot", "accessibility-tree"],
-      maximumClaim: "browser-semantics-tested",
-    };
-  }
+  const [executionClass, requiredCapabilities, requiredEvidenceTypes, maximumClaim] =
+    PLAN_CONTRACT[category];
   return {
     category,
-    executionClass: "serial-browser",
-    wcagSc: ["2.4.3"],
+    executionClass,
+    wcagSc: CATEGORY_SC[category],
     focusAreas: ["sample"],
-    requiredCapabilities: ["browser", "keyboard"],
-    requiredEvidenceTypes: ["screenshot", "focus-sequence"],
-    maximumClaim: "browser-keyboard-tested",
+    requiredCapabilities,
+    requiredEvidenceTypes,
+    maximumClaim,
   };
 };
-const plan = (categories) => ({
+const plan = () => ({
   schemaVersion: 1,
+  fullCoverage: true,
   target: "Sample",
   url: "https://example.test",
   executionEnvironment: "windows-host",
-  requestedCategories: [],
+  requestedCategories: [...CATEGORIES],
   focusAreas: ["sample"],
-  scCoverage: [...new Set(categories.map((category) => (category === "structure-semantics" ? "1.3.1" : "2.4.3")))],
-  categories: categories.map((category) => planCategory(category)),
+  scCoverage: [...new Set(CATEGORIES.flatMap((category) => CATEGORY_SC[category]))],
+  categories: CATEGORIES.map((category) => planCategory(category)),
 });
+const scResults = (category, evidenceUris, overrides = {}) =>
+  CATEGORY_SC[category].map((wcagSc) => ({
+    wcagSc,
+    status: overrides[wcagSc]?.status ?? "NEEDS_REVIEW",
+    details: overrides[wcagSc]?.details ?? "Evidence captured; manual review required.",
+    evidenceUris,
+  }));
+const writeGenericCategoryResult = (runDir, category) => {
+  const directory = path.join(runDir, "categories", category);
+  fs.mkdirSync(directory, { recursive: true });
+  const [, capabilities, evidenceTypes, claim] = PLAN_CONTRACT[category];
+  const producer = category === "screen-reader" ? "external" : "copilot-browser";
+  const evidence = evidenceTypes.map((type) => {
+    const extension = type === "screenshot" ? "png" : "json";
+    const file = path.join(directory, `${type}.${extension}`);
+    let content = JSON.stringify({ type });
+    if (type === "nvda-transcript") content = "NVDA transcript fixture";
+    if (type === "accessibility-tree" && category === "orientation-input-purpose") {
+      content = JSON.stringify({ inputs: [], axTree: { nodes: [] } });
+    }
+    fs.writeFileSync(file, content);
+    return {
+      type,
+      uri: file,
+      sha256: crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"),
+      producer,
+    };
+  });
+  const evidenceUris = evidence.map((entry) => entry.uri);
+  const categoryResult = {
+    schemaVersion: 1,
+    category,
+    status: "completed",
+    environment: "windows-host",
+    producer,
+    profileIsolationId: `fixture-${category}`,
+    startedAt: "2026-09-02T00:00:00.000Z",
+    endedAt: "2026-09-02T00:00:03.000Z",
+    durationSeconds: 3,
+    capabilitiesUsed: capabilities,
+    claims: [claim],
+    scResults: scResults(category, evidenceUris),
+    evidence,
+    findings: [],
+    blockers: [],
+  };
+  fs.writeFileSync(path.join(directory, "result.json"), JSON.stringify(categoryResult));
+};
 
 assert.equal(CATEGORIES.length, 9);
 const skillText = fs.readFileSync(path.join(skillRoot, "SKILL.md"), "utf8");
@@ -124,6 +166,9 @@ try {
     durationSeconds: 3,
     capabilitiesUsed: ["browser", "keyboard"],
     claims: ["browser-keyboard-tested"],
+    scResults: scResults("keyboard-focus", [screenshot, focusSequence], {
+      "2.4.3": { status: "FAIL", details: "Focus order issue observed." },
+    }),
     evidence: [
       {
         type: "screenshot",
@@ -160,13 +205,11 @@ try {
   };
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
-    JSON.stringify(plan(["keyboard-focus"])),
+    JSON.stringify(plan()),
   );
   fs.writeFileSync(path.join(categoryDir, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
 
-  const aggregate = aggregateResults(runDir);
-  assert.equal(aggregate.findings[0].id, "keyboard-focus:VIOLATION-1");
-  assert.equal(aggregate.counts.byClassification.VIOLATION, 1);
+  assert.throws(() => aggregateResults(runDir), /Missing planned category result: screen-reader/);
 
   const codespaceAtClaim = {
     ...result,
@@ -200,6 +243,14 @@ try {
         producer: "external",
         claims: ["nvda-tested"],
         evidence: realAtEvidence,
+        scResults: [
+          {
+            wcagSc: "1.3.1",
+            status: "PASS",
+            details: "NVDA structure announcement was captured.",
+            evidenceUris: realAtEvidence.map((entry) => entry.uri),
+          },
+        ],
         findings: [],
       },
       runDir,
@@ -208,8 +259,72 @@ try {
   );
   assert.throws(
     () =>
+      validateCategoryResult(
+        {
+          ...result,
+          category: "screen-reader",
+          environment: "codespace",
+          producer: "external",
+          claims: ["nvda-tested"],
+          evidence: realAtEvidence,
+          scResults: [
+            {
+              wcagSc: "1.3.1",
+              status: "PASS",
+              details: "An incomplete evidence link must not prove NVDA PASS.",
+              evidenceUris: [
+                realAtEvidence.find((entry) => entry.type === "screenshot").uri,
+              ],
+            },
+          ],
+          findings: [],
+        },
+        runDir,
+        "screen-reader",
+      ),
+    /PASS is missing linked nvda-transcript evidence/,
+  );
+  const narratorFile = path.join(screenReaderDir, "narrator.etl");
+  fs.writeFileSync(narratorFile, "narrator ETL fixture");
+  const narratorEvidence = {
+    type: "narrator-etl",
+    uri: narratorFile,
+    sha256: crypto
+      .createHash("sha256")
+      .update(fs.readFileSync(narratorFile))
+      .digest("hex"),
+    producer: "external",
+  };
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          category: "screen-reader",
+          environment: "codespace",
+          producer: "external",
+          claims: ["nvda-tested", "narrator-tested"],
+          evidence: [...realAtEvidence, narratorEvidence],
+          scResults: [
+            {
+              wcagSc: "1.3.1",
+              status: "PASS",
+              details: "Both claimed AT routes require linked evidence.",
+              evidenceUris: realAtEvidence.map((entry) => entry.uri),
+            },
+          ],
+          findings: [],
+        },
+        runDir,
+        "screen-reader",
+      ),
+    /PASS is missing linked narrator-etl evidence/,
+  );
+  assert.throws(
+    () =>
       validatePlan({
         schemaVersion: 1,
+        fullCoverage: true,
         target: "Screen reader",
         url: "https://example.test",
         executionEnvironment: "codespace",
@@ -230,21 +345,12 @@ try {
       }),
     /category cannot use claim/,
   );
-  assert.doesNotThrow(() =>
-    validatePlan({
-      schemaVersion: 1,
-      target: "Voice Access",
-      url: "https://example.test",
-      executionEnvironment: "windows-host",
-      requestedCategories: ["touch-pointer"],
-      focusAreas: ["voice command"],
-      scCoverage: ["2.5.3"],
-      categories: [
-        {
-          category: "touch-pointer",
+  const voicePlan = plan();
+  voicePlan.categories = voicePlan.categories.map((entry) =>
+    entry.category === "touch-pointer"
+      ? {
+          ...entry,
           executionClass: "serial-real-at",
-          wcagSc: ["2.5.3"],
-          focusAreas: ["voice command"],
           requiredCapabilities: ["voice-access", "audio"],
           requiredEvidenceTypes: [
             "voice-access-result",
@@ -254,10 +360,10 @@ try {
             "screenshot",
           ],
           maximumClaim: "voice-access-tested",
-        },
-      ],
-    }),
+        }
+      : entry,
   );
+  assert.doesNotThrow(() => validatePlan(voicePlan));
 
   const escapedEvidence = {
     ...result,
@@ -280,6 +386,102 @@ try {
       ),
     /not WCAG 2.2 A\/AA/,
   );
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          scResults: result.scResults.map((entry) =>
+            entry.wcagSc === "2.4.3" ? { ...entry, status: "PASS" } : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /violation VIOLATION-1 lacks a matching FAIL/,
+  );
+  const notTestedBlocker = "Console desktop is locked";
+  const notTestedResult = {
+    schemaVersion: 1,
+    category: "screen-reader",
+    status: "inconclusive",
+    environment: "windows-host",
+    producer: "windows-host",
+    profileIsolationId: "none",
+    startedAt: "2026-09-02T00:00:00.000Z",
+    endedAt: "2026-09-02T00:00:03.000Z",
+    durationSeconds: 3,
+    capabilitiesUsed: ["nvda"],
+    claims: [],
+    scResults: [
+      {
+        wcagSc: "1.1.1",
+        status: "NOT_TESTED",
+        details: "NVDA could not enter the page while the Console desktop was locked.",
+        blocker: notTestedBlocker,
+        attemptedRoute: "NVDA 2026 + real OS input in Console",
+        evidenceUris: [],
+      },
+    ],
+    evidence: [],
+    findings: [],
+    blockers: [notTestedBlocker],
+  };
+  assert.doesNotThrow(() =>
+    validateCategoryResult(notTestedResult, runDir, "screen-reader"),
+  );
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...notTestedResult,
+          scResults: [{ ...notTestedResult.scResults[0], attemptedRoute: "" }],
+        },
+        runDir,
+        "screen-reader",
+      ),
+    /NOT_TESTED requires a recorded blocker and attempted route/,
+  );
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        { ...notTestedResult, status: "blocked" },
+        runDir,
+        "screen-reader",
+      ),
+    /with NOT_TESTED success criteria must be inconclusive/,
+  );
+  for (const prohibitedType of [
+    "accessibility-tree",
+    "dom-snapshot",
+    "aria-snapshot",
+    "axe-results",
+  ]) {
+    const prohibitedFile = path.join(screenReaderDir, `${prohibitedType}.json`);
+    fs.writeFileSync(prohibitedFile, "{}");
+    assert.throws(
+      () =>
+        validateCategoryResult(
+          {
+            ...notTestedResult,
+            evidence: [
+              {
+                type: prohibitedType,
+                uri: prohibitedFile,
+                sha256: crypto
+                  .createHash("sha256")
+                  .update(fs.readFileSync(prohibitedFile))
+                  .digest("hex"),
+                producer: "windows-host",
+              },
+            ],
+          },
+          runDir,
+          "screen-reader",
+        ),
+      /screen-reader can use only real NVDA or Narrator evidence/,
+    );
+  }
 
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
@@ -289,13 +491,13 @@ try {
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
     JSON.stringify({
-      ...plan(["keyboard-focus", "dynamic-content"]),
+      ...plan(),
     }),
   );
-  assert.throws(() => aggregateResults(runDir), /Missing planned category result: dynamic-content/);
+  assert.throws(() => aggregateResults(runDir), /Missing planned category result: screen-reader/);
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
-    JSON.stringify(plan(["keyboard-focus"])),
+    JSON.stringify(plan()),
   );
 
   const dynamicDir = path.join(runDir, "categories", "dynamic-content");
@@ -335,6 +537,9 @@ try {
       },
     ],
     claims: ["browser-dynamic-tested"],
+    scResults: scResults("dynamic-content", [dynamicEvidence, interactionEvidence], {
+      "2.4.3": { status: "FAIL", details: "Dynamic focus issue observed." },
+    }),
     findings: [
       {
         ...result.findings[0],
@@ -367,6 +572,9 @@ try {
     category: "structure-semantics",
     capabilitiesUsed: ["browser"],
     claims: ["browser-semantics-tested"],
+    scResults: scResults("structure-semantics", [structureScreenshot, structureTree], {
+      "1.3.1": { status: "PASS", details: "Headings and landmarks were captured." },
+    }),
     evidence: [
       {
         type: "screenshot",
@@ -396,11 +604,70 @@ try {
     ],
   };
   fs.writeFileSync(path.join(structureDir, "result.json"), JSON.stringify(structureResult));
-  const duplicateIsolationPlan = plan(["keyboard-focus", "dynamic-content"]);
-  duplicateIsolationPlan.categories = duplicateIsolationPlan.categories.map((entry) => ({
+  for (const category of CATEGORIES.filter(
+    (value) => !["keyboard-focus", "dynamic-content", "structure-semantics"].includes(value),
+  )) {
+    writeGenericCategoryResult(runDir, category);
+  }
+  const falsePassPath = path.join(
+    runDir,
+    "categories",
+    "screen-reader",
+    "result.json",
+  );
+  const falsePass = JSON.parse(fs.readFileSync(falsePassPath, "utf8"));
+  fs.writeFileSync(
+    falsePassPath,
+    JSON.stringify({ ...falsePass, status: "blocked", claims: [] }),
+  );
+  assert.throws(
+    () => aggregateResults(runDir),
+    /tested success criteria require an NVDA or Narrator claim/,
+  );
+  writeGenericCategoryResult(runDir, "screen-reader");
+  const partialPass = JSON.parse(fs.readFileSync(falsePassPath, "utf8"));
+  partialPass.status = "inconclusive";
+  partialPass.blockers = [notTestedBlocker];
+  partialPass.scResults[0] = {
+    ...partialPass.scResults[0],
+    status: "NOT_TESTED",
+    blocker: notTestedBlocker,
+    attemptedRoute: "NVDA 2026 + real OS input in Console",
+  };
+  partialPass.scResults[1] = {
+    ...partialPass.scResults[1],
+    status: "PASS",
+    details: "NVDA evidence confirmed this success criterion.",
+  };
+  fs.writeFileSync(falsePassPath, JSON.stringify(partialPass));
+  assert.doesNotThrow(() => aggregateResults(runDir));
+  writeGenericCategoryResult(runDir, "screen-reader");
+  const completedUntestedPath = path.join(
+    runDir,
+    "categories",
+    "screen-reader",
+    "result.json",
+  );
+  const completedUntested = JSON.parse(fs.readFileSync(completedUntestedPath, "utf8"));
+  completedUntested.blockers = [notTestedBlocker];
+  completedUntested.scResults = completedUntested.scResults.map((entry) => ({
     ...entry,
-    executionClass: "parallel-browser",
+    status: "NOT_TESTED",
+    blocker: notTestedBlocker,
+    attemptedRoute: "NVDA 2026 + real OS input in Console",
   }));
+  fs.writeFileSync(completedUntestedPath, JSON.stringify(completedUntested));
+  assert.throws(
+    () => aggregateResults(runDir),
+    /with NOT_TESTED success criteria must be inconclusive/,
+  );
+  writeGenericCategoryResult(runDir, "screen-reader");
+  const duplicateIsolationPlan = plan();
+  duplicateIsolationPlan.categories = duplicateIsolationPlan.categories.map((entry) =>
+    ["keyboard-focus", "dynamic-content"].includes(entry.category)
+      ? { ...entry, executionClass: "parallel-browser" }
+      : entry,
+  );
   fs.writeFileSync(path.join(runDir, "plan.json"), JSON.stringify(duplicateIsolationPlan));
   fs.writeFileSync(
     path.join(categoryDir, "result.json"),
@@ -415,24 +682,26 @@ try {
   fs.writeFileSync(path.join(dynamicDir, "result.json"), JSON.stringify(dynamicResult));
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
-    JSON.stringify(plan(["keyboard-focus", "dynamic-content", "structure-semantics"])),
+    JSON.stringify(plan()),
   );
   const deduplicated = aggregateResults(runDir);
   assert.equal(deduplicated.findings.length, 2);
   assert.equal(deduplicated.findings[0].severity, "Critical");
   assert.equal(deduplicated.findings[0].sourceResults.length, 2);
-  deduplicated.findings.push({
-    id: "keyboard-focus:NEEDS-REVIEW-99",
-    classification: "NEEDS-REVIEW",
-    wcagSc: "2.4.3",
-    title: "Incomplete fixture",
-    selector: "",
-    steps: ["Review"],
-    expected: "Screenshot evidence",
-    actual: "Only a focus sequence was captured.",
-    evidenceUris: [focusSequence],
-    category: "keyboard-focus",
-  });
+  assert.equal(
+    summarizeScResults([
+      { category: "screen-reader", status: "NOT_TESTED", details: "NVDA blocked." },
+      { category: "structure-semantics", status: "PASS", details: "Browser passed." },
+    ]).status,
+    "NEEDS_REVIEW",
+  );
+  assert.equal(
+    summarizeScResults([
+      { category: "screen-reader", status: "NOT_TESTED", details: "NVDA blocked." },
+      { category: "structure-semantics", status: "FAIL", details: "Violation confirmed." },
+    ]).status,
+    "FAIL",
+  );
 
   fs.writeFileSync(
     path.join(runDir, "run.json"),
@@ -466,6 +735,7 @@ try {
   assert.match(html, /class="summary-grid"/);
   assert.match(html, /<link rel="icon" href="data:image\/svg\+xml,/);
   assert.match(html, /WCAG 2\.2 AA Conformance/);
+  assert.match(html, /2\.4\.3 Focus Order<\/td><td>FAIL<\/td>/);
   assert.match(html, /<img src="categories\//);
   assert.match(html, /Tab Order Map/);
   assert.match(html, /Heading Hierarchy/);
@@ -473,14 +743,12 @@ try {
   assert.match(html, /Task Runtime/);
   assert.match(html, /NVDA Transcript \(excerpts\)/);
   assert.match(html, /Test Coverage Notes/);
-  assert.match(html, /Screen reader:<\/strong> Not planned/);
+  assert.match(html, /Screen reader:<\/strong> NVDA \(completed\)/);
   assert.match(html, />body<\/td>|>#save<\/td>/);
   assert.match(html, /Obscured/);
   assert.match(html, /h1: Page title/);
   assert.match(html, /h3: Skipped heading/);
   assert.match(html, /Main content/);
-  assert.equal((html.match(/Omitted incomplete finding/g) ?? []).length, 1);
-  assert.doesNotMatch(html, /NEEDS-REVIEW-99: Incomplete fixture/);
   assert.doesNotMatch(html, /No screenshot artifact/);
   assert.doesNotMatch(html, /\{Page\/Feature Name\}|\{duration\}|\{status\}/);
 

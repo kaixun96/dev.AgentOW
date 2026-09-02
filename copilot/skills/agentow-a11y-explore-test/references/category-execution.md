@@ -65,8 +65,9 @@ capture.
 Focus-sequence entries are either a compact string or an object with `tag`, `text`, `id`,
 `outlineStyle`, `outlineWidth`, `boxShadow`, and optional `obscured`/`focusObscured` boolean.
 
-Supporting DOM/tree/axe evidence cannot prove spoken output, OS focus behavior, Voice Access, or
-screen-reader interaction.
+Accessibility-tree, DOM, ARIA, and axe evidence are prohibited in the `screen-reader` category.
+Use them only in their applicable browser structure/semantics categories. They cannot test or prove
+spoken output, OS focus behavior, Voice Access, or screen-reader interaction.
 
 Infrastructure failures are `blocked`, `inconclusive`, `skipped-environment`, or `failed`; never
 turn them into product violations or passes.

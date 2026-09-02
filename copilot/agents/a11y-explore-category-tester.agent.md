@@ -52,6 +52,16 @@ Return exactly:
   "durationSeconds": 0,
   "capabilitiesUsed": ["browser"],
   "claims": ["browser-keyboard-tested"],
+  "scResults": [
+    {
+      "wcagSc": "2.4.7",
+      "status": "PASS|FAIL|NEEDS_REVIEW|NOT_APPLICABLE|NOT_TESTED",
+      "details": "Observed result or applicability rationale",
+      "blocker": "required for NOT_TESTED and present in category blockers",
+      "attemptedRoute": "required for NOT_TESTED",
+      "evidenceUris": ["absolute path under categoryDir"]
+    }
+  ],
   "evidence": [
     {
       "type": "screenshot",
@@ -81,4 +91,12 @@ Return exactly:
 Omit `severity` for non-violations. Every finding requires at least one `evidenceUris` entry except a
 single infrastructure `NEEDS-REVIEW` record in a non-completed category. Do not report NVDA,
 Narrator, Voice Access, real focus, speech, or audio as tested unless matching producer evidence is
-present.
+present. For `screen-reader`, accept only real NVDA or Narrator interaction evidence; reject
+Accessibility Tree, DOM, ARIA, axe, or browser accessibility snapshots as category evidence.
+
+Return exactly one `scResults` entry for every planned criterion. Use `NOT_APPLICABLE` only after an
+applicability check with evidence and a concrete rationale. Use `NOT_TESTED` only for a specific
+environment/capability blocker after the available route was attempted; include `blocker` and
+`attemptedRoute`, and repeat the blocker in the category `blockers` array. `FAIL` requires a
+matching `VIOLATION` finding, and every violation requires a matching `FAIL`.
+Any category containing `NOT_TESTED` must have category status `inconclusive`.
