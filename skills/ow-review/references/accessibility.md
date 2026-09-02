@@ -100,7 +100,10 @@ Apply these checks to SPDS/Fluent usage and custom UI alike:
 - **Heading semantics:** text that functions visually as a section or dialog heading must use the
   owning component's semantic heading API or a real, reasonably nested heading. Review the page or
   dialog outline in context; do not enforce a universal single-`h1` rule or a fixed heading level
-  based only on visual size.
+  based only on visual size. For a heading-level change, require a pre-implementation
+  `heading-outline.md` that records the complete live outline, target, nearest parent, relevant
+  siblings, selected level, and rationale. Missing or ambiguous fields are `INCONCLUSIVE` and must
+  block implementation. Exact-scenario AFTER evidence must recapture and re-check the same outline.
 - **Duplicate or conflicting ARIA:** inspect the accessibility output already supplied by
   SPDS/Fluent before adding ARIA at the call site. Report duplicate names/descriptions, conflicting
   roles or states, and wrapper ARIA that overrides the component contract. Do not report the mere

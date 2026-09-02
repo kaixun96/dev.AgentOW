@@ -560,6 +560,10 @@ const checks = [
       "does not require or invoke an external test skill",
       "windows-host-testing.md",
       "Twinbot retains exclusive",
+      "create `heading-outline.md` before any source edit",
+      "nearest parent heading, relevant sibling headings, selected level, and",
+      "`Verdict: INCONCLUSIVE` and stop before Step 4",
+      "exact-scenario AFTER evidence must recapture the same complete live outline",
     ],
   },
   {

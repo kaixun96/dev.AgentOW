@@ -179,9 +179,11 @@ After strict reproduction PASS or entry into `unverified-fallback`:
 1. Trace the failing element/event to its implementation.
 2. Read the predecessor/native SPDS or Fluent implementation before hand-writing ARIA, focus,
    keyboard, live-region, or announcement behavior.
-3. For a heading change, capture the complete live heading outline and derive the target level from
-   verified parent and sibling headings. Never infer it from visual styling, a component name, or an
-   assumed hierarchy; missing surrounding context makes the conclusion inconclusive.
+3. For a heading change, create `heading-outline.md` before any source edit. Record the complete live
+   heading outline, target, nearest parent heading, relevant sibling headings, selected level, and
+   rationale. Derive the level only from those verified relationships, never from visual styling, a
+   component name, or an assumed hierarchy. If any required field is missing or ambiguous, record
+   `Verdict: INCONCLUSIVE` and stop before Step 4; do not implement a heading level.
 4. Read directly applicable routed project instructions.
 5. Identify the smallest source change that addresses the reproduced behavior.
 6. Write a short implementation note, not a long general plan:
@@ -193,6 +195,7 @@ After strict reproduction PASS or entry into `unverified-fallback`:
    - Files:
    - Existing pattern reused:
    - Acceptance replay:
+   - Heading outline artifact (heading changes only):
    ```
 
 No planner approval phase exists in A11y mode.
@@ -250,6 +253,9 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-a11y-evidence.mjs" \
 
 Gate:
 
+- For a heading change, exact-scenario AFTER evidence must recapture the same complete live outline
+  and re-check the target, nearest parent, and relevant siblings against `heading-outline.md`.
+  Missing, changed, or ambiguous surrounding context is `inconclusive`, not PASS.
 - `pass` + evaluator PASS: continue.
 - `fail` caused by product behavior: fix, rebuild, and replay; maximum three cycles.
 - evaluator-spec/invalid evidence: request corrected Twin evidence without editing code.

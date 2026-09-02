@@ -137,12 +137,16 @@ target rect 只能有渲染抖动允许范围内的小误差。任一无关状�
 
 不得根据视觉字号、组件名称、设计稿层级或假定的页面结构选择 heading level。修改 heading 前必须：
 
-1. 从真实页面采集完整 heading outline，而不是只检查目标元素；
-2. 识别目标最近的 parent heading，以及同一区域的 sibling headings；
-3. 使用能保持该已验证层级的 level，并记录选择依据；
-4. 在 BEFORE/AFTER 机器证据中同时保留足够的 surrounding heading context。
+1. 在修改任何源码前创建 `heading-outline.md`，从真实页面记录完整 heading outline，而不是只检查目标元素；
+2. 在 artifact 中明确记录 target、最近的 parent heading、相关 sibling headings、选择的 level 和依据；
+3. 只有上述字段完整且关系明确时才能进入实现；缺失或歧义必须记录
+   `Verdict: INCONCLUSIVE` 并停止，不得指定或实现 heading level；
+4. AFTER 必须用完全相同的页面、route、flags、viewport、触发步骤和展开/折叠状态重新采集完整
+   outline，并对照 `heading-outline.md` 复核 target、parent 和 siblings；
+5. 在 BEFORE/AFTER 机器证据中同时保留足够的 surrounding heading context。
 
-如果无法证明 parent/sibling 层级，heading level 结论为 `INCONCLUSIVE`，不得凭经验指定 H1/H2/H3。
+如果无法证明 parent/sibling 层级，或 AFTER 场景与 pre-implementation artifact 不一致，heading
+level 结论为 `INCONCLUSIVE`，不得凭经验指定 H1/H2/H3，也不得将验证标记为 PASS。
 
 标注不得：
 
