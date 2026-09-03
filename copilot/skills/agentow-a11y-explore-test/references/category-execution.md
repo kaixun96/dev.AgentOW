@@ -25,6 +25,11 @@ host/Twin may operate AT, Console transfer, real OS input, ETW, and audio routin
 
 ## Browser rules
 
+All browser results come from a live rendered surface. Source inspection and runtime DOM,
+Accessibility Tree, CSS, or attribute inventories may identify targets, but every mapped criterion
+also requires an executed live step and an `interaction-log` or the category's stronger runtime
+evidence. Static inventory alone cannot produce any SC status.
+
 - Prefer the approved personal evaluator profile on its Windows host.
 - Use repository Playwright/FIC in Codespaces.
 - Never copy normal browser cookies or read credentials.

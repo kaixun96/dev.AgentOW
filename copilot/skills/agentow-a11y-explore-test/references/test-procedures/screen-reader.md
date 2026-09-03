@@ -7,6 +7,8 @@
 3. For Narrator-specific behavior, stop NVDA first and preserve Narrator/UIAutomationCore/Speech-TTS
    ETW, screenshot, and UIA state.
 4. Repeat the task using the canonical steps and record exact announcements.
+5. Correlate each trigger to speech and explicitly check silence, duplication, stale output, timing,
+   and interaction mode.
 
 If real AT is unavailable, record the screen-reader category as `inconclusive` with justified
 `NOT_TESTED` criteria. Run browser semantics separately under `structure-semantics`; never place

@@ -217,14 +217,22 @@ function renderFinding(runDir, finding, aggregate, bugs) {
     finding.id,
   )}: ${escapeHtml(finding.title)}</h3>
 <dl>
-<dt>WCAG SC</dt><dd>${escapeHtml(finding.wcagSc || "N/A")} ${escapeHtml(
+<dt>MAS rule</dt><dd>${escapeHtml(finding.wcagSc ? `MAS ${finding.wcagSc}` : "N/A")} (public WCAG mapping: ${escapeHtml(
+    finding.wcagSc || "N/A",
+  )} ${escapeHtml(
     WCAG_NAMES[finding.wcagSc] || "",
-  )}</dd>
+  )})</dd>
 <dt>Category</dt><dd>${escapeHtml(CATEGORY_LABELS[finding.category] || finding.category)}</dd>
 <dt>Element</dt><dd><code>${escapeHtml(finding.selector || "page-level")}</code></dd>
 <dt>Steps to reproduce</dt><dd><ol>${steps}</ol></dd>
 <dt>Expected</dt><dd>${escapeHtml(finding.expected)}</dd>
 <dt>Actual</dt><dd>${escapeHtml(finding.actual)}</dd>
+<dt>User impact</dt><dd>${escapeHtml(finding.userImpact)}</dd>
+<dt>Reproducibility</dt><dd>${escapeHtml(finding.reproducibility)}</dd>
+<dt>Tested scope</dt><dd>${escapeHtml(finding.testedScope)}</dd>
+<dt>Evidence limitations</dt><dd>${escapeHtml(
+    finding.evidenceLimitations.length > 0 ? finding.evidenceLimitations.join("; ") : "None recorded",
+  )}</dd>
 ${bug ? `<dt>ADO Bug</dt><dd><a href="${escapeHtml(bug.bugUrl)}">#${escapeHtml(bug.bugId)}</a></dd>` : ""}
 ${screenshotRow}
 <dt>Evidence</dt><dd><ul>${renderEvidenceLinks(runDir, finding)}</ul></dd>
@@ -421,7 +429,7 @@ function renderCoverageNotes(aggregate, plan, omittedFindings) {
       `<li><strong>Omitted incomplete finding:</strong> ${escapeHtml(finding.id)} — no screenshot artifact.</li>`,
     );
   }
-  return `<ul>${lines.join("")}</ul><p>This exploratory run does not claim full WCAG conformance.</p>`;
+  return `<ul>${lines.join("")}</ul><p>This exploratory run does not claim full MAS conformance.</p>`;
 }
 
 function renderReport(runDir, aggregate, metadata, plan, bugEntries) {
@@ -457,7 +465,7 @@ function renderReport(runDir, aggregate, metadata, plan, bugEntries) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="${escapeHtml(favicon)}">
-<title>A11y Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</title>
+<title>MAS Web Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</title>
 <style>
 :root{--critical:#d32f2f;--high:#e53935;--medium:#f57c00;--low:#ffa726;--best:#7b1fa2;--pass:#2e7d32;--review:#1565c0}
 *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#212121;max-width:1200px;margin:0 auto;padding:24px;background:#fafafa}
@@ -476,9 +484,9 @@ details{margin:12px 0}summary{cursor:pointer;font-weight:600;padding:8px 0}
 </style>
 </head>
 <body>
-<h1>Accessibility Test Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</h1>
+<h1>MAS Web Accessibility Test Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</h1>
 <div class="meta">
-<p><strong>Run date:</strong> ${escapeHtml(aggregate.generatedAt)} | <strong>WCAG Level:</strong> 2.2 AA</p>
+<p><strong>Run date:</strong> ${escapeHtml(aggregate.generatedAt)} | <strong>Standard:</strong> MAS Web | <strong>Public mapping:</strong> WCAG 2.2 A/AA</p>
 <p><strong>Mode:</strong> ${escapeHtml(metadata.executionEnvironment || "unknown")} | <strong>Browser:</strong> Chromium | <strong>Screen reader:</strong> ${escapeHtml(
     screenReaderLabel(aggregate),
   )}</p>
@@ -496,8 +504,8 @@ details{margin:12px 0}summary{cursor:pointer;font-weight:600;padding:8px 0}
     aggregate,
     reportableFindings,
   )}</tbody></table>
-<h2>WCAG 2.2 AA Conformance</h2>
-<table><thead><tr><th>Success Criterion</th><th>Status</th><th>Details</th></tr></thead><tbody>${renderWcagTable(
+<h2>MAS Web Evaluation</h2>
+<table><thead><tr><th>MAS rule / public mapping</th><th>Status</th><th>Details</th></tr></thead><tbody>${renderWcagTable(
     plan,
     aggregate,
   )}</tbody></table>

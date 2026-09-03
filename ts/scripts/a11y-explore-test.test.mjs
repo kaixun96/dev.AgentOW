@@ -25,13 +25,13 @@ const testerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-categ
 const PLAN_CONTRACT = {
   "keyboard-focus": ["serial-browser", ["browser", "keyboard"], ["screenshot", "focus-sequence"], "browser-keyboard-tested"],
   "screen-reader": ["serial-real-at", ["nvda", "real-os-input", "uia"], ["nvda-transcript", "screenshot", "uia-state"], "nvda-tested"],
-  "structure-semantics": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree"], "browser-semantics-tested"],
-  "orientation-input-purpose": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree"], "browser-semantics-tested"],
-  "visual-color": ["serial-browser", ["browser"], ["screenshot", "measurement"], "browser-visual-tested"],
+  "structure-semantics": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-semantics-tested"],
+  "orientation-input-purpose": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-semantics-tested"],
+  "visual-color": ["serial-browser", ["browser"], ["screenshot", "measurement", "interaction-log"], "browser-visual-tested"],
   "timing-motion": ["serial-browser", ["browser"], ["screenshot", "interaction-log"], "browser-dynamic-tested"],
   "dynamic-content": ["serial-browser", ["browser"], ["screenshot", "interaction-log"], "browser-dynamic-tested"],
   "touch-pointer": ["serial-browser", ["browser"], ["screenshot", "measurement", "interaction-log"], "browser-touch-pointer-tested"],
-  "authentication-forms": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree"], "browser-forms-tested"],
+  "authentication-forms": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-forms-tested"],
 };
 const planCategory = (category) => {
   const [executionClass, requiredCapabilities, requiredEvidenceTypes, maximumClaim] =
@@ -48,6 +48,13 @@ const planCategory = (category) => {
 };
 const plan = () => ({
   schemaVersion: 1,
+  standard: "MAS",
+  standardProfile: "web",
+  standardAttestation: {
+    sourceType: "authorized-mas-web",
+    checkedAt: "2026-09-02T00:00:00.000Z",
+    contentEmbedded: false,
+  },
   fullCoverage: true,
   target: "Sample",
   url: "https://example.test",
@@ -58,12 +65,27 @@ const plan = () => ({
   categories: CATEGORIES.map((category) => planCategory(category)),
 });
 const scResults = (category, evidenceUris, overrides = {}) =>
-  CATEGORY_SC[category].map((wcagSc) => ({
-    wcagSc,
-    status: overrides[wcagSc]?.status ?? "NEEDS_REVIEW",
-    details: overrides[wcagSc]?.details ?? "Evidence captured; manual review required.",
-    evidenceUris,
-  }));
+  CATEGORY_SC[category].map((wcagSc) => {
+    const status = overrides[wcagSc]?.status ?? "NEEDS_REVIEW";
+    return {
+      wcagSc,
+      standardRule: `MAS ${wcagSc}`,
+      standardCheck: "authorized-source-consulted",
+      status,
+      testMode:
+        status === "NOT_TESTED"
+          ? "not-tested"
+          : category === "screen-reader"
+            ? "real-at"
+            : status === "NOT_APPLICABLE"
+              ? "not-applicable-check"
+              : "live-interaction",
+      stepsExecuted: ["Load the live surface", "Execute the category procedure"],
+      observedAt: "2026-09-02T00:00:02.000Z",
+      details: overrides[wcagSc]?.details ?? "Evidence captured; manual review required.",
+      evidenceUris,
+    };
+  });
 const writeGenericCategoryResult = (runDir, category) => {
   const directory = path.join(runDir, "categories", category);
   fs.mkdirSync(directory, { recursive: true });
@@ -74,6 +96,23 @@ const writeGenericCategoryResult = (runDir, category) => {
     const file = path.join(directory, `${type}.${extension}`);
     let content = JSON.stringify({ type });
     if (type === "nvda-transcript") content = "NVDA transcript fixture";
+    if (type === "interaction-log") {
+      content = JSON.stringify({
+        executedSteps: [
+          {
+            action: "Activate the live control",
+            observed: "The rendered state changed.",
+            at: "2026-09-02T00:00:02.000Z",
+          },
+        ],
+        ...(category === "timing-motion"
+          ? {
+              ordinaryMotion: { observationSeconds: 6, samples: 3 },
+              reducedMotion: { observationSeconds: 1, samples: 2 },
+            }
+          : {}),
+      });
+    }
     if (type === "accessibility-tree" && category === "orientation-input-purpose") {
       content = JSON.stringify({ inputs: [], axTree: { nodes: [] } });
     }
@@ -115,6 +154,8 @@ for (const file of [
   path.join(skillRoot, "SKILL.md"),
   path.join(skillRoot, "references", "category-execution.md"),
   path.join(skillRoot, "references", "severity-guidelines.md"),
+  path.join(skillRoot, "references", "mas-standard.md"),
+  path.join(skillRoot, "references", "bug-patterns.md"),
   path.join(skillRoot, "references", "wcag-criteria.md"),
   path.join(skillRoot, "references", "report-rules.md"),
   plannerAgent,
@@ -122,6 +163,7 @@ for (const file of [
 ]) {
   assert.equal(fs.existsSync(file), true, `missing ${file}`);
 }
+assert.match(skillText, /Static source, DOM, Accessibility Tree,[\s\S]*cannot independently produce/);
 for (const category of CATEGORIES) {
   assert.equal(
     fs.existsSync(path.join(skillRoot, "references", "test-procedures", `${category}.md`)),
@@ -198,6 +240,10 @@ try {
         steps: ["Press Tab"],
         expected: "Visible focus",
         actual: "No visible focus",
+        userImpact: "Keyboard users cannot reliably identify the active control.",
+        reproducibility: "always",
+        testedScope: "Forward Tab navigation on the live surface.",
+        evidenceLimitations: [],
         evidenceUris: [screenshot, focusSequence],
       },
     ],
@@ -210,6 +256,41 @@ try {
   fs.writeFileSync(path.join(categoryDir, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
 
   assert.throws(() => aggregateResults(runDir), /Missing planned category result: screen-reader/);
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        { ...result, durationSeconds: 0 },
+        runDir,
+        "keyboard-focus",
+      ),
+    /completed result must record positive execution time/,
+  );
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          scResults: result.scResults.map((entry, index) =>
+            index === 0 ? { ...entry, testMode: "static", stepsExecuted: [] } : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /scResults\[0\] is invalid/,
+  );
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          findings: [{ ...result.findings[0], userImpact: "" }],
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /lacks report context/,
+  );
 
   const codespaceAtClaim = {
     ...result,
@@ -246,7 +327,12 @@ try {
         scResults: [
           {
             wcagSc: "1.3.1",
+            standardRule: "MAS 1.3.1",
+            standardCheck: "authorized-source-consulted",
             status: "PASS",
+            testMode: "real-at",
+            stepsExecuted: ["Open the live page", "Navigate its structure with NVDA"],
+            observedAt: "2026-09-02T00:00:02.000Z",
             details: "NVDA structure announcement was captured.",
             evidenceUris: realAtEvidence.map((entry) => entry.uri),
           },
@@ -270,7 +356,12 @@ try {
           scResults: [
             {
               wcagSc: "1.3.1",
+              standardRule: "MAS 1.3.1",
+              standardCheck: "authorized-source-consulted",
               status: "PASS",
+              testMode: "real-at",
+              stepsExecuted: ["Open the live page", "Navigate its structure with NVDA"],
+              observedAt: "2026-09-02T00:00:02.000Z",
               details: "An incomplete evidence link must not prove NVDA PASS.",
               evidenceUris: [
                 realAtEvidence.find((entry) => entry.type === "screenshot").uri,
@@ -308,7 +399,12 @@ try {
           scResults: [
             {
               wcagSc: "1.3.1",
+              standardRule: "MAS 1.3.1",
+              standardCheck: "authorized-source-consulted",
               status: "PASS",
+              testMode: "real-at",
+              stepsExecuted: ["Open the live page", "Navigate with NVDA and Narrator"],
+              observedAt: "2026-09-02T00:00:02.000Z",
               details: "Both claimed AT routes require linked evidence.",
               evidenceUris: realAtEvidence.map((entry) => entry.uri),
             },
@@ -324,6 +420,13 @@ try {
     () =>
       validatePlan({
         schemaVersion: 1,
+        standard: "MAS",
+        standardProfile: "web",
+        standardAttestation: {
+          sourceType: "authorized-mas-web",
+          checkedAt: "2026-09-02T00:00:00.000Z",
+          contentEmbedded: false,
+        },
         fullCoverage: true,
         target: "Screen reader",
         url: "https://example.test",
@@ -416,7 +519,12 @@ try {
     scResults: [
       {
         wcagSc: "1.1.1",
+        standardRule: "MAS 1.1.1",
+        standardCheck: "authorized-source-consulted",
         status: "NOT_TESTED",
+        testMode: "not-tested",
+        stepsExecuted: ["Attempt NVDA in the Console session"],
+        observedAt: "2026-09-02T00:00:02.000Z",
         details: "NVDA could not enter the page while the Console desktop was locked.",
         blocker: notTestedBlocker,
         attemptedRoute: "NVDA 2026 + real OS input in Console",
@@ -487,7 +595,7 @@ try {
     path.join(runDir, "plan.json"),
     JSON.stringify({ schemaVersion: 1, categories: [{ category: "keyboard-focus" }] }),
   );
-  assert.throws(() => aggregateResults(runDir), /does not satisfy the A\/AA explore plan schema/);
+  assert.throws(() => aggregateResults(runDir), /does not satisfy the MAS Web explore plan schema/);
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
     JSON.stringify({
@@ -505,7 +613,18 @@ try {
   const dynamicEvidence = path.join(dynamicDir, "dialog.png");
   const interactionEvidence = path.join(dynamicDir, "interaction.json");
   fs.writeFileSync(dynamicEvidence, "dynamic fixture");
-  fs.writeFileSync(interactionEvidence, JSON.stringify({ action: "open dialog" }));
+  fs.writeFileSync(
+    interactionEvidence,
+    JSON.stringify({
+      executedSteps: [
+        {
+          action: "Open the live dialog",
+          observed: "The dialog opened and focus moved.",
+          at: "2026-09-02T00:00:02.000Z",
+        },
+      ],
+    }),
+  );
   const dynamicHash = crypto
     .createHash("sha256")
     .update(fs.readFileSync(dynamicEvidence))
@@ -554,7 +673,20 @@ try {
   fs.mkdirSync(structureDir, { recursive: true });
   const structureScreenshot = path.join(structureDir, "structure.png");
   const structureTree = path.join(structureDir, "accessibility-tree.json");
+  const structureInteraction = path.join(structureDir, "interaction.json");
   fs.writeFileSync(structureScreenshot, "structure screenshot");
+  fs.writeFileSync(
+    structureInteraction,
+    JSON.stringify({
+      executedSteps: [
+        {
+          action: "Activate the representative live control",
+          observed: "Its rendered semantic state changed.",
+          at: "2026-09-02T00:00:02.000Z",
+        },
+      ],
+    }),
+  );
   fs.writeFileSync(
     structureTree,
     JSON.stringify({
@@ -572,9 +704,13 @@ try {
     category: "structure-semantics",
     capabilitiesUsed: ["browser"],
     claims: ["browser-semantics-tested"],
-    scResults: scResults("structure-semantics", [structureScreenshot, structureTree], {
+    scResults: scResults(
+      "structure-semantics",
+      [structureScreenshot, structureTree, structureInteraction],
+      {
       "1.3.1": { status: "PASS", details: "Headings and landmarks were captured." },
-    }),
+      },
+    ),
     evidence: [
       {
         type: "screenshot",
@@ -588,6 +724,15 @@ try {
         sha256: crypto.createHash("sha256").update(fs.readFileSync(structureTree)).digest("hex"),
         producer: "copilot-browser",
       },
+      {
+        type: "interaction-log",
+        uri: structureInteraction,
+        sha256: crypto
+          .createHash("sha256")
+          .update(fs.readFileSync(structureInteraction))
+          .digest("hex"),
+        producer: "copilot-browser",
+      },
     ],
     findings: [
       {
@@ -599,7 +744,11 @@ try {
         steps: ["Inspect headings and landmarks"],
         expected: "Structure is exposed.",
         actual: "Headings and main landmark were captured.",
-        evidenceUris: [structureScreenshot, structureTree],
+        userImpact: "Users can navigate the page structure predictably.",
+        reproducibility: "always",
+        testedScope: "Live heading, landmark, and representative control transition.",
+        evidenceLimitations: [],
+        evidenceUris: [structureScreenshot, structureTree, structureInteraction],
       },
     ],
   };
@@ -609,6 +758,58 @@ try {
   )) {
     writeGenericCategoryResult(runDir, category);
   }
+  const timingInteractionPath = path.join(
+    runDir,
+    "categories",
+    "timing-motion",
+    "interaction-log.json",
+  );
+  fs.writeFileSync(timingInteractionPath, JSON.stringify({ executedSteps: [] }));
+  const timingResultPath = path.join(
+    runDir,
+    "categories",
+    "timing-motion",
+    "result.json",
+  );
+  const timingResult = JSON.parse(fs.readFileSync(timingResultPath, "utf8"));
+  timingResult.evidence = timingResult.evidence.map((entry) =>
+    entry.uri === timingInteractionPath
+      ? {
+          ...entry,
+          sha256: crypto
+            .createHash("sha256")
+            .update(fs.readFileSync(timingInteractionPath))
+            .digest("hex"),
+        }
+      : entry,
+  );
+  fs.writeFileSync(timingResultPath, JSON.stringify(timingResult));
+  assert.throws(
+    () => aggregateResults(runDir),
+    /interaction-log evidence has no executed live steps/,
+  );
+  writeGenericCategoryResult(runDir, "timing-motion");
+  const incompleteTiming = JSON.parse(fs.readFileSync(timingInteractionPath, "utf8"));
+  delete incompleteTiming.reducedMotion.samples;
+  fs.writeFileSync(timingInteractionPath, JSON.stringify(incompleteTiming));
+  const incompleteTimingResult = JSON.parse(fs.readFileSync(timingResultPath, "utf8"));
+  incompleteTimingResult.evidence = incompleteTimingResult.evidence.map((entry) =>
+    entry.uri === timingInteractionPath
+      ? {
+          ...entry,
+          sha256: crypto
+            .createHash("sha256")
+            .update(fs.readFileSync(timingInteractionPath))
+            .digest("hex"),
+        }
+      : entry,
+  );
+  fs.writeFileSync(timingResultPath, JSON.stringify(incompleteTimingResult));
+  assert.throws(
+    () => aggregateResults(runDir),
+    /timing-motion interaction-log lacks ordinary and reduced-motion observation/,
+  );
+  writeGenericCategoryResult(runDir, "timing-motion");
   const falsePassPath = path.join(
     runDir,
     "categories",
@@ -631,6 +832,7 @@ try {
   partialPass.scResults[0] = {
     ...partialPass.scResults[0],
     status: "NOT_TESTED",
+    testMode: "not-tested",
     blocker: notTestedBlocker,
     attemptedRoute: "NVDA 2026 + real OS input in Console",
   };
@@ -653,6 +855,7 @@ try {
   completedUntested.scResults = completedUntested.scResults.map((entry) => ({
     ...entry,
     status: "NOT_TESTED",
+    testMode: "not-tested",
     blocker: notTestedBlocker,
     attemptedRoute: "NVDA 2026 + real OS input in Console",
   }));
@@ -731,10 +934,15 @@ try {
   const html = fs.readFileSync(outputHtml, "utf8");
   assert.match(html, /&lt;script&gt;alert/);
   assert.doesNotMatch(html, /<script>alert/);
-  assert.match(html, /does not claim full WCAG conformance/);
+  assert.match(html, /does not claim full MAS conformance/);
   assert.match(html, /class="summary-grid"/);
   assert.match(html, /<link rel="icon" href="data:image\/svg\+xml,/);
-  assert.match(html, /WCAG 2\.2 AA Conformance/);
+  assert.match(html, /MAS Web Evaluation/);
+  assert.match(html, /<strong>Standard:<\/strong> MAS Web/);
+  assert.match(html, /User impact/);
+  assert.match(html, /Reproducibility/);
+  assert.match(html, /Tested scope/);
+  assert.match(html, /Evidence limitations/);
   assert.match(html, /2\.4\.3 Focus Order<\/td><td>FAIL<\/td>/);
   assert.match(html, /<img src="categories\//);
   assert.match(html, /Tab Order Map/);

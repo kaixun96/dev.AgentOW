@@ -1,4 +1,4 @@
-# WCAG 2.2 AA category map
+# MAS Web public WCAG mapping
 
 | Category | Primary success criteria |
 |---|---|
@@ -12,4 +12,5 @@
 | touch-pointer | 2.5.1, 2.5.2, 2.5.3, 2.5.4, 2.5.7, 2.5.8 |
 | authentication-forms | 3.3.1, 3.3.2, 3.3.3, 3.3.4, 3.3.7, 3.3.8 |
 
-This map guides coverage; it does not prove conformance.
+MAS Web is normative. These public WCAG 2.2 A/AA identifiers guide coverage and reporting; the map
+does not independently prove MAS conformance.

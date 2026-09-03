@@ -6,6 +6,8 @@
 3. Test text spacing overrides and 200% text resize where applicable.
 4. Check content loss, overlap, two-dimensional scrolling, clipped focus, and hidden actions.
 5. Test Windows High Contrast for selected, focused, disabled, and error states.
+6. Record live viewport, zoom/resize mode, state transitions, computed measurements, and matched
+   screenshots; CSS declarations alone are not evidence.
 
 Restore viewport, zoom, and injected spacing styles. Record computed measurements and matched
 screenshots.

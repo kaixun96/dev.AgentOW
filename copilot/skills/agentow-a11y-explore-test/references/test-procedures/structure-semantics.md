@@ -7,6 +7,8 @@
    semantics.
 4. Confirm DOM and accessibility reading order preserve meaning.
 5. Check link/button purpose and page title.
+6. Activate representative controls and verify their live computed semantics before and after the
+   transition; an inventory alone is not a test.
 
 Capture the accessibility facts and a full-page context screenshot. Do not infer hierarchy from
 visual size alone.

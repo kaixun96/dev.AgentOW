@@ -1,6 +1,6 @@
 ---
 name: agentow-a11y-explore-test
-description: "Explore a SharePoint or M365 surface for WCAG 2.2 AA issues with browser evidence and optional real assistive technology. Produces deterministic findings and HTML reports and can optionally file validated ADO bugs. Use for agentow a11y explore test, exploratory accessibility testing, WCAG audit, keyboard test, screen reader exploration, NVDA, Narrator, or Voice Access testing."
+description: "Explore a SharePoint or M365 surface against the MAS Web standard, using public WCAG 2.2 identifiers as mapping keys, with browser evidence and optional real assistive technology. Produces deterministic findings and HTML reports and can optionally file validated ADO bugs. Use for agentow a11y explore test, exploratory accessibility testing, MAS audit, keyboard test, screen reader exploration, NVDA, Narrator, or Voice Access testing."
 ---
 
 # agentOW Accessibility exploratory testing
@@ -8,6 +8,13 @@ description: "Explore a SharePoint or M365 surface for WCAG 2.2 AA issues with b
 This workflow discovers Accessibility issues. It does not modify product code, fix findings, create
 a product branch, or create a product pull request. Use `/agentow-a11y` for remediation after a
 finding becomes a concrete bug.
+
+MAS Web is the normative pass/fail standard. Read `references/mas-standard.md`; use
+`references/wcag-criteria.md` only as the public criterion mapping. Never publish internal or NDA
+MAS content.
+
+Read `references/bug-patterns.md` before planning. It is a de-identified heuristic checklist, not a
+standards source.
 
 ## Invocation
 
@@ -109,11 +116,16 @@ touch-pointer
 authentication-forms
 ```
 
-Require `fullCoverage: true`, all nine category objects, each category's complete A/AA mapping from
-`references/wcag-criteria.md`, and a `scCoverage` union containing every supported A/AA criterion.
+Require `standard: "MAS"`, `standardProfile: "web"`, `fullCoverage: true`, all nine category
+objects, each category's complete public mapping from `references/wcag-criteria.md`, and a
+`scCoverage` union containing every supported mapped criterion.
 
 Do not ask for plan approval. Ask only when the URL/fixture or expected surface is too incomplete to
 run.
+
+Every category must execute against a live rendered surface. Static source, DOM, Accessibility Tree,
+CSS, or attribute inventories may select targets only; they cannot independently produce
+`PASS`, `FAIL`, `NEEDS_REVIEW`, or `NOT_APPLICABLE`.
 
 ## Step 2: Prepare browser and execution schedule
 

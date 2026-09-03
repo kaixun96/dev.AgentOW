@@ -5,18 +5,24 @@ self-contained `report.html` with embedded CSS and no external runtime dependenc
 
 ## Required sections
 
-1. Page/feature title, run date, WCAG 2.2 AA label, environment, browser, screen-reader status, URL,
+1. Page/feature title, run date, MAS Web label, public WCAG mapping, environment, browser,
+   screen-reader status, URL,
    and evidence root.
 2. Bright summary cards for violations, best practices, scoped passes, and needs review.
 3. Per-category counts plus a total row.
-4. One WCAG 2.2 A/AA row per supported criterion, exactly once:
+4. One MAS Web mapped row per supported public WCAG criterion, exactly once:
    - red `FAIL`;
    - green `PASS`;
    - blue `NEEDS REVIEW`;
    - gray `NOT APPLICABLE` or `NOT TESTED`.
    `NOT_TESTED` is valid only with a concrete reason explaining why the test could not run.
 5. Findings ordered by severity/classification from the deterministic aggregate. Violation cards
-   show both type and severity badges.
+   show both type and severity badges. Each finding includes prerequisites, stable target, exact
+   input method, ordered steps, actual behavior, expected behavior, user impact, reproducibility,
+   environment, tested scope, and evidence limitations. Semantic findings state observed
+   name/role/state/value/relationships; focus findings state the ordered transition; screen-reader
+   findings state the trigger and real announcement sequence. Screenshots alone cannot prove
+   semantic, speech, focus-order, interaction, or measurement claims.
 6. At least one inline screenshot per reportable finding, using a relative path. Omit incomplete
    completed-category findings and list them in coverage notes. A non-completed infrastructure
    `NEEDS-REVIEW` record may render without a screenshot.
@@ -46,3 +52,5 @@ network dependency.
 - Keep report reads and writes inside the real run directory and reject symlink escapes.
 - Do not leave template placeholders in the output.
 - Do not label the exploratory result as full WCAG conformance.
+- Do not publish private standard text, internal mapping identifiers, bug text, work-item IDs, or
+  internal query links.

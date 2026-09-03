@@ -132,11 +132,11 @@ const CLAIM_RULES = {
   },
   "browser-semantics-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "accessibility-tree"],
+    evidence: ["screenshot", "accessibility-tree", "interaction-log"],
   },
   "browser-visual-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "measurement"],
+    evidence: ["screenshot", "measurement", "interaction-log"],
   },
   "browser-dynamic-tested": {
     producers: ["copilot-browser"],
@@ -148,7 +148,7 @@ const CLAIM_RULES = {
   },
   "browser-forms-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "accessibility-tree"],
+    evidence: ["screenshot", "accessibility-tree", "interaction-log"],
   },
   "nvda-tested": {
     producers: ["windows-host", "twin", "external"],
@@ -307,6 +307,39 @@ function validateEvidenceShape(filePath, type, category) {
       throw new Error(`${category} focus-sequence evidence has an invalid schema`);
     }
   }
+  if (type === "interaction-log") {
+    const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (
+      !Array.isArray(value?.executedSteps) ||
+      value.executedSteps.length === 0 ||
+      !value.executedSteps.every(
+        (entry) =>
+          entry &&
+          typeof entry === "object" &&
+          typeof entry.action === "string" &&
+          entry.action.trim() &&
+          typeof entry.observed === "string" &&
+          entry.observed.trim() &&
+          typeof entry.at === "string" &&
+          !Number.isNaN(Date.parse(entry.at)),
+      )
+    ) {
+      throw new Error(`${category} interaction-log evidence has no executed live steps`);
+    }
+    if (
+      category === "timing-motion" &&
+      (!Number.isFinite(value?.ordinaryMotion?.observationSeconds) ||
+        value.ordinaryMotion.observationSeconds < 5 ||
+        !Number.isInteger(value.ordinaryMotion.samples) ||
+        value.ordinaryMotion.samples < 2 ||
+        !Number.isFinite(value?.reducedMotion?.observationSeconds) ||
+        value.reducedMotion.observationSeconds <= 0 ||
+        !Number.isInteger(value.reducedMotion.samples) ||
+        value.reducedMotion.samples < 1)
+    ) {
+      throw new Error("timing-motion interaction-log lacks ordinary and reduced-motion observation");
+    }
+  }
   if (type !== "accessibility-tree") return;
   const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
   if (category === "structure-semantics") {
@@ -365,12 +398,30 @@ function validateFinding(finding, category, evidenceByUri, status, index) {
   } else if (finding.severity !== undefined) {
     throw new Error(`${category}.findings[${index}] must not assign severity to ${finding.classification}`);
   }
-  for (const field of ["wcagSc", "title", "selector", "expected", "actual"]) {
+  for (const field of [
+    "wcagSc",
+    "title",
+    "selector",
+    "expected",
+    "actual",
+    "userImpact",
+    "reproducibility",
+    "testedScope",
+  ]) {
     if (typeof finding[field] !== "string") {
       throw new Error(`${category}.findings[${index}].${field} must be a string`);
     }
     if (finding.wcagSc && !A_AA_SC.has(finding.wcagSc)) {
       throw new Error(`${category}.findings[${index}].wcagSc is not WCAG 2.2 A/AA`);
+    }
+    if (
+      !finding.userImpact.trim() ||
+      !["always", "intermittent", "once", "not-reproduced"].includes(finding.reproducibility) ||
+      !finding.testedScope.trim() ||
+      !Array.isArray(finding.evidenceLimitations) ||
+      !finding.evidenceLimitations.every((value) => typeof value === "string")
+    ) {
+      throw new Error(`${category}.findings[${index}] lacks report context`);
     }
     if (["VIOLATION", "PASS"].includes(finding.classification)) {
       if (
@@ -422,15 +473,53 @@ function validateScResult(scResult, category, evidenceByUri, blockers, index) {
   if (
     typeof scResult.wcagSc !== "string" ||
     !A_AA_SC.has(scResult.wcagSc) ||
+    scResult.standardRule !== `MAS ${scResult.wcagSc}` ||
+    scResult.standardCheck !== "authorized-source-consulted" ||
     !SC_STATUSES.has(scResult.status) ||
     typeof scResult.details !== "string" ||
     !scResult.details.trim() ||
+    !["live-interaction", "live-observation", "real-at", "not-applicable-check", "not-tested"].includes(
+      scResult.testMode,
+    ) ||
+    !Array.isArray(scResult.stepsExecuted) ||
+    scResult.stepsExecuted.length === 0 ||
+    !scResult.stepsExecuted.every((step) => typeof step === "string" && step.trim()) ||
+    typeof scResult.observedAt !== "string" ||
+    Number.isNaN(Date.parse(scResult.observedAt)) ||
     !Array.isArray(scResult.evidenceUris)
   ) {
     throw new Error(`${category}.scResults[${index}] is invalid`);
   }
   if (scResult.status !== "NOT_TESTED" && scResult.evidenceUris.length === 0) {
     throw new Error(`${category}.scResults[${index}] requires evidence`);
+  }
+  if (
+    (scResult.status === "NOT_TESTED" && scResult.testMode !== "not-tested") ||
+    (scResult.status !== "NOT_TESTED" && scResult.testMode === "not-tested")
+  ) {
+    throw new Error(`${category}.scResults[${index}] testMode conflicts with status`);
+  }
+  if (
+    scResult.status !== "NOT_TESTED" &&
+    category === "screen-reader" &&
+    scResult.testMode !== "real-at"
+  ) {
+    throw new Error(`${category}.scResults[${index}] requires real-at testMode`);
+  }
+  if (
+    scResult.status !== "NOT_TESTED" &&
+    category !== "screen-reader" &&
+    !["live-interaction", "live-observation", "not-applicable-check", "real-at"].includes(
+      scResult.testMode,
+    )
+  ) {
+    throw new Error(`${category}.scResults[${index}] requires a live testMode`);
+  }
+  if (
+    ["PASS", "FAIL", "NEEDS_REVIEW"].includes(scResult.status) &&
+    scResult.testMode === "not-applicable-check"
+  ) {
+    throw new Error(`${category}.scResults[${index}] testMode conflicts with tested status`);
   }
   if (
     scResult.status === "NOT_TESTED" &&
@@ -469,6 +558,9 @@ export function validateCategoryResult(result, runDir, expectedCategory) {
     !Array.isArray(result.blockers)
   ) {
     throw new Error(`${expectedCategory} execution metadata is invalid`);
+  }
+  if (result.status === "completed" && result.durationSeconds <= 0) {
+    throw new Error(`${expectedCategory} completed result must record positive execution time`);
   }
   for (const field of ["startedAt", "endedAt"]) {
     if (typeof result[field] !== "string" || Number.isNaN(Date.parse(result[field]))) {
@@ -527,26 +619,18 @@ export function validateCategoryResult(result, runDir, expectedCategory) {
   const scIds = new Set();
   result.scResults.forEach((scResult, index) => {
     validateScResult(scResult, expectedCategory, evidenceByUri, result.blockers, index);
-    if (
-      expectedCategory === "screen-reader" &&
-      ["PASS", "FAIL", "NEEDS_REVIEW"].includes(scResult.status)
-    ) {
-      const atClaims = result.claims.filter((claim) =>
-        ["nvda-tested", "narrator-tested"].includes(claim),
+    if (scResult.status !== "NOT_TESTED" && result.claims.length > 0) {
+      const linkedTypes = new Set(
+        scResult.evidenceUris.map((uri) => evidenceByUri.get(uri)?.type),
       );
-      if (atClaims.length > 0) {
-        const linkedTypes = new Set(
-          scResult.evidenceUris.map((uri) => evidenceByUri.get(uri)?.type),
-        );
-        const requiredTypes = new Set(
-          atClaims.flatMap((claim) => CLAIM_RULES[claim].evidence),
-        );
-        for (const requiredType of requiredTypes) {
-          if (!linkedTypes.has(requiredType)) {
-            throw new Error(
-              `${expectedCategory}.scResults[${index}] ${scResult.status} is missing linked ${requiredType} evidence`,
-            );
-          }
+      const requiredTypes = new Set(
+        result.claims.flatMap((claim) => CLAIM_RULES[claim]?.evidence ?? []),
+      );
+      for (const requiredType of requiredTypes) {
+        if (!linkedTypes.has(requiredType)) {
+          throw new Error(
+            `${expectedCategory}.scResults[${index}] ${scResult.status} is missing linked ${requiredType} evidence`,
+          );
         }
       }
     }
@@ -627,6 +711,13 @@ export function validatePlan(plan) {
   assertObject(plan, "plan.json");
   if (
     plan.schemaVersion !== 1 ||
+    plan.standard !== "MAS" ||
+    plan.standardProfile !== "web" ||
+    !plan.standardAttestation ||
+    plan.standardAttestation.sourceType !== "authorized-mas-web" ||
+    plan.standardAttestation.contentEmbedded !== false ||
+    typeof plan.standardAttestation.checkedAt !== "string" ||
+    Number.isNaN(Date.parse(plan.standardAttestation.checkedAt)) ||
     plan.fullCoverage !== true ||
     typeof plan.target !== "string" ||
     !plan.target.trim() ||
@@ -643,7 +734,7 @@ export function validatePlan(plan) {
     !Array.isArray(plan.categories) ||
     plan.categories.length === 0
   ) {
-    throw new Error("plan.json does not satisfy the A/AA explore plan schema");
+    throw new Error("plan.json does not satisfy the MAS Web explore plan schema");
   }
   const seen = new Set();
   const categoryCoverage = new Set();
@@ -701,7 +792,7 @@ export function validatePlan(plan) {
     const expected = [...CATEGORY_SC[entry.category]].sort();
     const actual = [...entry.wcagSc].sort();
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-      throw new Error(`plan.json ${entry.category} must cover its complete A/AA mapping`);
+      throw new Error(`plan.json ${entry.category} must cover its complete MAS Web mapping`);
     }
   }
   const declaredCoverage = [...new Set(plan.scCoverage)].sort();
@@ -760,10 +851,7 @@ export function aggregateResults(runDir) {
     ) {
       throw new Error(`${category} completed result contains NOT_TESTED success criteria`);
     }
-    if (
-      result.status === "completed" ||
-      result.scResults.some((entry) => entry.status === "PASS")
-    ) {
+    if (result.scResults.some((entry) => entry.status !== "NOT_TESTED")) {
       if (!result.claims.includes(planned.maximumClaim)) {
         throw new Error(`${category} did not satisfy its planned maximum claim`);
       }

@@ -1,7 +1,7 @@
 ---
 name: a11y-explore-category-tester
 description: |
-  Execute or evaluate exactly one WCAG category for /agentow-a11y-explore-test. Produces a structured
+  Execute or evaluate exactly one MAS Web category for /agentow-a11y-explore-test. Produces a structured
   category result with evidence provenance and never edits product code or controls unassigned AT.
 model: inherit
 tools:
@@ -18,6 +18,8 @@ another agent.
 Read:
 
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/category-execution.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/mas-standard.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/bug-patterns.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/severity-guidelines.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/test-procedures/<category>.md`
 
@@ -49,13 +51,18 @@ Return exactly:
   "profileIsolationId": "shared|unique-id|none",
   "startedAt": "ISO-8601",
   "endedAt": "ISO-8601",
-  "durationSeconds": 0,
+  "durationSeconds": 1,
   "capabilitiesUsed": ["browser"],
   "claims": ["browser-keyboard-tested"],
   "scResults": [
     {
       "wcagSc": "2.4.7",
+      "standardRule": "MAS 2.4.7",
+      "standardCheck": "authorized-source-consulted",
       "status": "PASS|FAIL|NEEDS_REVIEW|NOT_APPLICABLE|NOT_TESTED",
+      "testMode": "live-interaction|live-observation|real-at|not-applicable-check|not-tested",
+      "stepsExecuted": ["exact executed step"],
+      "observedAt": "ISO-8601",
       "details": "Observed result or applicability rationale",
       "blocker": "required for NOT_TESTED and present in category blockers",
       "attemptedRoute": "required for NOT_TESTED",
@@ -81,6 +88,10 @@ Return exactly:
       "steps": ["step"],
       "expected": "expected behavior",
       "actual": "observed behavior",
+      "userImpact": "specific user impact",
+      "reproducibility": "always|intermittent|once|not-reproduced",
+      "testedScope": "states, modes, and boundaries exercised",
+      "evidenceLimitations": ["known limitation"],
       "evidenceUris": ["absolute path under categoryDir"]
     }
   ],
@@ -100,3 +111,24 @@ environment/capability blocker after the available route was attempted; include 
 `attemptedRoute`, and repeat the blocker in the category `blockers` array. `FAIL` requires a
 matching `VIOLATION` finding, and every violation requires a matching `FAIL`.
 Any category containing `NOT_TESTED` must have category status `inconclusive`.
+Static inventories are target discovery only. Every non-`NOT_TESTED` SC result requires a live test
+mode, exact executed steps, observation time, and all evidence required by the category claim.
+
+`interaction-log` JSON is:
+
+```json
+{
+  "executedSteps": [
+    {
+      "action": "exact action on the live rendered surface",
+      "observed": "observable result",
+      "at": "ISO-8601"
+    }
+  ]
+}
+```
+
+For `timing-motion`, the same object also contains
+`ordinaryMotion: { observationSeconds: >=5, samples: >=2 }` and
+`reducedMotion: { observationSeconds: >0, samples: >=1 }`. Ordinary-mode samples determine MAS
+2.2.2; reduced motion is a separate supporting mode.
