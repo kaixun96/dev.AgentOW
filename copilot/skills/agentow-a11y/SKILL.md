@@ -78,6 +78,7 @@ On an unsupported host, run only host-supported browser/static checks and mark W
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/pr-evidence-capture-guide.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/windows-host-testing.md`
    - `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/accessibility.md`
+   - `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/sharepoint-design-system-and-ux-components.md`
 5. Write `knowledge-manifest.json` listing exact documents, versions/URLs when known, and why each
    applies. Keep this manifest A11y-only.
 6. Write concise progress lines for every gate.
@@ -186,7 +187,14 @@ After strict reproduction PASS or entry into `unverified-fallback`:
    `Verdict: INCONCLUSIVE` and stop before Step 4; do not implement a heading level.
 4. Read directly applicable routed project instructions.
 5. Identify the smallest source change that addresses the reproduced behavior.
-6. Write a short implementation note, not a long general plan:
+6. For an Input border or contrast change, inspect the version-pinned native Fluent V9 Input and
+   migration-shim styles. If they already provide the requested border hierarchy, remove the
+   consumer override and let the component own its styles. Otherwise, for the default outline
+   appearance, preserve
+   `borderColor: tokens.colorNeutralStroke1` on all four edges and
+   `borderBottomColor: tokens.colorNeutralStrokeAccessible` on the bottom edge; do not use the
+   accessible token as the full `borderColor`.
+7. Write a short implementation note, not a long general plan:
 
    ```markdown
    # A11y implementation note
@@ -284,6 +292,7 @@ After strict verify PASS or completion of the `unverified-fallback` supporting c
 - evidence metadata and hashes;
 - validation mode, exhausted attempt log, unavailable evidence types, and supporting checks;
 - `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/accessibility.md`.
+- `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/sharepoint-design-system-and-ux-components.md`.
 
 Critical/Important findings return to Step 4. Strict mode requires a complete Step 5 replay. In
 fallback mode, rerun affected supporting checks and retry real-AT verification only when the

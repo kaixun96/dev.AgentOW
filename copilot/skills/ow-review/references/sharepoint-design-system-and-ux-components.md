@@ -42,6 +42,25 @@ Treat a rendered UI change that lacks this analysis, contradicts its own evidenc
 17. Keep custom components focused and reusable. Do not reproduce a standard design-system control solely for visual customization.
 18. Verify the chosen implementation preserves design-system semantics, accessibility, theming, responsiveness, and upgrade resilience.
 
+## Fluent V9 Input border contract
+
+For the default outline appearance, preserve the native Fluent V9 token pair:
+`borderColor: tokens.colorNeutralStroke1` on the full perimeter and
+`borderBottomColor: tokens.colorNeutralStrokeAccessible` on the bottom edge. When the native
+component or migration shim already provides this hierarchy, do not repeat it as a consumer
+override; remove the override and let the component own its default and interaction-state styles.
+Do not apply `tokens.colorNeutralStrokeAccessible` through a `border` or `borderColor` shorthand,
+because that darkens all four edges and no longer matches the standard Input.
+
+This also applies when a Fluent V8 `TextField` is rendered through the V9 migration shim. The shim
+preserves the V8 `fieldGroup` styling API, but that compatibility API is not a reason to restate
+native V9 Input styles. Read the version-pinned native Input and shim styles first. If they already
+provide the required hierarchy, require no consumer `fieldGroup` override. Only when a documented
+product requirement genuinely needs a different base style may the consumer express the two layers
+separately with `borderColor: tokens.colorNeutralStroke1` and
+`borderBottomColor: tokens.colorNeutralStrokeAccessible`. Preserve the component's native hover,
+focus, error, disabled, forced-colors, and non-default appearance rules.
+
 ## Review questions
 
 - Can SPDS meet this requirement?
@@ -50,6 +69,10 @@ Treat a rendered UI change that lacks this analysis, contradicts its own evidenc
 - Is the code treating a compound component as a semantic API with valid child components and slots, rather than injecting unrelated content into its internal structure?
 - If custom HTML/CSS is proposed, why can neither `@msinternal/sharepoint-ui-react` nor Fluent V9 meet it?
 - Are existing components, tokens, typography, slots, or wrappers being bypassed?
+- Does a default Input preserve the normal four-edge stroke plus the darker accessible bottom edge,
+  including when a V8 `TextField` uses the V9 shim?
+- If the native component or shim already provides that border hierarchy, has a redundant consumer
+  override been removed rather than restating the component's own tokens?
 - Does the chosen implementation preserve design-system semantics, accessibility, theming, and upgrade resilience?
 
 ## Examples
