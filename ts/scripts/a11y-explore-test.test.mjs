@@ -23,7 +23,7 @@ const skillRoot = path.join(repoRoot, "copilot", "skills", "agentow-a11y-explore
 const plannerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-planner.agent.md");
 const testerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-category-tester.agent.md");
 const PLAN_CONTRACT = {
-  "keyboard-focus": ["serial-browser", ["browser", "keyboard"], ["screenshot", "focus-sequence"], "browser-keyboard-tested"],
+  "keyboard-focus": ["serial-browser", ["browser", "keyboard"], ["screenshot", "focus-sequence", "focus-visual-comparison"], "browser-keyboard-tested"],
   "screen-reader": ["serial-real-at", ["nvda", "real-os-input", "uia"], ["nvda-transcript", "screenshot", "uia-state"], "nvda-tested"],
   "structure-semantics": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-semantics-tested"],
   "orientation-input-purpose": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-semantics-tested"],
@@ -95,7 +95,9 @@ const writeGenericCategoryResult = (runDir, category) => {
     const extension = type === "screenshot" ? "png" : "json";
     const file = path.join(directory, `${type}.${extension}`);
     let content = JSON.stringify({ type });
-    if (type === "nvda-transcript") content = "NVDA transcript fixture";
+    if (type === "nvda-transcript") {
+      content = "Speaking ['Account manager for test-user']";
+    }
     if (type === "interaction-log") {
       content = JSON.stringify({
         executedSteps: [
@@ -111,6 +113,24 @@ const writeGenericCategoryResult = (runDir, category) => {
               reducedMotion: { observationSeconds: 1, samples: 2 },
             }
           : {}),
+      });
+    }
+    if (type === "focus-visual-comparison") {
+      content = JSON.stringify({
+        executedSteps: ["Capture identical unfocused and focused target crops"],
+        items: [
+          {
+            index: 1,
+            beforeSha256: "a".repeat(64),
+            afterSha256: "b".repeat(64),
+            pixelChanged: true,
+            styleChanged: true,
+            indicatorObserved: true,
+            geometryStable: true,
+            caretBearing: false,
+            targetPath: "html>body>button:nth-of-type(1)",
+          },
+        ],
       });
     }
     if (type === "accessibility-tree" && category === "orientation-input-purpose") {
@@ -178,15 +198,35 @@ try {
   fs.mkdirSync(categoryDir, { recursive: true });
   const screenshot = path.join(categoryDir, "focus.png");
   const focusSequence = path.join(categoryDir, "focus-sequence.json");
+  const focusVisual = path.join(categoryDir, "focus-visual-comparison.json");
+  const focusBefore1 = path.join(categoryDir, "focus-before-1.png");
+  const focusAfter1 = path.join(categoryDir, "focus-after-1.png");
+  const focusBefore2 = path.join(categoryDir, "focus-before-2.png");
+  const focusAfter2 = path.join(categoryDir, "focus-after-2.png");
   fs.writeFileSync(screenshot, "image fixture");
+  fs.writeFileSync(focusBefore1, "button before");
+  fs.writeFileSync(focusAfter1, "button after");
+  fs.writeFileSync(focusBefore2, "link before");
+  fs.writeFileSync(focusAfter2, "link after");
   fs.writeFileSync(
     focusSequence,
     JSON.stringify([
-      "body",
       {
+        index: 1,
+        tag: "BUTTON",
+        text: "Open",
+        id: "open",
+        path: "html>body>button:nth-of-type(1)",
+        outlineStyle: "solid",
+        outlineWidth: "2px",
+        boxShadow: "none",
+      },
+      {
+        index: 2,
         tag: "A",
         text: "Save",
         id: "save",
+        path: "html>body>a:nth-of-type(1)",
         outlineStyle: "solid",
         outlineWidth: "2px",
         boxShadow: "none",
@@ -194,8 +234,58 @@ try {
       },
     ]),
   );
+  fs.writeFileSync(
+    focusVisual,
+    JSON.stringify({
+      executedSteps: ["Capture identical unfocused and focused target crops"],
+      items: [
+        {
+          index: 1,
+          beforeSha256: crypto
+            .createHash("sha256")
+            .update(fs.readFileSync(focusBefore1))
+            .digest("hex"),
+          afterSha256: crypto
+            .createHash("sha256")
+            .update(fs.readFileSync(focusAfter1))
+            .digest("hex"),
+          pixelChanged: true,
+          styleChanged: true,
+          indicatorObserved: true,
+          geometryStable: true,
+          caretBearing: false,
+          targetPath: "html>body>button:nth-of-type(1)",
+          beforeUri: focusBefore1,
+          afterUri: focusAfter1,
+        },
+        {
+          index: 2,
+          beforeSha256: crypto
+            .createHash("sha256")
+            .update(fs.readFileSync(focusBefore2))
+            .digest("hex"),
+          afterSha256: crypto
+            .createHash("sha256")
+            .update(fs.readFileSync(focusAfter2))
+            .digest("hex"),
+          pixelChanged: true,
+          styleChanged: false,
+          indicatorObserved: true,
+          geometryStable: true,
+          caretBearing: false,
+          targetPath: "html>body>a:nth-of-type(1)",
+          beforeUri: focusBefore2,
+          afterUri: focusAfter2,
+        },
+      ],
+    }),
+  );
   const hash = crypto.createHash("sha256").update(fs.readFileSync(screenshot)).digest("hex");
   const focusHash = crypto.createHash("sha256").update(fs.readFileSync(focusSequence)).digest("hex");
+  const focusVisualHash = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(focusVisual))
+    .digest("hex");
   const result = {
     schemaVersion: 1,
     category: "keyboard-focus",
@@ -208,7 +298,7 @@ try {
     durationSeconds: 3,
     capabilitiesUsed: ["browser", "keyboard"],
     claims: ["browser-keyboard-tested"],
-    scResults: scResults("keyboard-focus", [screenshot, focusSequence], {
+    scResults: scResults("keyboard-focus", [screenshot, focusSequence, focusVisual], {
       "2.4.3": { status: "FAIL", details: "Focus order issue observed." },
     }),
     evidence: [
@@ -228,6 +318,12 @@ try {
         sha256: focusHash,
         producer: "copilot-browser",
       },
+      {
+        type: "focus-visual-comparison",
+        uri: focusVisual,
+        sha256: focusVisualHash,
+        producer: "copilot-browser",
+      },
     ],
     findings: [
       {
@@ -244,7 +340,7 @@ try {
         reproducibility: "always",
         testedScope: "Forward Tab navigation on the live surface.",
         evidenceLimitations: [],
-        evidenceUris: [screenshot, focusSequence],
+        evidenceUris: [screenshot, focusSequence, focusVisual],
       },
     ],
     blockers: [],
@@ -694,6 +790,7 @@ try {
         headings: [
           { level: 1, text: "Page title" },
           { level: 3, text: "Skipped heading" },
+          { level: 2, text: "owner@example.com" },
         ],
         landmarks: [{ tag: "MAIN", role: "main", name: "Main content" }],
       },
@@ -943,6 +1040,8 @@ try {
   assert.match(html, /Reproducibility/);
   assert.match(html, /Tested scope/);
   assert.match(html, /Evidence limitations/);
+  assert.match(html, /Account manager for \[redacted\]/);
+  assert.doesNotMatch(html, /Account manager for test-user/);
   assert.match(html, /2\.4\.3 Focus Order<\/td><td>FAIL<\/td>/);
   assert.match(html, /<img src="categories\//);
   assert.match(html, /Tab Order Map/);
@@ -952,10 +1051,13 @@ try {
   assert.match(html, /NVDA Transcript \(excerpts\)/);
   assert.match(html, /Test Coverage Notes/);
   assert.match(html, /Screen reader:<\/strong> NVDA \(completed\)/);
-  assert.match(html, />body<\/td>|>#save<\/td>/);
+  assert.match(html, />BUTTON<\/td>/);
+  assert.match(html, /Observed \(pixels\/styles\)/);
   assert.match(html, /Obscured/);
   assert.match(html, /h1: Page title/);
   assert.match(html, /h3: Skipped heading/);
+  assert.match(html, /\[redacted-email\]/);
+  assert.doesNotMatch(html, /owner@example\.com/);
   assert.match(html, /Main content/);
   assert.doesNotMatch(html, /No screenshot artifact/);
   assert.doesNotMatch(html, /\{Page\/Feature Name\}|\{duration\}|\{status\}/);

@@ -96,6 +96,18 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function redactEvidenceText(value) {
+  return String(value ?? "")
+    .replace(
+      /Account manager for\s+[^'",\]\r\n<]+/gi,
+      "Account manager for [redacted]",
+    )
+    .replace(
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+      "[redacted-email]",
+    );
+}
+
 function safeHttpUrl(value) {
   try {
     const parsed = new URL(String(value));
@@ -303,6 +315,17 @@ function renderWcagTable(plan, aggregate) {
 function renderTabOrder(runDir, aggregate) {
   const sequence = readEvidenceJson(runDir, aggregate, "focus-sequence", "keyboard-focus");
   if (!Array.isArray(sequence)) return "<p>Tab order was not captured.</p>";
+  const comparison = readEvidenceJson(
+    runDir,
+    aggregate,
+    "focus-visual-comparison",
+    "keyboard-focus",
+  );
+  const comparisonsByIndex = new Map(
+    Array.isArray(comparison?.items)
+      ? comparison.items.map((entry) => [entry.index, entry])
+      : [],
+  );
   const rows = sequence
     .map((entry, index) => {
       const value =
@@ -310,17 +333,24 @@ function renderTabOrder(runDir, aggregate) {
           ? { tag: "", text: entry, id: "", outlineStyle: "", outlineWidth: "", boxShadow: "" }
           : entry;
       const obscured = value.obscured === true || value.focusObscured === true;
-      const indicator = obscured
-        ? "Obscured"
-        : value.outlineStyle && value.outlineStyle !== "none"
-          ? `${value.outlineStyle} ${value.outlineWidth || ""}`.trim()
-          : value.boxShadow && value.boxShadow !== "none"
-            ? "box-shadow"
-            : "Needs review";
-      const rowClass = ["Needs review", "Obscured"].includes(indicator) ? ' class="sc-fail"' : "";
+      const visualComparison = comparisonsByIndex.get(value.index ?? index + 1);
+      const indicator = comparison?.items
+        ? visualComparison?.indicatorObserved
+          ? "Observed (pixels/styles)"
+          : "Missing"
+        : obscured
+          ? "Obscured"
+          : value.outlineStyle && value.outlineStyle !== "none"
+            ? `${value.outlineStyle} ${value.outlineWidth || ""}`.trim()
+            : value.boxShadow && value.boxShadow !== "none"
+              ? "box-shadow"
+              : "Needs review";
+      const rowClass = ["Missing", "Needs review", "Obscured"].includes(indicator)
+        ? ' class="sc-fail"'
+        : "";
       return `<tr${rowClass}><td>${index + 1}</td><td>${escapeHtml(value.tag)}</td><td>${escapeHtml(
         value.tag?.toLowerCase() || "",
-      )}</td><td>${escapeHtml(value.text || value.href || "")}</td><td>${escapeHtml(
+      )}</td><td>${escapeHtml(redactEvidenceText(value.text || value.href || ""))}</td><td>${escapeHtml(
         indicator,
       )}</td><td>${escapeHtml(value.id || "")}</td></tr>`;
     })
@@ -337,7 +367,9 @@ function renderHeadingHierarchy(runDir, aggregate) {
     .map((heading) => {
       const issue = previous && heading.level > previous + 1;
       previous = heading.level;
-      const value = `${"  ".repeat(Math.max(0, heading.level - 1))}h${heading.level}: ${heading.text}`;
+      const value = `${"  ".repeat(Math.max(0, heading.level - 1))}h${heading.level}: ${redactEvidenceText(
+        heading.text,
+      )}`;
       return issue ? `<span class="issue">${escapeHtml(value)}</span>` : escapeHtml(value);
     })
     .join("\n")}</div>`;
@@ -351,7 +383,7 @@ function renderLandmarks(runDir, aggregate) {
     .map(
       (entry) =>
         `<tr class="sc-pass"><td>${escapeHtml(entry.role || entry.tag?.toLowerCase())}</td><td>${escapeHtml(
-          entry.name || "(none)",
+          redactEvidenceText(entry.name || "(none)"),
         )}</td><td>Yes</td></tr>`,
     )
     .join("");
@@ -390,7 +422,9 @@ function renderNvdaExcerpt(runDir, aggregate) {
     .split(/\r?\n/)
     .filter((line) => /Speaking \[|Input:|Lock Screen|pane/.test(line))
     .slice(-60);
-  return lines.length ? lines.join("\n") : "NVDA evidence exists, but no speech excerpt was available.";
+  return lines.length
+    ? redactEvidenceText(lines.join("\n"))
+    : "NVDA evidence exists, but no speech excerpt was available.";
 }
 
 function screenReaderLabel(aggregate) {

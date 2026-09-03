@@ -132,3 +132,11 @@ For `timing-motion`, the same object also contains
 `ordinaryMotion: { observationSeconds: >=5, samples: >=2 }` and
 `reducedMotion: { observationSeconds: >0, samples: >=1 }`. Ordinary-mode samples determine MAS
 2.2.2; reduced motion is a separate supporting mode.
+
+`keyboard-focus` also requires `focus-visual-comparison` JSON. For every sampled Tab position,
+capture the same target crop while unfocused and focused; record SHA-256 for both images, whether
+pixels changed, whether element/pseudo-element/ancestor focus styles changed, and
+`indicatorObserved`. Both captures must resolve the same stable DOM path and record geometry
+stability. A caret-bearing control cannot pass from pixel difference alone because a blinking caret
+is not a focus indicator; it also needs a focus-style or target-geometry change. Checking only
+`outline` or `box-shadow` is insufficient.

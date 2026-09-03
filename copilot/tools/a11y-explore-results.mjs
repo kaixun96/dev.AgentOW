@@ -128,7 +128,7 @@ const A_AA_SC = new Set([
 const CLAIM_RULES = {
   "browser-keyboard-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "focus-sequence"],
+    evidence: ["screenshot", "focus-sequence", "focus-visual-comparison"],
   },
   "browser-semantics-tested": {
     producers: ["copilot-browser"],
@@ -305,6 +305,65 @@ function validateEvidenceShape(filePath, type, category) {
       )
     ) {
       throw new Error(`${category} focus-sequence evidence has an invalid schema`);
+    }
+  }
+  if (type === "focus-visual-comparison") {
+    const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (
+      !Array.isArray(value?.executedSteps) ||
+      value.executedSteps.length === 0 ||
+      !Array.isArray(value?.items) ||
+      value.items.length === 0 ||
+      !value.items.every(
+        (entry) =>
+          Number.isInteger(entry.index) &&
+          typeof entry.beforeSha256 === "string" &&
+          SHA256.test(entry.beforeSha256) &&
+          typeof entry.afterSha256 === "string" &&
+          SHA256.test(entry.afterSha256) &&
+          typeof entry.pixelChanged === "boolean" &&
+          typeof entry.styleChanged === "boolean" &&
+          typeof entry.indicatorObserved === "boolean" &&
+          typeof entry.geometryStable === "boolean" &&
+          typeof entry.caretBearing === "boolean" &&
+          typeof entry.targetPath === "string" &&
+          entry.targetPath.trim() &&
+          typeof entry.beforeUri === "string" &&
+          typeof entry.afterUri === "string" &&
+          entry.indicatorObserved ===
+            (entry.styleChanged ||
+              (entry.pixelChanged && (!entry.caretBearing || !entry.geometryStable))),
+      )
+    ) {
+      throw new Error(`${category} focus-visual-comparison evidence has an invalid schema`);
+    }
+    const comparisonRoot = fs.realpathSync(path.dirname(filePath));
+    for (const entry of value.items) {
+      if (
+        entry.pixelChanged !==
+        (entry.beforeSha256 !== entry.afterSha256)
+      ) {
+        throw new Error(
+          `${category} focus-visual-comparison pixelChanged contradicts capture hashes`,
+        );
+      }
+      for (const [uriField, hashField] of [
+        ["beforeUri", "beforeSha256"],
+        ["afterUri", "afterSha256"],
+      ]) {
+        const resolved = path.resolve(entry[uriField]);
+        const realCapture = fs.existsSync(resolved) ? fs.realpathSync(resolved) : resolved;
+        if (
+          !isPathInside(comparisonRoot, realCapture) ||
+          !fs.existsSync(resolved) ||
+          crypto.createHash("sha256").update(fs.readFileSync(realCapture)).digest("hex") !==
+            entry[hashField]
+        ) {
+          throw new Error(
+            `${category} focus-visual-comparison ${uriField} is missing, escaped, or hash-mismatched`,
+          );
+        }
+      }
     }
   }
   if (type === "interaction-log") {
@@ -606,6 +665,39 @@ export function validateCategoryResult(result, runDir, expectedCategory) {
     }
   }
   const evidenceByUri = new Map(result.evidence.map((entry) => [entry.uri, entry]));
+  if (expectedCategory === "keyboard-focus" && result.claims.includes("browser-keyboard-tested")) {
+    const sequenceEvidence = result.evidence.find((entry) => entry.type === "focus-sequence");
+    const comparisonEvidence = result.evidence.find(
+      (entry) => entry.type === "focus-visual-comparison",
+    );
+    if (sequenceEvidence && comparisonEvidence) {
+      const sequence = JSON.parse(fs.readFileSync(sequenceEvidence.uri, "utf8"));
+      const comparison = JSON.parse(fs.readFileSync(comparisonEvidence.uri, "utf8"));
+      const indices = new Set(comparison.items.map((entry) => entry.index));
+      if (
+        !sequence.every(
+          (entry, index) =>
+            entry &&
+            typeof entry === "object" &&
+            entry.index === index + 1 &&
+            typeof entry.path === "string" &&
+            entry.path.trim(),
+        ) ||
+        comparison.items.length !== sequence.length ||
+        indices.size !== sequence.length ||
+        comparison.items.some(
+          (entry) =>
+            entry.index < 1 ||
+            entry.index > sequence.length ||
+            entry.targetPath !== sequence[entry.index - 1].path,
+        )
+      ) {
+        throw new Error(
+          "keyboard-focus visual comparisons do not exactly match the focus sequence",
+        );
+      }
+    }
+  }
   const findingIds = new Set();
   for (const finding of result.findings) {
     if (findingIds.has(finding.id)) {

@@ -116,7 +116,7 @@ Return one JSON object and no surrounding prose:
       "wcagSc": ["2.1.1", "2.1.2", "2.1.4", "2.4.3", "2.4.7", "2.4.11"],
       "focusAreas": ["full MAS Web mapped coverage"],
       "requiredCapabilities": ["browser", "keyboard"],
-      "requiredEvidenceTypes": ["screenshot", "focus-sequence"],
+      "requiredEvidenceTypes": ["screenshot", "focus-sequence", "focus-visual-comparison"],
       "maximumClaim": "browser-keyboard-tested"
     },
     {
