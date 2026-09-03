@@ -491,7 +491,7 @@ details{margin:12px 0}summary{cursor:pointer;font-weight:600;padding:8px 0}
     screenReaderLabel(aggregate),
   )}</p>
 <p><strong>URL:</strong> ${renderedUrl}</p>
-<p><strong>Evidence root:</strong> <code>${escapeHtml(runDir)}</code></p>
+<p><strong>Evidence:</strong> Report-local artifacts with validated hashes</p>
 </div>
 <h2>Summary</h2>
 <div class="summary-grid">
