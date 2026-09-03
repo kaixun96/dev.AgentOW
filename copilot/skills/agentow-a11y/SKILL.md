@@ -186,6 +186,10 @@ After strict reproduction PASS or entry into `unverified-fallback`:
    `Verdict: INCONCLUSIVE` and stop before Step 4; do not implement a heading level.
 4. Read directly applicable routed project instructions.
 5. Identify the smallest source change that addresses the reproduced behavior.
+   When using Fluent V9 `useAnnounce()` under a guaranteed ancestor `AriaLiveAnnouncer`, call its
+   provider-backed `announce` function directly. Do not stabilize it through a ref plus an empty-
+   dependency callback unless the component can render without that provider and evidence proves
+   fallback identity causes a real problem.
 6. Write a short implementation note, not a long general plan:
 
    ```markdown
