@@ -13,6 +13,10 @@ description: "Use for Rush, Heft, pnpm, rigs, project tags, lockfiles, package o
 - Output directories vary. Confirm `outDir`/`declarationDir`; common outputs are `lib-esm`,
   `lib-commonjs`, and `lib-dts`. Jest normally consumes CommonJS output.
 - Rush configuration and lockfiles live under `common/config/rush/`; never edit the pnpm lockfile manually.
+- Never manually create or hand-write a Rush change file under `common/changes/**/*.json`. Run the
+  repository-approved `rush change` command first, then edit only the generated file when its
+  message or metadata needs adjustment. If generation hangs or fails, repair the command path or
+  report the blocker; do not construct the JSON as a fallback.
 - Use project or tag selectors such as `tag:spartan-apps` only after confirming membership in
   `rush.json`.
 - Treat cache and shrinkwrap errors as infrastructure state: run `rush install` once, then retry the
