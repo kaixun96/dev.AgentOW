@@ -290,6 +290,7 @@ export function summarizeScResults(results) {
 function renderWcagTable(plan, aggregate) {
   const planned = new Set(plan.scCoverage);
   return Object.keys(WCAG_NAMES)
+    .filter((criterion) => planned.has(criterion))
     .map((criterion) => {
       const results = planned.has(criterion)
         ? aggregate.scResults.filter((entry) => entry.wcagSc === criterion)
@@ -445,7 +446,7 @@ function screenReaderLabel(aggregate) {
   return `${technology} (${category.status})`;
 }
 
-function renderCoverageNotes(aggregate, plan, omittedFindings) {
+function renderCoverageNotes(aggregate, plan, omittedFindings, scoped = false) {
   const lines = aggregate.categories.map((entry) => {
     const blockers = entry.blockers?.length ? ` — ${entry.blockers.join("; ")}` : "";
     return `<li><strong>${escapeHtml(CATEGORY_LABELS[entry.category] || entry.category)}:</strong> ${escapeHtml(
@@ -453,9 +454,11 @@ function renderCoverageNotes(aggregate, plan, omittedFindings) {
     )}${escapeHtml(blockers)}</li>`;
   });
   const planned = new Set(plan.categories.map((entry) => entry.category));
-  for (const category of Object.keys(CATEGORY_LABELS)) {
-    if (!planned.has(category)) {
-      lines.push(`<li><strong>${escapeHtml(CATEGORY_LABELS[category])}:</strong> not planned</li>`);
+  if (!scoped) {
+    for (const category of Object.keys(CATEGORY_LABELS)) {
+      if (!planned.has(category)) {
+        lines.push(`<li><strong>${escapeHtml(CATEGORY_LABELS[category])}:</strong> not planned</li>`);
+      }
     }
   }
   for (const finding of omittedFindings) {
@@ -493,6 +496,7 @@ function renderReport(runDir, aggregate, metadata, plan, bugEntries) {
   const renderedUrl = reportUrl
     ? `<a href="${escapeHtml(reportUrl)}">${escapeHtml(metadata.url)}</a>`
     : escapeHtml(metadata.url || "");
+  const includedCategories = new Set(aggregate.categories.map((entry) => entry.category));
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -521,9 +525,12 @@ details{margin:12px 0}summary{cursor:pointer;font-weight:600;padding:8px 0}
 <h1>MAS Web Accessibility Test Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</h1>
 <div class="meta">
 <p><strong>Run date:</strong> ${escapeHtml(aggregate.generatedAt)} | <strong>Standard:</strong> MAS Web | <strong>Public mapping:</strong> WCAG 2.2 A/AA</p>
-<p><strong>Mode:</strong> ${escapeHtml(metadata.executionEnvironment || "unknown")} | <strong>Browser:</strong> Chromium | <strong>Screen reader:</strong> ${escapeHtml(
-    screenReaderLabel(aggregate),
-  )}</p>
+<p><strong>Mode:</strong> ${escapeHtml(metadata.executionEnvironment || "unknown")} | <strong>Browser:</strong> Chromium${
+    includedCategories.has("screen-reader")
+      ? ` | <strong>Screen reader:</strong> ${escapeHtml(screenReaderLabel(aggregate))}`
+      : ""
+  }</p>
+${metadata.reportScope ? `<p><strong>Report scope:</strong> ${escapeHtml(metadata.reportScope)}</p>` : ""}
 <p><strong>URL:</strong> ${renderedUrl}</p>
 <p><strong>Evidence:</strong> Report-local artifacts with validated hashes</p>
 </div>
@@ -545,18 +552,19 @@ details{margin:12px 0}summary{cursor:pointer;font-weight:600;padding:8px 0}
   )}</tbody></table>
 <h2>Findings</h2>
 ${cards || "<p>No findings were recorded.</p>"}
-<h2>Tab Order Map</h2><div class="structure-section">${renderTabOrder(runDir, aggregate)}</div>
-<h2>Heading Hierarchy</h2><div class="structure-section">${renderHeadingHierarchy(runDir, aggregate)}</div>
-<h2>Landmark Regions</h2><div class="structure-section">${renderLandmarks(runDir, aggregate)}</div>
+${includedCategories.has("keyboard-focus") ? `<h2>Tab Order Map</h2><div class="structure-section">${renderTabOrder(runDir, aggregate)}</div>` : ""}
+${includedCategories.has("structure-semantics") ? `<h2>Heading Hierarchy</h2><div class="structure-section">${renderHeadingHierarchy(runDir, aggregate)}</div>
+<h2>Landmark Regions</h2><div class="structure-section">${renderLandmarks(runDir, aggregate)}</div>` : ""}
 <h2>Task Runtime</h2>
 <table><thead><tr><th>Task</th><th>Duration</th></tr></thead><tbody>${renderRuntime(aggregate)}</tbody></table>
-<details><summary>NVDA Transcript (excerpts)</summary><pre>${escapeHtml(
+${includedCategories.has("screen-reader") ? `<details><summary>NVDA Transcript (excerpts)</summary><pre>${escapeHtml(
     renderNvdaExcerpt(runDir, aggregate),
-  )}</pre></details>
+  )}</pre></details>` : ""}
 <details><summary>Test Coverage Notes</summary>${renderCoverageNotes(
     aggregate,
     plan,
     omittedFindings,
+    Boolean(metadata.reportScope),
   )}</details>
 </body>
 </html>
@@ -581,7 +589,7 @@ function main() {
   const realFindings = fs.realpathSync(findingsPath);
   if (!isPathInside(realRun, realFindings)) throw new Error("Findings path resolves outside --run-dir");
   JSON.parse(fs.readFileSync(realFindings, "utf8"));
-  const aggregate = aggregateResults(runDir);
+  let aggregate = aggregateResults(runDir);
   const metadataPath = path.join(runDir, "run.json");
   const planPath = path.join(runDir, "plan.json");
   const bugsPath = path.join(runDir, "ado-bugs.json");
@@ -590,11 +598,64 @@ function main() {
       throw new Error(`${path.basename(candidate)} resolves outside --run-dir`);
     }
   }
-  const metadata = fs.existsSync(metadataPath) ? JSON.parse(fs.readFileSync(metadataPath, "utf8")) : {};
+  let metadata = fs.existsSync(metadataPath) ? JSON.parse(fs.readFileSync(metadataPath, "utf8")) : {};
   if (!fs.existsSync(planPath)) throw new Error("plan.json is required for report rendering");
-  const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
-  const bugs = fs.existsSync(bugsPath) ? JSON.parse(fs.readFileSync(bugsPath, "utf8")) : [];
+  let plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
+  if (args.category) {
+    if (!CATEGORY_LABELS[args.category]) {
+      throw new Error(`Unknown --category: ${args.category}`);
+    }
+    const categories = aggregate.categories.filter((entry) => entry.category === args.category);
+    const evidence = aggregate.evidence.filter((entry) => entry.category === args.category);
+    const selectedResultPath = categories[0]?.resultPath;
+    const selectedResult = JSON.parse(fs.readFileSync(selectedResultPath, "utf8"));
+    const findings = selectedResult.findings.map((entry) => ({
+        ...entry,
+        id: `${args.category}:${entry.id}`,
+        category: args.category,
+        sourceResult: selectedResultPath,
+        sourceResults: [selectedResultPath],
+      }));
+    aggregate = {
+      ...aggregate,
+      categories,
+      scResults: aggregate.scResults.filter((entry) => entry.category === args.category),
+      findings,
+      evidence,
+    };
+    const byClassification = {};
+    const bySeverity = {};
+    for (const finding of aggregate.findings) {
+      byClassification[finding.classification] =
+        (byClassification[finding.classification] ?? 0) + 1;
+      if (finding.severity) {
+        bySeverity[finding.severity] = (bySeverity[finding.severity] ?? 0) + 1;
+      }
+    }
+    aggregate.counts = {
+      total: aggregate.findings.length,
+      byClassification,
+      bySeverity,
+    };
+    const planCategories = plan.categories.filter((entry) => entry.category === args.category);
+    plan = {
+      ...plan,
+      requestedCategories: [args.category],
+      categories: planCategories,
+      scCoverage: [...new Set(planCategories.flatMap((entry) => entry.wcagSc))],
+    };
+    metadata = {
+      ...metadata,
+      target: `${metadata.target || "Accessibility exploration"} — ${CATEGORY_LABELS[args.category]}`,
+      reportScope: CATEGORY_LABELS[args.category],
+    };
+  }
+  let bugs = fs.existsSync(bugsPath) ? JSON.parse(fs.readFileSync(bugsPath, "utf8")) : [];
   if (!Array.isArray(bugs)) throw new Error("ado-bugs.json must contain an array");
+  if (args.category) {
+    const findingIds = new Set(aggregate.findings.map((entry) => entry.id));
+    bugs = bugs.filter((entry) => findingIds.has(entry.findingId));
+  }
   const report = { ...aggregate, metadata, adoBugs: bugs };
   safeWriteFile(runDir, outputJson, `${JSON.stringify(report, null, 2)}\n`);
   safeWriteFile(runDir, outputHtml, renderReport(runDir, aggregate, metadata, plan, bugs));

@@ -1062,6 +1062,61 @@ try {
   assert.doesNotMatch(html, /No screenshot artifact/);
   assert.doesNotMatch(html, /\{Page\/Feature Name\}|\{duration\}|\{status\}/);
 
+  const focusedHtml = path.join(runDir, "focus-report.html");
+  const focusedJson = path.join(runDir, "focus-report.json");
+  execFileSync(process.execPath, [
+    reportTool,
+    "--run-dir",
+    runDir,
+    "--findings",
+    findings,
+    "--out-json",
+    focusedJson,
+    "--out-html",
+    focusedHtml,
+    "--category",
+    "keyboard-focus",
+  ]);
+  const focused = fs.readFileSync(focusedHtml, "utf8");
+  const focusedData = JSON.parse(fs.readFileSync(focusedJson, "utf8"));
+  assert.match(focused, /Report scope:<\/strong> Keyboard &amp; Focus/);
+  assert.match(focused, /Tab Order Map/);
+  assert.doesNotMatch(focused, /Heading Hierarchy|NVDA Transcript/);
+  assert.doesNotMatch(focused, /1\.3\.1 Info and Relationships/);
+  assert.doesNotMatch(focused, /Screen reader:/);
+  assert.deepEqual(focusedData.categories.map((entry) => entry.category), ["keyboard-focus"]);
+  assert.equal(focusedData.counts.total, focusedData.findings.length);
+  assert.equal(focusedData.scResults.every((entry) => entry.category === "keyboard-focus"), true);
+  assert.equal(
+    focusedData.findings.every(
+      (entry) =>
+        entry.evidenceUris.every((uri) => uri.includes(`${path.sep}keyboard-focus${path.sep}`)) &&
+        entry.sourceResults.every((uri) => uri.includes(`${path.sep}keyboard-focus${path.sep}`)),
+    ),
+    true,
+  );
+  assert.doesNotMatch(focused, /categories\/dynamic-content/);
+  assert.deepEqual(focusedData.adoBugs, []);
+
+  const dynamicFocusedHtml = path.join(runDir, "dynamic-report.html");
+  const dynamicFocusedJson = path.join(runDir, "dynamic-report.json");
+  execFileSync(process.execPath, [
+    reportTool,
+    "--run-dir",
+    runDir,
+    "--findings",
+    findings,
+    "--out-json",
+    dynamicFocusedJson,
+    "--out-html",
+    dynamicFocusedHtml,
+    "--category",
+    "dynamic-content",
+  ]);
+  const dynamicFocused = JSON.parse(fs.readFileSync(dynamicFocusedJson, "utf8"));
+  assert.equal(dynamicFocused.findings.length, dynamicResult.findings.length);
+  assert.equal(dynamicFocused.findings.every((entry) => entry.category === "dynamic-content"), true);
+
   fs.writeFileSync(
     path.join(runDir, "run.json"),
     JSON.stringify({
