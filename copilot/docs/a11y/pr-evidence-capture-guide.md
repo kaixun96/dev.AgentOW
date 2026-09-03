@@ -186,6 +186,19 @@ level 结论为 `INCONCLUSIVE`，不得凭经验指定 H1/H2/H3，也不得将�
 
 需要剪辑时只能裁掉操作前后的空白，不得改变顺序、节奏或结果。
 
+“显示 target”不是只在开头或独立截图中出现。对每个 canonical action，视频必须从 action
+前的稳定状态开始，一直到可观察结果和 AT speech quiescence 结束，持续完整显示：
+
+- 能唯一识别操作对象的 visible label；
+- 实际 focus indicator、cursor 或 overlay；
+- 与 acceptance criteria 相关的 visible state/value；
+- 触发动作前后的状态变化。
+
+录制后必须使用 action audit 中的真实媒体时间戳，在每个 action 前、动作时和结果稳定后抽帧或生成
+contact sheet。验收者必须逐帧确认上述内容在实际编码像素中完整、清晰且未被 viewport、桌面捕获边界、
+sticky UI 或裁剪截掉。DOM/UIA 的 `visible`/`inViewport` 值、另一张 full-page 截图或 transcript
+不能替代该媒体像素检查。
+
 ### 7.3 Screen reader 视频
 
 Screen reader 证据必须同时证明“操作对象”和“实际输出”：
@@ -207,9 +220,15 @@ Screen reader 证据必须同时证明“操作对象”和“实际输出”：
 
 - 输出足够清晰，文字、focus ring 和 overlay 可辨认；
 - 避免过度压缩、极低帧率、跳帧和音画不同步；
+- MP4 必须包含前置索引（fast start），关键帧间隔不得超过 2 秒；
 - 只录目标应用及必要 OS surface；
 - 不展示凭据、token、个人通知、无关聊天或敏感客户数据；
 - 不为“更好看”而隐藏与 bug 判断相关的 browser chrome 或 OS surface。
+
+本地可播放不代表 reviewer 媒体可用。最终承载 URL 和 PR 页面播放器必须支持随机访问：
+对非零字节范围请求返回 `206 Partial Content`，并声明 `Accept-Ranges: bytes`。发布者还必须在
+真实 PR 页面分别拖动到约 25%、50% 和 75%，确认画面、音频和时长定位正确。只返回整文件
+`200 OK` 的 endpoint 不满足视频发布要求，即使文件较小或从头播放成功。
 
 ## 8. Voice Access 特殊规则
 
@@ -242,6 +261,10 @@ AFTER 必须绑定实际 PR HEAD：
 - 记录 commit SHA、changed-build selector、资源 URL 和成功响应；
 - 证明受影响 package 的精确 HEAD asset 已加载并执行；
 - 任何源码变化都会使旧 AFTER 失效，必须完整重拍；
+- reviewer finding、KS 或任何后续源码修改完成后，必须重新生成 AFTER，并删除或替换 PR
+  description 中全部旧 AFTER 引用；
+- 发布时下载 live PR URL 的实际 bytes，验证其 SHA 与已接受的 exact-HEAD evidence manifest
+  完全一致；description 中写了新 commit 或新 hash 不能证明所链接附件已更新；
 - debug manifest error、fallback 到 deployed asset、404/CORS 或 error overlay 都使 AFTER 无效；
 - 不得把历史 branch、近似 fixture 或手工修改 DOM 当作 AFTER。
 
@@ -347,12 +370,17 @@ Creating or updating only a PR description or attachment does not require a Code
 task involves odsp-web source changes, branching, builds, commits, or pushes, all code work must
 still happen in an allowed Codespace under an exclusive lease.
 
-附件必须：
+图片及其他不需要随机访问的附件必须：
 
 - 通过 ADO Git pull-request attachment endpoint 上传；
 - 使用最终的绝对 `https://onedrive.visualstudio.com/...` attachment URL；
 - 不依赖本地路径、session artifact、临时 server、`dev.azure.com` 重写或短期 token URL；
 - 不发 PR comment thread；全部 reviewer-safe 证据写入 PR description。
+
+视频只能发布到稳定、reviewer-authenticated 且通过第 7.4 节 Range/seek 门禁的承载 URL。不得因为
+ADO attachment 是图片的标准承载方式，就假定它也适合视频；如果实际 endpoint 忽略 Range 请求，
+该视频不能发布。没有获批且可 seek 的稳定承载方式时，PR 必须保持 Draft，并将 publication 标记为
+`blocked`，不能用“可下载”或“能从头播放”降级通过。
 
 ### 10.4 Post-publication acceptance
 
@@ -360,7 +388,9 @@ still happen in an allowed Codespace under an exclusive lease.
 
 - 使用 reviewer 身份可见的实际页面打开；
 - 图片返回正确 bytes，实际渲染尺寸非 0，清晰度足够；
-- 视频播放器/下载链接存在且附件能完整播放；
+- 视频播放器存在，能完整播放，并通过 25%/50%/75% 拖动 seek 检查；
+- 按 action 时间戳抽帧确认 target label、focus 和状态变化在整个 action window 中持续可见；
+- live attachment SHA 与当前 HEAD 对应的 accepted evidence manifest 一致；
 - BEFORE/AFTER 标签和顺序正确；
 - description 中没有 broken image、过期链接或旧证据；
 - reviewer 能在数秒内看出 bug、修复和正确性理由。
@@ -379,6 +409,9 @@ API 上传成功、HTTP 200 或 markdown 文本正确都不能替代真实 PR �
 - 语义 bug 没有 AX/UIA/DOM 机器证据；
 - 时序 bug 使用静态截图或 slideshow 代替真实连续操作；
 - screen reader 视频没有真实焦点/cursor 移动或真实音频；
+- 视频在任一 action window 中没有持续完整显示 target label、focus 或相关状态；
+- 视频 URL 不支持 Range/seek，或在真实 PR 页面不能拖动到任意关键时间点；
+- live PR 附件 SHA 不等于当前 HEAD 对应的 accepted evidence manifest；
 - Voice Access overlay 没有完整归属；
 - 媒体 URL 在实际 PR 页面无法加载或播放；
 - reviewer 不能一眼看出“修了什么、为什么正确”。
@@ -405,10 +438,14 @@ API 上传成功、HTTP 200 或 markdown 文本正确都不能替代真实 PR �
 - [ ] Heading level 来自完整页面 parent/sibling outline，而非视觉或假设。
 - [ ] 所有 screen reader 缺陷均提供修复后真实连续 AFTER 录屏。
 - [ ] Screen reader 视频包含真实移动和真实音频/transcript。
+- [ ] 已按 action 时间戳抽帧，确认每个 action window 持续显示 target label、focus 和相关状态。
+- [ ] 视频为 fast-start MP4、关键帧间隔不超过 2 秒，并通过 Range 与 25%/50%/75% seek 检查。
 - [ ] AFTER 绑定并加载实际 PR HEAD。
+- [ ] live PR 附件 SHA 与当前 HEAD 对应的 accepted evidence manifest 完全一致。
 - [ ] The Evidence section embeds the images/videos required for the defect type rather than only
       prose or hashes.
-- [ ] 附件使用 ADO PR attachment 和绝对 `visualstudio.com` URL。
+- [ ] 图片附件使用 ADO PR attachment 和绝对 `visualstudio.com` URL；视频使用通过 Range/seek
+      门禁的稳定 reviewer-authenticated URL。
 - [ ] 已在真实 PR 页面验证图片尺寸和视频播放。
 - [ ] 已删除旧的、错误的或误导性证据引用。
 
