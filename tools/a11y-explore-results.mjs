@@ -128,7 +128,12 @@ const A_AA_SC = new Set([
 const CLAIM_RULES = {
   "browser-keyboard-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "focus-sequence", "focus-visual-comparison"],
+    evidence: [
+      "screenshot",
+      "focus-sequence",
+      "focus-visual-comparison",
+      "keyboard-navigation",
+    ],
   },
   "browser-semantics-tested": {
     producers: ["copilot-browser"],
@@ -364,6 +369,118 @@ function validateEvidenceShape(filePath, type, category) {
           );
         }
       }
+    }
+  }
+  if (type === "keyboard-navigation") {
+    const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const inventoryPaths = Array.isArray(value?.inventory)
+      ? value.inventory.map((entry) => entry?.path)
+      : [];
+    const forwardPaths = Array.isArray(value?.forward)
+      ? value.forward.map((entry) => entry?.path)
+      : [];
+    const reversePaths = Array.isArray(value?.reverse)
+      ? value.reverse.map((entry) => entry?.path)
+      : [];
+    const computedReverseMatches =
+      JSON.stringify(reversePaths) === JSON.stringify([...forwardPaths].reverse());
+    const inventoryIndex = new Map(inventoryPaths.map((entry, index) => [entry, index]));
+    const compositeResolvedPaths = Array.isArray(value?.compositeResolvedPaths)
+      ? value.compositeResolvedPaths
+      : [];
+    const compositeInventoryPaths = Array.isArray(value?.compositeInventoryPaths)
+      ? value.compositeInventoryPaths
+      : [];
+    const tabSkippedPaths = Array.isArray(value?.tabSkippedPaths)
+      ? value.tabSkippedPaths
+      : [];
+    const coveredPaths = new Set([...forwardPaths, ...compositeResolvedPaths]);
+    const forwardSet = new Set(forwardPaths);
+    const inventoryPathsSkippedByTab = inventoryPaths.filter(
+      (entry) => !forwardSet.has(entry),
+    );
+    const allInventory = new Set([...inventoryPaths, ...compositeInventoryPaths]);
+    const computedMissingPaths = [...allInventory]
+      .filter((entry) => !coveredPaths.has(entry))
+      .sort();
+    const computedExtraPaths = [...coveredPaths]
+      .filter((entry) => !allInventory.has(entry))
+      .sort();
+    const reachedPositions = forwardPaths
+      .filter((entry) => inventoryIndex.has(entry))
+      .map((entry) => inventoryIndex.get(entry));
+    const computedDomOrder =
+      JSON.stringify(reachedPositions) === JSON.stringify([...reachedPositions].sort((a, b) => a - b));
+    const interactionHasFailure = Array.isArray(value?.interactions) &&
+      value.interactions.some(
+        (entry) =>
+          entry?.failures?.length > 0 ||
+          entry?.focusRestored === false ||
+          entry?.urlStable === false,
+      );
+    const searchHasFailure =
+      value?.search?.applicable === true &&
+      (value.search.focusRetained === false || value.search.urlStable === false);
+    if (
+      !Array.isArray(value?.executedSteps) ||
+      value.executedSteps.length === 0 ||
+      inventoryPaths.length === 0 ||
+      inventoryPaths.some((entry) => typeof entry !== "string" || !entry.trim()) ||
+      new Set(inventoryPaths).size !== inventoryPaths.length ||
+      forwardPaths.length === 0 ||
+      forwardPaths.some((entry) => typeof entry !== "string" || !entry.trim()) ||
+      new Set(forwardPaths).size !== forwardPaths.length ||
+      reversePaths.length !== forwardPaths.length ||
+      reversePaths.some((entry) => typeof entry !== "string" || !entry.trim()) ||
+      value.reverseMatches !== computedReverseMatches ||
+      value.domOrderMonotonic !== computedDomOrder ||
+      !Array.isArray(value?.missingPaths) ||
+      !value.missingPaths.every((entry) => typeof entry === "string" && entry.trim()) ||
+      JSON.stringify([...value.missingPaths].sort()) !== JSON.stringify(computedMissingPaths) ||
+      !Array.isArray(value?.extraPaths) ||
+      !value.extraPaths.every((entry) => typeof entry === "string" && entry.trim()) ||
+      JSON.stringify([...value.extraPaths].sort()) !== JSON.stringify(computedExtraPaths) ||
+      compositeResolvedPaths.some((entry) => typeof entry !== "string" || !entry.trim()) ||
+      new Set(compositeResolvedPaths).size !== compositeResolvedPaths.length ||
+      compositeInventoryPaths.some((entry) => typeof entry !== "string" || !entry.trim()) ||
+      new Set(compositeInventoryPaths).size !== compositeInventoryPaths.length ||
+      compositeResolvedPaths.some((entry) => !compositeInventoryPaths.includes(entry)) ||
+      tabSkippedPaths.some((entry) => typeof entry !== "string" || !entry.trim()) ||
+      new Set(tabSkippedPaths).size !== tabSkippedPaths.length ||
+      tabSkippedPaths.some(
+        (entry) =>
+          !compositeInventoryPaths.includes(entry) ||
+          !compositeResolvedPaths.includes(entry),
+      ) ||
+      inventoryPathsSkippedByTab.some((entry) => !tabSkippedPaths.includes(entry)) ||
+      !Array.isArray(value?.interactions) ||
+      !value.interactions.every(
+        (entry) =>
+          entry &&
+          typeof entry.name === "string" &&
+          typeof entry.applicable === "boolean" &&
+          (entry.failures === undefined || Array.isArray(entry.failures)) &&
+          (entry.focusRestored === undefined || typeof entry.focusRestored === "boolean") &&
+          (entry.urlStable === undefined || typeof entry.urlStable === "boolean") &&
+          (entry.enteredExpandedRegion === undefined ||
+            typeof entry.enteredExpandedRegion === "boolean"),
+      ) ||
+      !Array.isArray(value?.failures) ||
+      !value.failures.every((entry) => typeof entry === "string" && entry.trim()) ||
+      !value?.search ||
+      typeof value.search.applicable !== "boolean" ||
+      (value.search.applicable &&
+        (typeof value.search.focusRetained !== "boolean" ||
+          typeof value.search.urlStable !== "boolean")) ||
+      (value.failures.length === 0 &&
+        (value.missingPaths.length > 0 ||
+          value.extraPaths.length > 0 ||
+          !computedReverseMatches ||
+          !computedDomOrder ||
+          interactionHasFailure ||
+          searchHasFailure))
+    ) {
+      throw new Error(`${category} keyboard-navigation evidence has an invalid schema`);
     }
   }
   if (type === "interaction-log") {

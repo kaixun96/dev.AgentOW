@@ -23,7 +23,7 @@ const skillRoot = path.join(repoRoot, "copilot", "skills", "agentow-a11y-explore
 const plannerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-planner.agent.md");
 const testerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-category-tester.agent.md");
 const PLAN_CONTRACT = {
-  "keyboard-focus": ["serial-browser", ["browser", "keyboard"], ["screenshot", "focus-sequence", "focus-visual-comparison"], "browser-keyboard-tested"],
+  "keyboard-focus": ["serial-browser", ["browser", "keyboard"], ["screenshot", "focus-sequence", "focus-visual-comparison", "keyboard-navigation"], "browser-keyboard-tested"],
   "screen-reader": ["serial-real-at", ["nvda", "real-os-input", "uia"], ["nvda-transcript", "screenshot", "uia-state"], "nvda-tested"],
   "structure-semantics": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-semantics-tested"],
   "orientation-input-purpose": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-semantics-tested"],
@@ -133,6 +133,23 @@ const writeGenericCategoryResult = (runDir, category) => {
         ],
       });
     }
+    if (type === "keyboard-navigation") {
+      content = JSON.stringify({
+        executedSteps: ["Traverse forward and backward", "Test Arrow navigation"],
+        inventory: [{ path: "html>body>button:nth-of-type(1)" }],
+        forward: [{ path: "html>body>button:nth-of-type(1)" }],
+        reverse: [{ path: "html>body>button:nth-of-type(1)" }],
+        missingPaths: [],
+        extraPaths: [],
+        reverseMatches: true,
+        domOrderMonotonic: true,
+        interactions: [],
+        tabSkippedPaths: [],
+        compositeInventoryPaths: [],
+        search: { applicable: false },
+        failures: [],
+      });
+    }
     if (type === "accessibility-tree" && category === "orientation-input-purpose") {
       content = JSON.stringify({ inputs: [], axTree: { nodes: [] } });
     }
@@ -199,6 +216,7 @@ try {
   const screenshot = path.join(categoryDir, "focus.png");
   const focusSequence = path.join(categoryDir, "focus-sequence.json");
   const focusVisual = path.join(categoryDir, "focus-visual-comparison.json");
+  const keyboardNavigation = path.join(categoryDir, "keyboard-navigation.json");
   const focusBefore1 = path.join(categoryDir, "focus-before-1.png");
   const focusAfter1 = path.join(categoryDir, "focus-after-1.png");
   const focusBefore2 = path.join(categoryDir, "focus-before-2.png");
@@ -280,11 +298,33 @@ try {
       ],
     }),
   );
+  fs.writeFileSync(
+    keyboardNavigation,
+    JSON.stringify({
+      executedSteps: ["Traverse forward and backward", "Test Arrow navigation"],
+      inventory: [{ path: "html>body>button:nth-of-type(1)" }],
+      forward: [{ path: "html>body>button:nth-of-type(1)" }],
+      reverse: [{ path: "html>body>button:nth-of-type(1)" }],
+      missingPaths: [],
+      extraPaths: [],
+      reverseMatches: true,
+      domOrderMonotonic: true,
+      interactions: [],
+      tabSkippedPaths: [],
+      compositeInventoryPaths: [],
+      search: { applicable: false },
+      failures: [],
+    }),
+  );
   const hash = crypto.createHash("sha256").update(fs.readFileSync(screenshot)).digest("hex");
   const focusHash = crypto.createHash("sha256").update(fs.readFileSync(focusSequence)).digest("hex");
   const focusVisualHash = crypto
     .createHash("sha256")
     .update(fs.readFileSync(focusVisual))
+    .digest("hex");
+  const keyboardNavigationHash = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(keyboardNavigation))
     .digest("hex");
   const result = {
     schemaVersion: 1,
@@ -298,9 +338,13 @@ try {
     durationSeconds: 3,
     capabilitiesUsed: ["browser", "keyboard"],
     claims: ["browser-keyboard-tested"],
-    scResults: scResults("keyboard-focus", [screenshot, focusSequence, focusVisual], {
+    scResults: scResults(
+      "keyboard-focus",
+      [screenshot, focusSequence, focusVisual, keyboardNavigation],
+      {
       "2.4.3": { status: "FAIL", details: "Focus order issue observed." },
-    }),
+      },
+    ),
     evidence: [
       {
         type: "screenshot",
@@ -324,6 +368,12 @@ try {
         sha256: focusVisualHash,
         producer: "copilot-browser",
       },
+      {
+        type: "keyboard-navigation",
+        uri: keyboardNavigation,
+        sha256: keyboardNavigationHash,
+        producer: "copilot-browser",
+      },
     ],
     findings: [
       {
@@ -340,11 +390,132 @@ try {
         reproducibility: "always",
         testedScope: "Forward Tab navigation on the live surface.",
         evidenceLimitations: [],
-        evidenceUris: [screenshot, focusSequence, focusVisual],
+        evidenceUris: [screenshot, focusSequence, focusVisual, keyboardNavigation],
       },
     ],
     blockers: [],
   };
+  const validKeyboardNavigation = fs.readFileSync(keyboardNavigation, "utf8");
+  const malformedKeyboardNavigation = JSON.parse(validKeyboardNavigation);
+  malformedKeyboardNavigation.reverse = [];
+  fs.writeFileSync(keyboardNavigation, JSON.stringify(malformedKeyboardNavigation));
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          evidence: result.evidence.map((entry) =>
+            entry.type === "keyboard-navigation"
+              ? {
+                  ...entry,
+                  sha256: crypto
+                    .createHash("sha256")
+                    .update(fs.readFileSync(keyboardNavigation))
+                    .digest("hex"),
+                }
+              : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /keyboard-navigation evidence has an invalid schema/,
+  );
+  fs.writeFileSync(keyboardNavigation, validKeyboardNavigation);
+  const contradictoryInteraction = JSON.parse(validKeyboardNavigation);
+  contradictoryInteraction.interactions = [
+    {
+      name: "Help",
+      applicable: true,
+      focusRestored: false,
+      urlStable: true,
+      failures: [],
+    },
+  ];
+  fs.writeFileSync(keyboardNavigation, JSON.stringify(contradictoryInteraction));
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          evidence: result.evidence.map((entry) =>
+            entry.type === "keyboard-navigation"
+              ? {
+                  ...entry,
+                  sha256: crypto
+                    .createHash("sha256")
+                    .update(fs.readFileSync(keyboardNavigation))
+                    .digest("hex"),
+                }
+              : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /keyboard-navigation evidence has an invalid schema/,
+  );
+  fs.writeFileSync(keyboardNavigation, validKeyboardNavigation);
+  const contradictorySearch = JSON.parse(validKeyboardNavigation);
+  contradictorySearch.search = {
+    applicable: true,
+    focusRetained: false,
+    urlStable: true,
+  };
+  fs.writeFileSync(keyboardNavigation, JSON.stringify(contradictorySearch));
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          evidence: result.evidence.map((entry) =>
+            entry.type === "keyboard-navigation"
+              ? {
+                  ...entry,
+                  sha256: crypto
+                    .createHash("sha256")
+                    .update(fs.readFileSync(keyboardNavigation))
+                    .digest("hex"),
+                }
+              : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /keyboard-navigation evidence has an invalid schema/,
+  );
+  fs.writeFileSync(keyboardNavigation, validKeyboardNavigation);
+  const fakeCompositeResolution = JSON.parse(validKeyboardNavigation);
+  fakeCompositeResolution.inventory.push({ path: "html>body>button:nth-of-type(2)" });
+  fakeCompositeResolution.compositeInventoryPaths = [
+    "html>body>button:nth-of-type(2)",
+  ];
+  fakeCompositeResolution.compositeResolvedPaths = ["html>body>button:nth-of-type(2)"];
+  fs.writeFileSync(keyboardNavigation, JSON.stringify(fakeCompositeResolution));
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          evidence: result.evidence.map((entry) =>
+            entry.type === "keyboard-navigation"
+              ? {
+                  ...entry,
+                  sha256: crypto
+                    .createHash("sha256")
+                    .update(fs.readFileSync(keyboardNavigation))
+                    .digest("hex"),
+                }
+              : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /keyboard-navigation evidence has an invalid schema/,
+  );
+  fs.writeFileSync(keyboardNavigation, validKeyboardNavigation);
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
     JSON.stringify(plan()),
@@ -1045,6 +1216,7 @@ try {
   assert.match(html, /2\.4\.3 Focus Order<\/td><td>FAIL<\/td>/);
   assert.match(html, /<img src="categories\//);
   assert.match(html, /Tab Order Map/);
+  assert.match(html, /Keyboard Navigation/);
   assert.match(html, /Heading Hierarchy/);
   assert.match(html, /Landmark Regions/);
   assert.match(html, /Task Runtime/);
@@ -1081,6 +1253,7 @@ try {
   const focusedData = JSON.parse(fs.readFileSync(focusedJson, "utf8"));
   assert.match(focused, /Report scope:<\/strong> Keyboard &amp; Focus/);
   assert.match(focused, /Tab Order Map/);
+  assert.match(focused, /Keyboard Navigation/);
   assert.doesNotMatch(focused, /Heading Hierarchy|NVDA Transcript/);
   assert.doesNotMatch(focused, /1\.3\.1 Info and Relationships/);
   assert.doesNotMatch(focused, /Screen reader:/);

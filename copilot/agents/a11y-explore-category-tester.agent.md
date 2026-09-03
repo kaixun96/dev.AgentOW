@@ -140,3 +140,41 @@ pixels changed, whether element/pseudo-element/ancestor focus styles changed, an
 stability. A caret-bearing control cannot pass from pixel difference alone because a blinking caret
 is not a focus indicator; it also needs a focus-style or target-geometry change. Checking only
 `outline` or `box-shadow` is insufficient.
+
+`keyboard-navigation` JSON records the live tabbable inventory, complete forward sequence until
+BODY/repeat, reverse sequence, missing/extra paths, DOM-order result, composite-widget Arrow-key
+interactions, safe Enter/Escape/focus-restoration checks, and failures. Elements intentionally
+skipped by Tab are not failures when the documented composite Arrow-key model reaches them.
+
+Use this exact shape:
+
+```json
+{
+  "executedSteps": ["exact live keyboard step"],
+  "inventory": [{ "path": "stable DOM path for each independently tabbable target" }],
+  "forward": [{ "path": "each unique forward Tab target, in order" }],
+  "reverse": [{ "path": "the exact reverse of forward, including the starting last target" }],
+  "reverseMatches": true,
+  "domOrderMonotonic": true,
+  "tabSkippedPaths": ["tabbable paths intentionally skipped by a composite"],
+  "compositeInventoryPaths": ["all Arrow-key children, including tabindex=-1 children"],
+  "compositeResolvedPaths": ["composite children actually reached by Arrow keys"],
+  "missingPaths": [],
+  "extraPaths": [],
+  "interactions": [
+    {
+      "name": "control or composite",
+      "applicable": true,
+      "focusRestored": true,
+      "urlStable": true,
+      "failures": []
+    }
+  ],
+  "search": {
+    "applicable": true,
+    "focusRetained": true,
+    "urlStable": true
+  },
+  "failures": []
+}
+```

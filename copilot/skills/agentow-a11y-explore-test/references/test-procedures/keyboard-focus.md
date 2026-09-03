@@ -13,6 +13,10 @@
 7. Capture the focused element, screenshot, ordered focus sequence, focus visual comparison, and
    input method.
 8. Exercise dialog/menu open, internal navigation, Escape dismissal, return focus, and reverse
-   traversal where those states exist.
+   traversal where those states exist. Follow the control's documented entry step (for example,
+   Tab into an expanded iframe) before testing Escape and restoration.
+9. Compare the live `tabIndex >= 0` inventory with the complete forward and reverse sequence. For
+   composite widgets, verify every Tab-skipped item is reachable by its Arrow-key model before
+   reporting it as unreachable.
 
 Do not call browser focus movement a real-AT result.

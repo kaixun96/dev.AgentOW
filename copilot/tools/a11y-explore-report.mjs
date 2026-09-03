@@ -359,6 +359,52 @@ function renderTabOrder(runDir, aggregate) {
   return `<table><thead><tr><th>#</th><th>Element</th><th>Role</th><th>Name</th><th>Focus Indicator</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+function renderKeyboardNavigation(runDir, aggregate) {
+  const navigation = readEvidenceJson(
+    runDir,
+    aggregate,
+    "keyboard-navigation",
+    "keyboard-focus",
+  );
+  if (!navigation) return "<p>Keyboard navigation evidence was not captured.</p>";
+  const summary = [
+    ["Tabbable inventory", navigation.inventory?.length ?? 0],
+    ["Unique forward targets", navigation.forward?.length ?? 0],
+    ["Reverse order matched", navigation.reverseMatches ? "Yes" : "No"],
+    ["DOM order monotonic", navigation.domOrderMonotonic ? "Yes" : "No"],
+    ["Tab-skipped composite items", navigation.tabSkippedPaths?.length ?? 0],
+    ["Composite items reached by arrows", navigation.compositeResolvedPaths?.length ?? 0],
+    ["Unresolved targets", navigation.missingPaths?.length ?? 0],
+    ["Failures", navigation.failures?.length ?? 0],
+  ]
+    .map(
+      ([label, value]) =>
+        `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`,
+    )
+    .join("");
+  const interactions = Array.isArray(navigation.interactions)
+    ? navigation.interactions
+        .map((entry) => {
+          const outcome = entry.failures?.length
+            ? entry.failures.join("; ")
+            : entry.focusRestored === false
+              ? "Focus not restored"
+              : entry.urlStable === false
+                ? "Unexpected navigation"
+                : "No recorded failure";
+          return `<tr><td>${escapeHtml(redactEvidenceText(entry.name || "Interaction"))}</td><td>${escapeHtml(
+            entry.applicable === false ? "Not applicable" : "Executed",
+          )}</td><td>${escapeHtml(redactEvidenceText(outcome))}</td></tr>`;
+        })
+        .join("")
+    : "";
+  return `<table><thead><tr><th>Keyboard check</th><th>Result</th></tr></thead><tbody>${summary}</tbody></table>${
+    interactions
+      ? `<table><thead><tr><th>Interaction</th><th>Status</th><th>Outcome</th></tr></thead><tbody>${interactions}</tbody></table>`
+      : ""
+  }`;
+}
+
 function renderHeadingHierarchy(runDir, aggregate) {
   const structure = readEvidenceJson(runDir, aggregate, "accessibility-tree", "structure-semantics");
   const headings = structure?.inventory?.headings;
@@ -553,6 +599,7 @@ ${metadata.reportScope ? `<p><strong>Report scope:</strong> ${escapeHtml(metadat
 <h2>Findings</h2>
 ${cards || "<p>No findings were recorded.</p>"}
 ${includedCategories.has("keyboard-focus") ? `<h2>Tab Order Map</h2><div class="structure-section">${renderTabOrder(runDir, aggregate)}</div>` : ""}
+${includedCategories.has("keyboard-focus") ? `<h2>Keyboard Navigation</h2><div class="structure-section">${renderKeyboardNavigation(runDir, aggregate)}</div>` : ""}
 ${includedCategories.has("structure-semantics") ? `<h2>Heading Hierarchy</h2><div class="structure-section">${renderHeadingHierarchy(runDir, aggregate)}</div>
 <h2>Landmark Regions</h2><div class="structure-section">${renderLandmarks(runDir, aggregate)}</div>` : ""}
 <h2>Task Runtime</h2>
