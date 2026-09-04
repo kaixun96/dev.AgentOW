@@ -121,8 +121,24 @@ into the helper: KS activated produces the exact old result, while KS not activa
 **Trigger:** changed hooks, render-time work, transient UI editing state, context/theme
 consumption, event-driven updates, or memoization.
 
+For every React or Next.js review, consult [Vercel React Best
+Practices](https://agenticskills.io/skills/react-best-practices) as the performance review baseline.
+Apply its rules by relevance and priority across waterfalls, bundle size, server/client data
+fetching, rerenders, rendering, JavaScript hot paths, and advanced patterns. Verify each candidate
+against the repository's React version, framework, compiler configuration, and measured code path;
+the reference does not justify mechanical findings or Next.js-specific advice in a non-Next.js
+surface. Repository contracts and current official React guidance remain authoritative when a rule
+does not apply or conflicts with the installed stack.
+
 - Use `useCallback` only when identity reaches a memoized/expensive child or another
   identity-sensitive API. A local handler does not need stable identity by default.
+- Keep reactive dependencies explicit. Do not copy a changing function into a ref and wrap the ref
+  call in an empty-dependency `useCallback` merely to manufacture stable identity. Never assign a
+  ref during render to evade Hook dependencies. When a stable callback has a concrete consumer,
+  use `useCallback` with its complete dependency list.
+- Use latest-value refs or Effect Events only for their documented lifecycle cases, such as a
+  long-lived subscription that must read the latest committed handler. Do not use them as a
+  general substitute for dependencies; Effect Events stay local to Effects.
 - Use a module constant for a truly static value. When memoization is necessary, include the
   dependencies that represent the value's real contract.
 - Do not create work, mutations, or action telemetry during render; render may repeat without a
