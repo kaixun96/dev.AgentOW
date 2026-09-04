@@ -117,6 +117,28 @@ function safeHttpUrl(value) {
   }
 }
 
+function sanitizeReportValue(value, runDir) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeReportValue(entry, runDir));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        sanitizeReportValue(entry, runDir),
+      ]),
+    );
+  }
+  if (typeof value === "string") {
+    const resolved = path.resolve(value);
+    if (path.isAbsolute(value) && isPathInside(runDir, resolved)) {
+      return path.relative(runDir, resolved).split(path.sep).join("/");
+    }
+    return redactEvidenceText(value);
+  }
+  return value;
+}
+
 function isPathInside(root, candidate) {
   const relative = path.relative(root, candidate);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
@@ -638,7 +660,10 @@ function main() {
   const realFindings = fs.realpathSync(findingsPath);
   if (!isPathInside(realRun, realFindings)) throw new Error("Findings path resolves outside --run-dir");
   JSON.parse(fs.readFileSync(realFindings, "utf8"));
-  let aggregate = aggregateResults(runDir);
+  let aggregate = aggregateResults(
+    runDir,
+    args.category ? { category: args.category } : {},
+  );
   const metadataPath = path.join(runDir, "run.json");
   const planPath = path.join(runDir, "plan.json");
   const bugsPath = path.join(runDir, "ado-bugs.json");
@@ -716,7 +741,11 @@ function main() {
     },
     adoBugs: bugs,
   };
-  safeWriteFile(runDir, outputJson, `${JSON.stringify(report, null, 2)}\n`);
+  safeWriteFile(
+    runDir,
+    outputJson,
+    `${JSON.stringify(sanitizeReportValue(report, runDir), null, 2)}\n`,
+  );
   safeWriteFile(runDir, outputHtml, renderReport(runDir, aggregate, metadata, plan, bugs));
   process.stdout.write(`${outputHtml}\n`);
 }

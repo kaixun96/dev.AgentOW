@@ -18,5 +18,8 @@
 9. Compare the live `tabIndex >= 0` inventory with the complete forward and reverse sequence. For
    composite widgets, verify every Tab-skipped item is reachable by its Arrow-key model before
    reporting it as unreachable.
+10. Compare adjacent focus stops for matching names and overlapping rectangles. Activate both when
+    safe; a nonfunctional focusable wrapper plus a nested functional control is a duplicate focus
+    group and blocks keyboard PASS.
 
 Do not call browser focus movement a real-AT result.

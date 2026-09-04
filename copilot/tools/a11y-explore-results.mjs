@@ -468,6 +468,18 @@ function validateEvidenceShape(filePath, type, category) {
       ) ||
       !Array.isArray(value?.failures) ||
       !value.failures.every((entry) => typeof entry === "string" && entry.trim()) ||
+      !Array.isArray(value?.duplicateFocusGroups) ||
+      !value.duplicateFocusGroups.every(
+        (entry) =>
+          entry &&
+          Array.isArray(entry.indices) &&
+          entry.indices.length >= 2 &&
+          entry.indices.every(Number.isInteger) &&
+          typeof entry.name === "string" &&
+          typeof entry.overlapRatio === "number" &&
+          Array.isArray(entry.activationOutcomes) &&
+          entry.activationOutcomes.length === entry.indices.length,
+      ) ||
       !value?.search ||
       typeof value.search.applicable !== "boolean" ||
       (value.search.applicable &&
@@ -476,6 +488,7 @@ function validateEvidenceShape(filePath, type, category) {
       (value.failures.length === 0 &&
         (value.missingPaths.length > 0 ||
           value.extraPaths.length > 0 ||
+          value.duplicateFocusGroups.length > 0 ||
           !computedReverseMatches ||
           !computedDomOrder ||
           interactionHasFailure ||
@@ -1000,6 +1013,32 @@ export function validateCategoryResult(result, runDir, expectedCategory) {
     }
     scIds.add(scResult.wcagSc);
   });
+  if (expectedCategory === "keyboard-focus") {
+    const navigationEvidence = result.evidence.find(
+      (entry) => entry.type === "keyboard-navigation",
+    );
+    if (navigationEvidence) {
+      const navigation = JSON.parse(
+        fs.readFileSync(navigationEvidence.uri, "utf8"),
+      );
+      if (navigation.duplicateFocusGroups?.length > 0) {
+        if (
+          !result.scResults.some(
+            (entry) => entry.wcagSc === "2.4.3" && entry.status === "FAIL",
+          ) ||
+          !result.findings.some(
+            (entry) =>
+              entry.wcagSc === "2.4.3" &&
+              entry.classification === "VIOLATION",
+          )
+        ) {
+          throw new Error(
+            "keyboard-focus duplicate focus groups require a matching 2.4.3 FAIL and violation",
+          );
+        }
+      }
+    }
+  }
   if (
     expectedCategory === "screen-reader" &&
     result.scResults.some((scResult) => ["PASS", "FAIL", "NEEDS_REVIEW"].includes(scResult.status)) &&
@@ -1166,7 +1205,7 @@ export function validatePlan(plan) {
   return plan;
 }
 
-export function aggregateResults(runDir) {
+export function aggregateResults(runDir, options = {}) {
   const realRunDir = fs.realpathSync(runDir);
   const planPath = path.join(runDir, "plan.json");
   if (!fs.existsSync(planPath)) throw new Error("plan.json is required");
@@ -1176,7 +1215,14 @@ export function aggregateResults(runDir) {
   }
   const plan = JSON.parse(fs.readFileSync(realPlanPath, "utf8"));
   validatePlan(plan);
-  const plannedCategories = plan.categories.map((entry) => entry.category);
+  const plannedCategories = options.category
+    ? plan.categories
+        .filter((entry) => entry.category === options.category)
+        .map((entry) => entry.category)
+    : plan.categories.map((entry) => entry.category);
+  if (options.category && plannedCategories.length !== 1) {
+    throw new Error(`Unknown aggregate category: ${options.category}`);
+  }
   const categoriesRoot = path.join(runDir, "categories");
   const records = [];
   const parallelIsolationIds = new Set();

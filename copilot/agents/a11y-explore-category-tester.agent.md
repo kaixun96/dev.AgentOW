@@ -170,6 +170,14 @@ Use this exact shape:
       "failures": []
     }
   ],
+  "duplicateFocusGroups": [
+    {
+      "indices": [10, 11],
+      "name": "Back",
+      "overlapRatio": 0.98,
+      "activationOutcomes": ["no-action", "navigation"]
+    }
+  ],
   "search": {
     "applicable": true,
     "focusRetained": true,
@@ -178,6 +186,11 @@ Use this exact shape:
   "failures": []
 }
 ```
+
+Compare adjacent Tab stops by visible rectangle overlap, accessible name, ancestor/descendant
+relationship, role, and activation outcome. If two stops represent the same visual object or one is
+a nonfunctional wrapper around the other, record a `duplicateFocusGroups` entry and a keyboard
+failure; do not report keyboard PASS.
 
 Every browser category also returns `interaction-coverage`:
 

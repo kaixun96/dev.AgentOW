@@ -146,6 +146,7 @@ const writeGenericCategoryResult = (runDir, category) => {
         reverseMatches: true,
         domOrderMonotonic: true,
         interactions: [],
+        duplicateFocusGroups: [],
         tabSkippedPaths: [],
         compositeInventoryPaths: [],
         search: { applicable: false },
@@ -361,6 +362,7 @@ try {
       reverseMatches: true,
       domOrderMonotonic: true,
       interactions: [],
+      duplicateFocusGroups: [],
       tabSkippedPaths: [],
       compositeInventoryPaths: [],
       search: { applicable: false },
@@ -519,6 +521,12 @@ try {
       validateCategoryResult(
         {
           ...result,
+          scResults: result.scResults.map((entry) =>
+            entry.wcagSc === "2.4.3"
+              ? { ...entry, status: "PASS", details: "Incorrect PASS fixture." }
+              : entry,
+          ),
+          findings: [],
           evidence: result.evidence.map((entry) =>
             entry.type === "keyboard-navigation"
               ? {
@@ -553,6 +561,12 @@ try {
       validateCategoryResult(
         {
           ...result,
+          scResults: result.scResults.map((entry) =>
+            entry.wcagSc === "2.4.3"
+              ? { ...entry, status: "PASS", details: "Incorrect PASS fixture." }
+              : entry,
+          ),
+          findings: [],
           evidence: result.evidence.map((entry) =>
             entry.type === "keyboard-navigation"
               ? {
@@ -583,6 +597,12 @@ try {
       validateCategoryResult(
         {
           ...result,
+          scResults: result.scResults.map((entry) =>
+            entry.wcagSc === "2.4.3"
+              ? { ...entry, status: "PASS", details: "Incorrect PASS fixture." }
+              : entry,
+          ),
+          findings: [],
           evidence: result.evidence.map((entry) =>
             entry.type === "keyboard-navigation"
               ? {
@@ -599,6 +619,50 @@ try {
         "keyboard-focus",
       ),
     /keyboard-navigation evidence has an invalid schema/,
+  );
+  fs.writeFileSync(keyboardNavigation, validKeyboardNavigation);
+  const duplicateFocusWithoutFinding = JSON.parse(validKeyboardNavigation);
+  duplicateFocusWithoutFinding.duplicateFocusGroups = [
+    {
+      indices: [1, 2],
+      name: "Back",
+      overlapRatio: 0.99,
+      activationOutcomes: ["no-action", "navigation"],
+    },
+  ];
+  duplicateFocusWithoutFinding.failures = ["Duplicate focus stops"];
+  fs.writeFileSync(
+    keyboardNavigation,
+    JSON.stringify(duplicateFocusWithoutFinding),
+  );
+  const duplicateFocusPassResult = {
+    ...result,
+    scResults: result.scResults.map((entry) =>
+      entry.wcagSc === "2.4.3"
+        ? { ...entry, status: "PASS", details: "Incorrect PASS fixture." }
+        : entry,
+    ),
+    findings: [],
+    evidence: result.evidence.map((entry) =>
+      entry.type === "keyboard-navigation"
+        ? {
+            ...entry,
+            sha256: crypto
+              .createHash("sha256")
+              .update(fs.readFileSync(keyboardNavigation))
+              .digest("hex"),
+          }
+        : entry,
+    ),
+  };
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        duplicateFocusPassResult,
+        runDir,
+        "keyboard-focus",
+      ),
+    /duplicate focus groups require a matching 2\.4\.3 FAIL and violation/,
   );
   fs.writeFileSync(keyboardNavigation, validKeyboardNavigation);
   const fakeCompositeResolution = JSON.parse(validKeyboardNavigation);
@@ -1691,13 +1755,18 @@ try {
   assert.equal(
     focusedData.findings.every(
       (entry) =>
-        entry.evidenceUris.every((uri) => uri.includes(`${path.sep}keyboard-focus${path.sep}`)) &&
-        entry.sourceResults.every((uri) => uri.includes(`${path.sep}keyboard-focus${path.sep}`)),
+        entry.evidenceUris.every((uri) => uri.includes("keyboard-focus/")) &&
+        entry.sourceResults.every((uri) => uri.includes("keyboard-focus/")),
     ),
     true,
   );
   assert.doesNotMatch(focused, /categories\/dynamic-content/);
   assert.deepEqual(focusedData.adoBugs, []);
+  assert.doesNotMatch(fs.readFileSync(focusedJson, "utf8"), /[A-Z]:\\\\Users\\\\/i);
+  assert.equal(
+    focusedData.evidence.every((entry) => !path.isAbsolute(entry.uri)),
+    true,
+  );
 
   const dynamicFocusedHtml = path.join(runDir, "dynamic-report.html");
   const dynamicFocusedJson = path.join(runDir, "dynamic-report.json");
