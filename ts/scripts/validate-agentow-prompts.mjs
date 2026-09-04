@@ -347,6 +347,8 @@ const accessibilitySnippets = [
   "Fluent V9 `useAnnounce()` or `@msinternal/screen-reader-alert` is acceptable",
   "already established by the host: use `useAnnounce()`",
   "never invoke both for the same event",
+  "use the provider-backed `announce` function",
+  "do not copy it into a ref",
   "## Async collection state and announcement contract",
   "Missing accessibility code does not make these workflows out of scope",
   "absence of `aria-live`, announcement code, or",

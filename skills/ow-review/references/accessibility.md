@@ -190,6 +190,30 @@ already established by the host: use `useAnnounce()` when an ancestor `AriaLiveA
 available; use the SharePoint shared API when that is the surface convention. Do not add a new
 announcer/provider solely to replace a working shared API, and never invoke both for the same event.
 
+When an ancestor `AriaLiveAnnouncer` is guaranteed, use the provider-backed `announce` function
+directly. Fluent memoizes that function; do not copy it into a ref or wrap the ref call in an empty-
+dependency `useCallback` merely to stabilize it. That workaround obscures the documented Fluent
+pattern and is only justified when the component can render without the provider and its fallback
+identity must be isolated for a proven reason.
+
+```tsx
+const { announce } = useAnnounce();
+
+const announceSaveResult = (message: string): void => {
+  announce(message);
+};
+```
+
+Do not generate this defensive provider-backed pattern:
+
+```tsx
+const announceRef = React.useRef(announce);
+announceRef.current = announce;
+const announceSaveResult = React.useCallback((message: string): void => {
+  announceRef.current(message);
+}, []);
+```
+
 The SharePoint shared API is:
 
 ```ts

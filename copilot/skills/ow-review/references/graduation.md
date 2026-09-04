@@ -121,7 +121,7 @@ Every gate must also contain exactly one `ruleChecks` entry for each of these cl
 - `coverage-and-tests`: threshold or test changes follow actual-failure and PR-evidence requirements.
 - `scope-purity`: the diff contains no unrelated behavior hidden inside graduation-only scope.
 - `minor-cleanup`: fixed options needing author confirmation, redundant Fragments, undefined props,
-  and safe single-consumer style consolidation.
+  flight-only helper flattening, and safe single-consumer style consolidation.
 
 Use `clear` only with concrete evidence that the class was checked, and `not-applicable` only with
 evidence explaining why the class cannot occur for that gate. `finding` must reference one or more
@@ -263,6 +263,37 @@ reference, inline it at that reference and delete the declaration. This includes
 object literals, and other expressions extracted only because both rollout branches consumed them.
 Inline only when doing so preserves evaluation count, order, timing, side effects, and object
 identity; otherwise keep the temporary and record why it still has independent semantic value.
+
+When a method or local helper was introduced only to isolate the Flight-enabled or KS-inactive
+branch, graduation should inline its body into the original entry point and remove the helper after
+the fallback branch and gate are removed. First verify that the helper has no other callers and no
+independent override, test, subclass, or API contract. If the graduated code leaves this single-use
+indirection but is behaviorally correct, emit a non-blocking **Minor** suggestion whose description
+starts with `Nit:`. Do not request changes for this readability cleanup alone.
+
+```ts
+// Before graduation
+public loadTheme(): Promise<unknown> {
+  return isBrandCenterThemesV2FlightEnabled() ? this.loadThemeForVC() : this.loadLegacyTheme();
+}
+
+private loadThemeForVC(): Promise<unknown> {
+  return this.themeLoader.load();
+}
+
+// Incomplete: the gate is gone, but its branch-isolation helper remains
+public loadTheme(): Promise<unknown> {
+  return this.loadThemeForVC();
+}
+
+// Preferred when loadThemeForVC has no independent contract or callers
+public loadTheme(): Promise<unknown> {
+  return this.themeLoader.load();
+}
+```
+
+Example finding: `Nit: loadThemeForVC only isolated the retired Flight branch. Inline its body
+into loadTheme and remove the helper now that loadTheme has one permanent implementation.`
 
 A retired gate invocation must not survive only to discard its result. Expressions such as
 `void retiredGate()`, `retiredGate();`, a discarded assignment, or a comma-expression call are
