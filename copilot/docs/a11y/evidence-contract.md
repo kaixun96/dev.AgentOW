@@ -32,10 +32,10 @@ agentOW writes `<sessionDir>/a11y/<phase>/evaluator-request.json`:
       "id": "open-dialog",
       "action": "Activate the trigger",
       "expected": "Dialog title is announced",
-      "requiredEvidenceTypes": ["screenshot", "nvda-transcript"]
+      "requiredEvidenceTypes": ["screenshot", "nvda-transcript", "screen-reader-video"]
     }
   ],
-  "requiredEvidenceTypes": ["screenshot", "nvda-transcript", "ui-automation"]
+  "requiredEvidenceTypes": ["screenshot", "nvda-transcript", "screen-reader-video", "ui-automation"]
 }
 ```
 
@@ -119,6 +119,7 @@ Use the narrowest applicable type:
 - `keyboard-focus`
 - `ui-automation`
 - `nvda-transcript`
+- `screen-reader-video`
 - `narrator-etl`
 - `voice-access-result`
 - `voice-access-audio`
@@ -130,8 +131,8 @@ Use the narrowest applicable type:
 The validator rejects unknown evidence types and enforces:
 
 - every request includes `screenshot`;
-- NVDA includes `nvda-transcript`;
-- Narrator includes `narrator-etl`;
+- NVDA includes `nvda-transcript` and `screen-reader-video`;
+- Narrator includes `narrator-etl` and `screen-reader-video`;
 - Voice Access includes both `voice-access-result` and `voice-access-audio`;
 - Voice Access also includes `capture-state` and `overlay-map`;
 - Keyboard includes `keyboard-focus`;
