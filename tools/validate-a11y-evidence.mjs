@@ -18,6 +18,7 @@ const EVIDENCE_TYPES = new Set([
   "keyboard-focus",
   "ui-automation",
   "nvda-transcript",
+  "screen-reader-video",
   "narrator-etl",
   "voice-access-result",
   "voice-access-audio",
@@ -28,8 +29,8 @@ const EVIDENCE_TYPES = new Set([
 ]);
 
 const REQUIRED_AT_EVIDENCE = new Map([
-  ["nvda", ["nvda-transcript"]],
-  ["narrator", ["narrator-etl"]],
+  ["nvda", ["nvda-transcript", "screen-reader-video"]],
+  ["narrator", ["narrator-etl", "screen-reader-video"]],
   [
     "voice access",
     ["voice-access-result", "voice-access-audio", "capture-state", "overlay-map"],

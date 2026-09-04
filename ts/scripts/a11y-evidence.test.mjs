@@ -26,10 +26,10 @@ const reproduceRequest = {
       id: "open",
       action: "Open dialog",
       expected: "Dialog title is announced",
-      requiredEvidenceTypes: ["screenshot", "nvda-transcript"],
+      requiredEvidenceTypes: ["screenshot", "nvda-transcript", "screen-reader-video"],
     },
   ],
-  requiredEvidenceTypes: ["screenshot", "nvda-transcript"],
+  requiredEvidenceTypes: ["screenshot", "nvda-transcript", "screen-reader-video"],
 };
 reproduceRequest.scenarioHash = computeScenarioHash(reproduceRequest);
 
@@ -45,7 +45,7 @@ const reproduceResult = {
       stepId: "open",
       status: "fail",
       actual: "No title was spoken",
-      evidence: ["speech", "shot"],
+      evidence: ["speech", "shot", "video"],
     },
   ],
   evidence: [
@@ -60,6 +60,12 @@ const reproduceResult = {
       type: "screenshot",
       uri: "twin-evidence://run/before.png",
       sha256: "d".repeat(64),
+    },
+    {
+      id: "video",
+      type: "screen-reader-video",
+      uri: "twin-evidence://run/before.mp4",
+      sha256: "b".repeat(64),
     },
   ],
 };
@@ -121,6 +127,33 @@ assert.throws(
   /NVDA requires evidence type: nvda-transcript/,
 );
 
+const noVideoRequest = {
+  ...reproduceRequest,
+  requiredEvidenceTypes: ["screenshot", "nvda-transcript"],
+  steps: reproduceRequest.steps.map((step) => ({
+    ...step,
+    requiredEvidenceTypes: ["screenshot", "nvda-transcript"],
+  })),
+};
+noVideoRequest.scenarioHash = computeScenarioHash(noVideoRequest);
+assert.throws(
+  () =>
+    validateA11yEvidence("reproduce", noVideoRequest, {
+      ...reproduceResult,
+      scenarioHash: noVideoRequest.scenarioHash,
+      stepResults: [
+        {
+          ...reproduceResult.stepResults[0],
+          evidence: ["speech", "shot"],
+        },
+      ],
+      evidence: reproduceResult.evidence.filter(
+        (item) => item.type !== "screen-reader-video",
+      ),
+    }),
+  /NVDA requires evidence type: screen-reader-video/,
+);
+
 assert.throws(
   () =>
     validateA11yEvidence("reproduce", reproduceRequest, {
@@ -169,7 +202,7 @@ const verifyResult = {
       stepId: "open",
       status: "pass",
       actual: "Dialog title was spoken",
-      evidence: ["speech", "shot"],
+      evidence: ["speech", "shot", "video"],
     },
   ],
   evidence: [
@@ -184,6 +217,12 @@ const verifyResult = {
       type: "screenshot",
       uri: "twin-evidence://run/after.png",
       sha256: "c".repeat(64),
+    },
+    {
+      id: "video",
+      type: "screen-reader-video",
+      uri: "twin-evidence://run/after.mp4",
+      sha256: "b".repeat(64),
     },
   ],
 };

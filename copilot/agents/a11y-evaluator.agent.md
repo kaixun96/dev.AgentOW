@@ -40,6 +40,8 @@ validated duration, frame dimensions, image variance, audio RMS and peak, and an
 with visible focus. The media must contain real screen-reader speech captured from a persistent
 audio endpoint and the composed Windows desktop; an existing MP4, silent audio, a static slideshow,
 or browser-only capture is not sufficient.
+Every applicable step must link the immutable recording as `screen-reader-video`; merely placing an
+MP4 beside the result or mentioning it in prose is not evidence-contract coverage.
 
 ## Input
 
