@@ -133,27 +133,28 @@ const CLAIM_RULES = {
       "focus-sequence",
       "focus-visual-comparison",
       "keyboard-navigation",
+      "interaction-coverage",
     ],
   },
   "browser-semantics-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "accessibility-tree", "interaction-log"],
+    evidence: ["screenshot", "accessibility-tree", "interaction-log", "interaction-coverage"],
   },
   "browser-visual-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "measurement", "interaction-log"],
+    evidence: ["screenshot", "measurement", "interaction-log", "interaction-coverage"],
   },
   "browser-dynamic-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "interaction-log"],
+    evidence: ["screenshot", "interaction-log", "interaction-coverage"],
   },
   "browser-touch-pointer-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "measurement", "interaction-log"],
+    evidence: ["screenshot", "measurement", "interaction-log", "interaction-coverage"],
   },
   "browser-forms-tested": {
     producers: ["copilot-browser"],
-    evidence: ["screenshot", "accessibility-tree", "interaction-log"],
+    evidence: ["screenshot", "accessibility-tree", "interaction-log", "interaction-coverage"],
   },
   "nvda-tested": {
     producers: ["windows-host", "twin", "external"],
@@ -483,6 +484,157 @@ function validateEvidenceShape(filePath, type, category) {
       throw new Error(`${category} keyboard-navigation evidence has an invalid schema`);
     }
   }
+  if (type === "interaction-coverage") {
+      const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      const allowedRisk = new Set(["safe", "confirmation-required"]);
+      const allowedStatus = new Set([
+        "executed",
+        "stopped-before-confirmation",
+      ]);
+      const allowedOutcome = new Set([
+        "no-change",
+        "ui-change",
+        "navigation",
+        "stopped-before-confirmation",
+      ]);
+      const allowedScope = new Set([
+        "not-navigation",
+        "in-scope",
+        "out-of-scope-user-confirmed",
+      ]);
+      const controls = Array.isArray(value?.controls) ? value.controls : [];
+      const surfaces = Array.isArray(value?.surfaces) ? value.surfaces : [];
+      const surfaceIds = surfaces.map((entry) => entry?.id);
+      const surfaceById = new Map(surfaces.map((entry) => [entry?.id, entry]));
+      const referencedSurfaceIds = new Set(
+        controls.flatMap((entry) =>
+          Array.isArray(entry?.newSurfaceIds) ? entry.newSurfaceIds : [],
+        ),
+      );
+      const controlKeys = controls.map(
+        (entry) => `${entry?.surfaceId ?? ""}\u0000${entry?.path ?? ""}`,
+      );
+      const inventoryKeys = surfaces.flatMap((entry) =>
+        Array.isArray(entry?.actionablePaths)
+          ? entry.actionablePaths.map((pathValue) => `${entry.id}\u0000${pathValue}`)
+          : [],
+      );
+      const normalizePaths = (entries) => [...new Set(entries)].sort();
+      const normalizeUrl = (value) => {
+        try {
+          return new URL(value).href;
+        } catch {
+          return null;
+        }
+      };
+      if (
+        !Array.isArray(value?.executedSteps) ||
+        value.executedSteps.length === 0 ||
+        typeof value?.route !== "string" ||
+        !value.route.trim() ||
+        controls.length === 0 ||
+        new Set(controlKeys).size !== controlKeys.length ||
+        controls.some(
+          (entry) =>
+            typeof entry.role !== "string" ||
+            typeof entry.name !== "string" ||
+            typeof entry.surfaceId !== "string" ||
+            !surfaceById.has(entry.surfaceId) ||
+            !allowedRisk.has(entry.risk) ||
+            !allowedStatus.has(entry.status) ||
+            typeof entry.action !== "string" ||
+            !entry.action.trim() ||
+            !allowedOutcome.has(entry.outcome) ||
+            !entry.before ||
+            typeof entry.before.url !== "string" ||
+            typeof entry.before.focusPath !== "string" ||
+            !entry.before.state ||
+            typeof entry.before.state !== "object" ||
+            Array.isArray(entry.before.state) ||
+            Object.keys(entry.before.state).length === 0 ||
+            !entry.after ||
+            typeof entry.after.url !== "string" ||
+            typeof entry.after.focusPath !== "string" ||
+            !entry.after.state ||
+            typeof entry.after.state !== "object" ||
+            Array.isArray(entry.after.state) ||
+            Object.keys(entry.after.state).length === 0 ||
+            typeof entry.before.focusPath !== "string" ||
+            !entry.before.focusPath.trim() ||
+            typeof entry.after.focusPath !== "string" ||
+            !entry.after.focusPath.trim() ||
+            !Array.isArray(entry.newSurfaceIds) ||
+            entry.newSurfaceIds.some((id) => !surfaceById.has(id)) ||
+            !allowedScope.has(entry.scopeDecision) ||
+            (entry.risk === "safe" && entry.status !== "executed") ||
+            (entry.risk === "confirmation-required" &&
+              entry.status !== "stopped-before-confirmation") ||
+            (entry.risk === "safe" && entry.outcome === "stopped-before-confirmation") ||
+            (entry.risk === "confirmation-required" &&
+              (entry.outcome !== "stopped-before-confirmation" ||
+                normalizeUrl(entry.before.url) !== normalizeUrl(entry.after.url))) ||
+            (entry.outcome === "no-change" &&
+              (entry.newSurfaceIds.length > 0 ||
+                normalizeUrl(entry.before.url) !== normalizeUrl(entry.after.url))) ||
+            (entry.outcome === "ui-change" && entry.newSurfaceIds.length === 0) ||
+            (entry.outcome === "navigation" &&
+              (!["in-scope", "out-of-scope-user-confirmed"].includes(entry.scopeDecision) ||
+                !normalizeUrl(entry.before.url) ||
+                normalizeUrl(entry.before.url) === normalizeUrl(entry.after.url) ||
+                (entry.scopeDecision === "in-scope" && entry.newSurfaceIds.length === 0) ||
+                (entry.scopeDecision === "out-of-scope-user-confirmed" &&
+                  entry.newSurfaceIds.length !== 0))) ||
+            (entry.scopeDecision === "out-of-scope-user-confirmed" &&
+              entry.outcome !== "navigation"),
+        ) ||
+        surfaces.length === 0 ||
+        new Set(surfaceIds).size !== surfaceIds.length ||
+        surfaces.filter((entry) => entry.triggerPath === null).length !== 1 ||
+        surfaces.some(
+          (entry) =>
+            entry.triggerPath !== null && !referencedSurfaceIds.has(entry.id),
+        ) ||
+        surfaces.some(
+          (entry) =>
+            typeof entry.id !== "string" ||
+            !entry.id.trim() ||
+            typeof entry.route !== "string" ||
+            !entry.route.trim() ||
+            (entry.triggerPath !== null &&
+              (typeof entry.triggerPath !== "string" || !entry.triggerPath.trim())) ||
+            typeof entry.type !== "string" ||
+            !entry.type.trim() ||
+            !Array.isArray(entry.actionablePaths) ||
+            entry.actionablePaths.some(
+              (pathValue) => typeof pathValue !== "string" || !pathValue.trim(),
+            ) ||
+            controls.some(
+              (control) =>
+                !surfaceById.get(control.surfaceId)?.actionablePaths.includes(control.path) ||
+                control.before.url !== surfaceById.get(control.surfaceId)?.route ||
+                control.newSurfaceIds.some((surfaceId) => {
+                  const surface = surfaceById.get(surfaceId);
+                  return (
+                    surface.triggerPath !== control.path ||
+                    surface.route !== control.after.url
+                  );
+                }),
+            ) ||
+            entry.inventoryComplete !== true ||
+            entry.tested !== true,
+        ) ||
+        JSON.stringify(normalizePaths(controlKeys)) !==
+          JSON.stringify(normalizePaths(inventoryKeys)) ||
+        !value?.summary ||
+        value.summary.discovered !== controls.length ||
+        value.summary.executed !== controls.filter((entry) => entry.status === "executed").length ||
+        value.summary.stoppedBeforeConfirmation !==
+          controls.filter((entry) => entry.status === "stopped-before-confirmation").length ||
+        value.summary.untestedSafe !== 0
+      ) {
+        throw new Error(`${category} interaction-coverage evidence has an invalid schema`);
+    }
+  }
   if (type === "interaction-log") {
     const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
     if (
@@ -649,8 +801,8 @@ function validateScResult(scResult, category, evidenceByUri, blockers, index) {
   if (
     typeof scResult.wcagSc !== "string" ||
     !A_AA_SC.has(scResult.wcagSc) ||
-    scResult.standardRule !== `MAS ${scResult.wcagSc}` ||
-    scResult.standardCheck !== "authorized-source-consulted" ||
+    scResult.standardRule !== `WCAG 2.2 SC ${scResult.wcagSc}` ||
+    scResult.standardCheck !== "w3c-recommendation-consulted" ||
     !SC_STATUSES.has(scResult.status) ||
     typeof scResult.details !== "string" ||
     !scResult.details.trim() ||
@@ -920,10 +1072,12 @@ export function validatePlan(plan) {
   assertObject(plan, "plan.json");
   if (
     plan.schemaVersion !== 1 ||
-    plan.standard !== "MAS" ||
-    plan.standardProfile !== "web" ||
+    plan.standard !== "WCAG" ||
+    plan.standardVersion !== "2.2" ||
+    plan.standardLevel !== "AA" ||
     !plan.standardAttestation ||
-    plan.standardAttestation.sourceType !== "authorized-mas-web" ||
+    plan.standardAttestation.sourceType !== "w3c-recommendation" ||
+    plan.standardAttestation.sourceUrl !== "https://www.w3.org/TR/WCAG22/" ||
     plan.standardAttestation.contentEmbedded !== false ||
     typeof plan.standardAttestation.checkedAt !== "string" ||
     Number.isNaN(Date.parse(plan.standardAttestation.checkedAt)) ||
@@ -943,7 +1097,7 @@ export function validatePlan(plan) {
     !Array.isArray(plan.categories) ||
     plan.categories.length === 0
   ) {
-    throw new Error("plan.json does not satisfy the MAS Web explore plan schema");
+    throw new Error("plan.json does not satisfy the WCAG 2.2 A/AA explore plan schema");
   }
   const seen = new Set();
   const categoryCoverage = new Set();
@@ -1001,7 +1155,7 @@ export function validatePlan(plan) {
     const expected = [...CATEGORY_SC[entry.category]].sort();
     const actual = [...entry.wcagSc].sort();
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-      throw new Error(`plan.json ${entry.category} must cover its complete MAS Web mapping`);
+      throw new Error(`plan.json ${entry.category} must cover its complete WCAG 2.2 A/AA mapping`);
     }
   }
   const declaredCoverage = [...new Set(plan.scCoverage)].sort();
@@ -1047,6 +1201,53 @@ export function aggregateResults(runDir) {
     );
     if (result.environment !== plan.executionEnvironment) {
       throw new Error(`${category}.environment does not match plan.json`);
+    }
+    for (const coverage of result.evidence.filter(
+      (entry) => entry.type === "interaction-coverage",
+    )) {
+      const value = JSON.parse(fs.readFileSync(coverage.uri, "utf8"));
+      if (value.route !== plan.url) {
+        throw new Error(`${category} interaction coverage route does not match plan URL`);
+      }
+      const rootSurface = value.surfaces.find((entry) => entry.triggerPath === null);
+      if (!rootSurface || rootSurface.route !== plan.url || rootSurface.id !== "root") {
+        throw new Error(`${category} interaction coverage root does not match plan URL`);
+      }
+      const planOrigin = new URL(plan.url).origin;
+      for (const control of value.controls) {
+        const before = new URL(control.before.url);
+        const after = new URL(control.after.url);
+        if (before.origin !== planOrigin) {
+          throw new Error(`${category} interaction begins outside the planned origin`);
+        }
+        if (
+          control.outcome !== "navigation" &&
+          control.outcome !== "stopped-before-confirmation" &&
+          before.href !== after.href
+        ) {
+          throw new Error(`${category} interaction changed URL without a navigation outcome`);
+        }
+        if (
+          control.outcome === "navigation" &&
+          control.scopeDecision === "in-scope" &&
+          !control.newSurfaceIds.some(
+            (surfaceId) => {
+              const surface = value.surfaces.find((entry) => entry.id === surfaceId);
+              return (
+                surface?.triggerPath === control.path &&
+                surface?.route === control.after.url
+              );
+            },
+          )
+        ) {
+          throw new Error(`${category} in-scope navigation lacks recursive surface coverage`);
+        }
+        if (control.outcome === "navigation" && control.scopeDecision === "in-scope") {
+          if (after.origin !== planOrigin) {
+            throw new Error(`${category} in-scope navigation leaves the planned origin`);
+          }
+        }
+      }
     }
     const planned = plan.categories.find((entry) => entry.category === category);
     const resultCriteria = [...result.scResults.map((entry) => entry.wcagSc)].sort();

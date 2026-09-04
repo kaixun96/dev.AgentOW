@@ -229,11 +229,9 @@ function renderFinding(runDir, finding, aggregate, bugs) {
     finding.id,
   )}: ${escapeHtml(finding.title)}</h3>
 <dl>
-<dt>MAS rule</dt><dd>${escapeHtml(finding.wcagSc ? `MAS ${finding.wcagSc}` : "N/A")} (public WCAG mapping: ${escapeHtml(
-    finding.wcagSc || "N/A",
-  )} ${escapeHtml(
+<dt>WCAG SC</dt><dd>${escapeHtml(finding.wcagSc || "N/A")} ${escapeHtml(
     WCAG_NAMES[finding.wcagSc] || "",
-  )})</dd>
+  )}</dd>
 <dt>Category</dt><dd>${escapeHtml(CATEGORY_LABELS[finding.category] || finding.category)}</dd>
 <dt>Element</dt><dd><code>${escapeHtml(finding.selector || "page-level")}</code></dd>
 <dt>Steps to reproduce</dt><dd><ol>${steps}</ol></dd>
@@ -512,7 +510,7 @@ function renderCoverageNotes(aggregate, plan, omittedFindings, scoped = false) {
       `<li><strong>Omitted incomplete finding:</strong> ${escapeHtml(finding.id)} — no screenshot artifact.</li>`,
     );
   }
-  return `<ul>${lines.join("")}</ul><p>This exploratory run does not claim full MAS conformance.</p>`;
+  return `<ul>${lines.join("")}</ul><p>This exploratory run does not claim full WCAG conformance.</p>`;
 }
 
 function renderReport(runDir, aggregate, metadata, plan, bugEntries) {
@@ -542,6 +540,10 @@ function renderReport(runDir, aggregate, metadata, plan, bugEntries) {
   const renderedUrl = reportUrl
     ? `<a href="${escapeHtml(reportUrl)}">${escapeHtml(metadata.url)}</a>`
     : escapeHtml(metadata.url || "");
+  const standardUrl = safeHttpUrl(plan.standardAttestation?.sourceUrl);
+  const renderedStandard = standardUrl
+    ? `<a href="${escapeHtml(standardUrl)}">WCAG ${escapeHtml(plan.standardVersion)}</a>`
+    : `WCAG ${escapeHtml(plan.standardVersion || "2.2")}`;
   const includedCategories = new Set(aggregate.categories.map((entry) => entry.category));
   return `<!DOCTYPE html>
 <html lang="en">
@@ -549,7 +551,7 @@ function renderReport(runDir, aggregate, metadata, plan, bugEntries) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="${escapeHtml(favicon)}">
-<title>MAS Web Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</title>
+<title>WCAG 2.2 A/AA Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</title>
 <style>
 :root{--critical:#d32f2f;--high:#e53935;--medium:#f57c00;--low:#ffa726;--best:#7b1fa2;--pass:#2e7d32;--review:#1565c0}
 *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#212121;max-width:1200px;margin:0 auto;padding:24px;background:#fafafa}
@@ -568,9 +570,9 @@ details{margin:12px 0}summary{cursor:pointer;font-weight:600;padding:8px 0}
 </style>
 </head>
 <body>
-<h1>MAS Web Accessibility Test Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</h1>
+<h1>WCAG 2.2 A/AA Accessibility Test Report: ${escapeHtml(metadata.target || "Accessibility exploration")}</h1>
 <div class="meta">
-<p><strong>Run date:</strong> ${escapeHtml(aggregate.generatedAt)} | <strong>Standard:</strong> MAS Web | <strong>Public mapping:</strong> WCAG 2.2 A/AA</p>
+<p><strong>Run date:</strong> ${escapeHtml(aggregate.generatedAt)} | <strong>Standard:</strong> ${renderedStandard} Level A and AA | <strong>Standard checked:</strong> ${escapeHtml(plan.standardAttestation?.checkedAt || "Not recorded")}</p>
 <p><strong>Mode:</strong> ${escapeHtml(metadata.executionEnvironment || "unknown")} | <strong>Browser:</strong> Chromium${
     includedCategories.has("screen-reader")
       ? ` | <strong>Screen reader:</strong> ${escapeHtml(screenReaderLabel(aggregate))}`
@@ -591,8 +593,8 @@ ${metadata.reportScope ? `<p><strong>Report scope:</strong> ${escapeHtml(metadat
     aggregate,
     reportableFindings,
   )}</tbody></table>
-<h2>MAS Web Evaluation</h2>
-<table><thead><tr><th>MAS rule / public mapping</th><th>Status</th><th>Details</th></tr></thead><tbody>${renderWcagTable(
+<h2>WCAG 2.2 A/AA Evaluation</h2>
+<table><thead><tr><th>Success Criterion</th><th>Status</th><th>Details</th></tr></thead><tbody>${renderWcagTable(
     plan,
     aggregate,
   )}</tbody></table>
@@ -703,7 +705,17 @@ function main() {
     const findingIds = new Set(aggregate.findings.map((entry) => entry.id));
     bugs = bugs.filter((entry) => findingIds.has(entry.findingId));
   }
-  const report = { ...aggregate, metadata, adoBugs: bugs };
+  const report = {
+    ...aggregate,
+    metadata,
+    standard: {
+      name: plan.standard,
+      version: plan.standardVersion,
+      level: plan.standardLevel,
+      attestation: plan.standardAttestation,
+    },
+    adoBugs: bugs,
+  };
   safeWriteFile(runDir, outputJson, `${JSON.stringify(report, null, 2)}\n`);
   safeWriteFile(runDir, outputHtml, renderReport(runDir, aggregate, metadata, plan, bugs));
   process.stdout.write(`${outputHtml}\n`);

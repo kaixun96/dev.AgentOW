@@ -16,7 +16,7 @@ High-yield patterns:
 - Target size, gesture alternatives, timing, or motion controls are absent.
 
 Test the live transition and every relevant state. Report one independently reproducible behavior
-per finding, using public WCAG identifiers only as MAS mapping keys.
+per finding, using WCAG 2.2 A/AA success criteria.
 
 Static source, DOM, Accessibility Tree, CSS, or attribute inventories may locate targets, but they
 never establish a test result. Every result requires a live rendered surface plus executed steps,

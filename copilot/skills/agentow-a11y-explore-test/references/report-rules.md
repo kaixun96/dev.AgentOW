@@ -5,12 +5,12 @@ self-contained `report.html` with embedded CSS and no external runtime dependenc
 
 ## Required sections
 
-1. Page/feature title, run date, MAS Web label, public WCAG mapping, environment, browser,
+1. Page/feature title, run date, WCAG 2.2 A/AA label, environment, browser,
    screen-reader status, URL, and a non-sensitive statement that evidence is report-local and
    hash-validated. Never render an absolute local evidence path.
 2. Bright summary cards for violations, best practices, scoped passes, and needs review.
 3. Per-category counts plus a total row.
-4. One MAS Web mapped row per supported public WCAG criterion, exactly once:
+4. One WCAG 2.2 A/AA row per supported criterion, exactly once:
    - red `FAIL`;
    - green `PASS`;
    - blue `NEEDS REVIEW`;

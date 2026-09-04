@@ -1,7 +1,7 @@
 ---
 name: a11y-explore-planner
 description: |
-  Build a bounded MAS Web exploratory test plan from a feature description and starting URL.
+  Build a bounded WCAG 2.2 A/AA exploratory test plan from a feature description and starting URL.
   Selects categories, focus areas, evidence requirements, and execution isolation without operating
   a browser or assistive technology.
 model: inherit
@@ -17,7 +17,7 @@ technology, edit files, file bugs, or dispatch another agent.
 Read:
 
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/wcag-criteria.md`
-- `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/mas-standard.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/wcag-standard.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/bug-patterns.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/category-execution.md`
 
@@ -76,10 +76,12 @@ Return one JSON object and no surrounding prose:
 ```json
 {
   "schemaVersion": 1,
-  "standard": "MAS",
-  "standardProfile": "web",
+  "standard": "WCAG",
+  "standardVersion": "2.2",
+  "standardLevel": "AA",
   "standardAttestation": {
-    "sourceType": "authorized-mas-web",
+    "sourceType": "w3c-recommendation",
+    "sourceUrl": "https://www.w3.org/TR/WCAG22/",
     "checkedAt": "ISO-8601 time when the authorized source was consulted",
     "contentEmbedded": false
   },
@@ -114,16 +116,16 @@ Return one JSON object and no surrounding prose:
       "category": "keyboard-focus",
       "executionClass": "serial-browser",
       "wcagSc": ["2.1.1", "2.1.2", "2.1.4", "2.4.3", "2.4.7", "2.4.11"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["browser", "keyboard"],
-      "requiredEvidenceTypes": ["screenshot", "focus-sequence", "focus-visual-comparison", "keyboard-navigation"],
+      "requiredEvidenceTypes": ["screenshot", "focus-sequence", "focus-visual-comparison", "keyboard-navigation", "interaction-coverage"],
       "maximumClaim": "browser-keyboard-tested"
     },
     {
       "category": "screen-reader",
       "executionClass": "serial-real-at",
       "wcagSc": ["1.1.1", "1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.5", "1.3.1", "1.3.2", "2.4.2", "2.4.4", "3.3.2", "4.1.2", "4.1.3"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["nvda", "real-os-input", "uia"],
       "requiredEvidenceTypes": ["nvda-transcript", "screenshot", "uia-state"],
       "maximumClaim": "nvda-tested"
@@ -132,73 +134,73 @@ Return one JSON object and no surrounding prose:
       "category": "structure-semantics",
       "executionClass": "serial-browser",
       "wcagSc": ["1.3.1", "1.3.2", "1.3.3", "1.3.5", "2.4.1", "2.4.5", "2.4.6", "3.1.1", "3.1.2"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["browser"],
-      "requiredEvidenceTypes": ["screenshot", "accessibility-tree", "interaction-log"],
+      "requiredEvidenceTypes": ["screenshot", "accessibility-tree", "interaction-log", "interaction-coverage"],
       "maximumClaim": "browser-semantics-tested"
     },
     {
       "category": "orientation-input-purpose",
       "executionClass": "serial-browser",
       "wcagSc": ["1.3.4", "1.3.5"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["browser"],
-      "requiredEvidenceTypes": ["screenshot", "accessibility-tree", "interaction-log"],
+      "requiredEvidenceTypes": ["screenshot", "accessibility-tree", "interaction-log", "interaction-coverage"],
       "maximumClaim": "browser-semantics-tested"
     },
     {
       "category": "visual-color",
       "executionClass": "serial-browser",
       "wcagSc": ["1.4.1", "1.4.2", "1.4.3", "1.4.4", "1.4.5", "1.4.10", "1.4.11", "1.4.12", "1.4.13"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["browser"],
-      "requiredEvidenceTypes": ["screenshot", "measurement", "interaction-log"],
+      "requiredEvidenceTypes": ["screenshot", "measurement", "interaction-log", "interaction-coverage"],
       "maximumClaim": "browser-visual-tested"
     },
     {
       "category": "timing-motion",
       "executionClass": "serial-browser",
       "wcagSc": ["2.2.1", "2.2.2", "2.3.1"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["browser"],
-      "requiredEvidenceTypes": ["screenshot", "interaction-log"],
+      "requiredEvidenceTypes": ["screenshot", "interaction-log", "interaction-coverage"],
       "maximumClaim": "browser-dynamic-tested"
     },
     {
       "category": "dynamic-content",
       "executionClass": "serial-browser",
       "wcagSc": ["1.3.2", "2.4.3", "3.2.1", "3.2.2", "3.2.3", "3.2.4", "3.2.6", "4.1.3"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["browser"],
-      "requiredEvidenceTypes": ["screenshot", "interaction-log"],
+      "requiredEvidenceTypes": ["screenshot", "interaction-log", "interaction-coverage"],
       "maximumClaim": "browser-dynamic-tested"
     },
     {
       "category": "touch-pointer",
       "executionClass": "serial-browser",
       "wcagSc": ["2.5.1", "2.5.2", "2.5.3", "2.5.4", "2.5.7", "2.5.8"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["browser"],
-      "requiredEvidenceTypes": ["screenshot", "measurement", "interaction-log"],
+      "requiredEvidenceTypes": ["screenshot", "measurement", "interaction-log", "interaction-coverage"],
       "maximumClaim": "browser-touch-pointer-tested"
     },
     {
       "category": "authentication-forms",
       "executionClass": "serial-browser",
       "wcagSc": ["3.3.1", "3.3.2", "3.3.3", "3.3.4", "3.3.7", "3.3.8"],
-      "focusAreas": ["full MAS Web mapped coverage"],
+      "focusAreas": ["full WCAG 2.2 A/AA live coverage"],
       "requiredCapabilities": ["browser"],
-      "requiredEvidenceTypes": ["screenshot", "accessibility-tree", "interaction-log"],
+      "requiredEvidenceTypes": ["screenshot", "accessibility-tree", "interaction-log", "interaction-coverage"],
       "maximumClaim": "browser-forms-tested"
     }
   ]
 }
 ```
 
-`standard` is always `MAS`, `standardProfile` is always `web`, and `fullCoverage` is always `true`.
-`standardAttestation` records only non-sensitive provenance; never include source text or links.
+`standard` is always `WCAG`, `standardVersion` is `2.2`, `standardLevel` is `AA`, and
+`fullCoverage` is always `true`. `standardAttestation` points to the public W3C Recommendation.
 `requestedCategories` contains all nine category slugs.
 `scCoverage` must equal the sorted union of
-all category `wcagSc` arrays and cover every supported MAS Web criterion in the public mapping.
+all category `wcagSc` arrays and cover every supported WCAG 2.2 A/AA criterion.
 Plan live steps for every criterion. Static inventories may locate targets but cannot satisfy
 coverage.

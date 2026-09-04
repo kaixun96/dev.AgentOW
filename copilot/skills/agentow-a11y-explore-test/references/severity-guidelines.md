@@ -2,8 +2,8 @@
 
 ## Classification
 
-- `VIOLATION`: observed failure of an applicable MAS Web requirement with reproducible evidence.
-- `BEST-PRACTICE`: improvement beyond a proven MAS Web failure.
+- `VIOLATION`: observed failure of an applicable WCAG 2.2 A/AA success criterion with reproducible evidence.
+- `BEST-PRACTICE`: APG/platform guidance or improvement beyond a proven WCAG A/AA failure.
 - `PASS`: the tested behavior met the stated expectation; scope the claim to the executed steps.
 - `NEEDS-REVIEW`: evidence is incomplete or the requirement needs human interpretation.
 

@@ -1,7 +1,7 @@
 ---
 name: a11y-explore-category-tester
 description: |
-  Execute or evaluate exactly one MAS Web category for /agentow-a11y-explore-test. Produces a structured
+  Execute or evaluate exactly one WCAG 2.2 A/AA category for /agentow-a11y-explore-test. Produces a structured
   category result with evidence provenance and never edits product code or controls unassigned AT.
 model: inherit
 tools:
@@ -18,7 +18,7 @@ another agent.
 Read:
 
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/category-execution.md`
-- `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/mas-standard.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/wcag-standard.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/bug-patterns.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/severity-guidelines.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/agentow-a11y-explore-test/references/test-procedures/<category>.md`
@@ -57,8 +57,8 @@ Return exactly:
   "scResults": [
     {
       "wcagSc": "2.4.7",
-      "standardRule": "MAS 2.4.7",
-      "standardCheck": "authorized-source-consulted",
+      "standardRule": "WCAG 2.2 SC 2.4.7",
+      "standardCheck": "w3c-recommendation-consulted",
       "status": "PASS|FAIL|NEEDS_REVIEW|NOT_APPLICABLE|NOT_TESTED",
       "testMode": "live-interaction|live-observation|real-at|not-applicable-check|not-tested",
       "stepsExecuted": ["exact executed step"],
@@ -130,7 +130,7 @@ mode, exact executed steps, observation time, and all evidence required by the c
 
 For `timing-motion`, the same object also contains
 `ordinaryMotion: { observationSeconds: >=5, samples: >=2 }` and
-`reducedMotion: { observationSeconds: >0, samples: >=1 }`. Ordinary-mode samples determine MAS
+`reducedMotion: { observationSeconds: >0, samples: >=1 }`. Ordinary-mode samples determine WCAG
 2.2.2; reduced motion is a separate supporting mode.
 
 `keyboard-focus` also requires `focus-visual-comparison` JSON. For every sampled Tab position,
@@ -178,3 +178,55 @@ Use this exact shape:
   "failures": []
 }
 ```
+
+Every browser category also returns `interaction-coverage`:
+
+```json
+{
+  "executedSteps": ["inventory, execute, observe, and recurse"],
+  "route": "tested URL",
+  "controls": [
+    {
+      "path": "stable DOM path",
+      "surfaceId": "root",
+      "role": "button",
+      "name": "Settings",
+      "risk": "safe|confirmation-required",
+      "action": "Enter|Space|click|type ...",
+      "status": "executed|stopped-before-confirmation",
+      "outcome": "no-change|ui-change|navigation|stopped-before-confirmation",
+      "before": { "url": "...", "focusPath": "stable focus path", "state": { "expanded": false } },
+      "after": { "url": "...", "focusPath": "stable focus path", "state": { "expanded": true } },
+      "newSurfaceIds": ["panel-1"],
+      "scopeDecision": "not-navigation|in-scope|out-of-scope-user-confirmed"
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "root or stable new surface ID",
+      "triggerPath": null,
+      "type": "page|dialog|menu|panel|other",
+      "route": "surface URL",
+      "actionablePaths": ["every live actionable path on the surface"],
+      "inventoryComplete": true,
+      "tested": true
+    }
+  ],
+  "summary": {
+    "discovered": 1,
+    "executed": 1,
+    "stoppedBeforeConfirmation": 0,
+    "untestedSafe": 0
+  }
+}
+```
+
+Execute every safe control. Stop confirmation-required actions before the confirmation boundary.
+For a user-confirmed out-of-scope destination, execute the control and verify the URL transition,
+record `outcome: "navigation"`, `scopeDecision: "out-of-scope-user-confirmed"`, and no
+`newSurfaceIds`; then return to the source route without auditing destination content. In
+user-facing reports, describe this as “Navigation verified; destination content excluded by
+owner,” not by exposing the internal status value.
+The exact union of `surfaces[].actionablePaths` must equal `controls[].path`. Recursively inventory
+and test every new UI surface. If navigation scope is uncertain, do not mark
+the category completed; ask the user and record the resulting scope decision.

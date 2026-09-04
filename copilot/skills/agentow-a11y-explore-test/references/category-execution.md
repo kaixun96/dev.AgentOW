@@ -30,6 +30,11 @@ Accessibility Tree, CSS, or attribute inventories may identify targets, but ever
 also requires an executed live step and an `interaction-log` or the category's stronger runtime
 evidence. Static inventory alone cannot produce any SC status.
 
+Inventory every visible actionable control, execute every safe action, and recursively test newly
+revealed UI. Stop destructive or confirmation-required actions before confirmation. Record every
+navigation scope decision; an unknown destination keeps the run inconclusive until the user decides
+whether it is in scope.
+
 - Prefer the approved personal evaluator profile on its Windows host.
 - Use repository Playwright/FIC in Codespaces.
 - Never copy normal browser cookies or read credentials.

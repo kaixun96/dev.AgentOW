@@ -23,15 +23,15 @@ const skillRoot = path.join(repoRoot, "copilot", "skills", "agentow-a11y-explore
 const plannerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-planner.agent.md");
 const testerAgent = path.join(repoRoot, "copilot", "agents", "a11y-explore-category-tester.agent.md");
 const PLAN_CONTRACT = {
-  "keyboard-focus": ["serial-browser", ["browser", "keyboard"], ["screenshot", "focus-sequence", "focus-visual-comparison", "keyboard-navigation"], "browser-keyboard-tested"],
+  "keyboard-focus": ["serial-browser", ["browser", "keyboard"], ["screenshot", "focus-sequence", "focus-visual-comparison", "keyboard-navigation", "interaction-coverage"], "browser-keyboard-tested"],
   "screen-reader": ["serial-real-at", ["nvda", "real-os-input", "uia"], ["nvda-transcript", "screenshot", "uia-state"], "nvda-tested"],
-  "structure-semantics": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-semantics-tested"],
-  "orientation-input-purpose": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-semantics-tested"],
-  "visual-color": ["serial-browser", ["browser"], ["screenshot", "measurement", "interaction-log"], "browser-visual-tested"],
-  "timing-motion": ["serial-browser", ["browser"], ["screenshot", "interaction-log"], "browser-dynamic-tested"],
-  "dynamic-content": ["serial-browser", ["browser"], ["screenshot", "interaction-log"], "browser-dynamic-tested"],
-  "touch-pointer": ["serial-browser", ["browser"], ["screenshot", "measurement", "interaction-log"], "browser-touch-pointer-tested"],
-  "authentication-forms": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log"], "browser-forms-tested"],
+  "structure-semantics": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log", "interaction-coverage"], "browser-semantics-tested"],
+  "orientation-input-purpose": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log", "interaction-coverage"], "browser-semantics-tested"],
+  "visual-color": ["serial-browser", ["browser"], ["screenshot", "measurement", "interaction-log", "interaction-coverage"], "browser-visual-tested"],
+  "timing-motion": ["serial-browser", ["browser"], ["screenshot", "interaction-log", "interaction-coverage"], "browser-dynamic-tested"],
+  "dynamic-content": ["serial-browser", ["browser"], ["screenshot", "interaction-log", "interaction-coverage"], "browser-dynamic-tested"],
+  "touch-pointer": ["serial-browser", ["browser"], ["screenshot", "measurement", "interaction-log", "interaction-coverage"], "browser-touch-pointer-tested"],
+  "authentication-forms": ["serial-browser", ["browser"], ["screenshot", "accessibility-tree", "interaction-log", "interaction-coverage"], "browser-forms-tested"],
 };
 const planCategory = (category) => {
   const [executionClass, requiredCapabilities, requiredEvidenceTypes, maximumClaim] =
@@ -48,10 +48,12 @@ const planCategory = (category) => {
 };
 const plan = () => ({
   schemaVersion: 1,
-  standard: "MAS",
-  standardProfile: "web",
+  standard: "WCAG",
+  standardVersion: "2.2",
+  standardLevel: "AA",
   standardAttestation: {
-    sourceType: "authorized-mas-web",
+    sourceType: "w3c-recommendation",
+    sourceUrl: "https://www.w3.org/TR/WCAG22/",
     checkedAt: "2026-09-02T00:00:00.000Z",
     contentEmbedded: false,
   },
@@ -69,8 +71,8 @@ const scResults = (category, evidenceUris, overrides = {}) =>
     const status = overrides[wcagSc]?.status ?? "NEEDS_REVIEW";
     return {
       wcagSc,
-      standardRule: `MAS ${wcagSc}`,
-      standardCheck: "authorized-source-consulted",
+      standardRule: `WCAG 2.2 SC ${wcagSc}`,
+      standardCheck: "w3c-recommendation-consulted",
       status,
       testMode:
         status === "NOT_TESTED"
@@ -150,6 +152,53 @@ const writeGenericCategoryResult = (runDir, category) => {
         failures: [],
       });
     }
+    if (type === "interaction-coverage") {
+      content = JSON.stringify({
+        executedSteps: ["Inventory the live control", "Execute its safe action"],
+        route: "https://example.test",
+        controls: [
+          {
+            path: "html>body>button:nth-of-type(1)",
+            surfaceId: "root",
+            role: "button",
+            name: "Open",
+            risk: "safe",
+            action: "Enter",
+            status: "executed",
+            outcome: "no-change",
+            before: {
+              url: "https://example.test",
+              focusPath: "html>body>button:nth-of-type(1)",
+              state: { disabled: false },
+            },
+            after: {
+              url: "https://example.test",
+              focusPath: "html>body>button:nth-of-type(1)",
+              state: { disabled: false },
+            },
+            scopeDecision: "not-navigation",
+            newSurfaceIds: [],
+          },
+        ],
+        surfaces: [
+          {
+            id: "root",
+            triggerPath: null,
+            type: "page",
+            route: "https://example.test",
+            actionablePaths: ["html>body>button:nth-of-type(1)"],
+            inventoryComplete: true,
+            tested: true,
+          },
+        ],
+        summary: {
+          discovered: 1,
+          executed: 1,
+          stoppedBeforeConfirmation: 0,
+          untestedSafe: 0,
+        },
+      });
+    }
     if (type === "accessibility-tree" && category === "orientation-input-purpose") {
       content = JSON.stringify({ inputs: [], axTree: { nodes: [] } });
     }
@@ -191,7 +240,7 @@ for (const file of [
   path.join(skillRoot, "SKILL.md"),
   path.join(skillRoot, "references", "category-execution.md"),
   path.join(skillRoot, "references", "severity-guidelines.md"),
-  path.join(skillRoot, "references", "mas-standard.md"),
+  path.join(skillRoot, "references", "wcag-standard.md"),
   path.join(skillRoot, "references", "bug-patterns.md"),
   path.join(skillRoot, "references", "wcag-criteria.md"),
   path.join(skillRoot, "references", "report-rules.md"),
@@ -217,6 +266,7 @@ try {
   const focusSequence = path.join(categoryDir, "focus-sequence.json");
   const focusVisual = path.join(categoryDir, "focus-visual-comparison.json");
   const keyboardNavigation = path.join(categoryDir, "keyboard-navigation.json");
+  const interactionCoverage = path.join(categoryDir, "interaction-coverage.json");
   const focusBefore1 = path.join(categoryDir, "focus-before-1.png");
   const focusAfter1 = path.join(categoryDir, "focus-after-1.png");
   const focusBefore2 = path.join(categoryDir, "focus-before-2.png");
@@ -235,6 +285,7 @@ try {
         text: "Open",
         id: "open",
         path: "html>body>button:nth-of-type(1)",
+        surfaceId: "root",
         outlineStyle: "solid",
         outlineWidth: "2px",
         boxShadow: "none",
@@ -316,6 +367,54 @@ try {
       failures: [],
     }),
   );
+  fs.writeFileSync(
+    interactionCoverage,
+    JSON.stringify({
+      executedSteps: ["Inventory the live button", "Press Enter"],
+      route: "https://example.test",
+      controls: [
+        {
+          path: "html>body>button:nth-of-type(1)",
+          surfaceId: "root",
+          role: "button",
+          name: "Open",
+          risk: "safe",
+          action: "Enter",
+          status: "executed",
+          outcome: "no-change",
+          before: {
+            url: "https://example.test",
+            focusPath: "html>body>button:nth-of-type(1)",
+            state: { disabled: false },
+          },
+          after: {
+            url: "https://example.test",
+            focusPath: "html>body>button:nth-of-type(1)",
+            state: { disabled: false },
+          },
+          scopeDecision: "not-navigation",
+          newSurfaceIds: [],
+        },
+      ],
+      surfaces: [
+        {
+          id: "root",
+          triggerPath: null,
+          type: "page",
+          route: "https://example.test",
+          actionablePaths: ["html>body>button:nth-of-type(1)"],
+          inventoryComplete: true,
+          tested: true,
+        },
+      ],
+      summary: {
+        discovered: 1,
+        executed: 1,
+        stoppedBeforeConfirmation: 0,
+        untestedSafe: 0,
+      },
+    }),
+  );
   const hash = crypto.createHash("sha256").update(fs.readFileSync(screenshot)).digest("hex");
   const focusHash = crypto.createHash("sha256").update(fs.readFileSync(focusSequence)).digest("hex");
   const focusVisualHash = crypto
@@ -325,6 +424,10 @@ try {
   const keyboardNavigationHash = crypto
     .createHash("sha256")
     .update(fs.readFileSync(keyboardNavigation))
+    .digest("hex");
+  const interactionCoverageHash = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(interactionCoverage))
     .digest("hex");
   const result = {
     schemaVersion: 1,
@@ -340,7 +443,7 @@ try {
     claims: ["browser-keyboard-tested"],
     scResults: scResults(
       "keyboard-focus",
-      [screenshot, focusSequence, focusVisual, keyboardNavigation],
+      [screenshot, focusSequence, focusVisual, keyboardNavigation, interactionCoverage],
       {
       "2.4.3": { status: "FAIL", details: "Focus order issue observed." },
       },
@@ -374,6 +477,12 @@ try {
         sha256: keyboardNavigationHash,
         producer: "copilot-browser",
       },
+      {
+        type: "interaction-coverage",
+        uri: interactionCoverage,
+        sha256: interactionCoverageHash,
+        producer: "copilot-browser",
+      },
     ],
     findings: [
       {
@@ -390,7 +499,13 @@ try {
         reproducibility: "always",
         testedScope: "Forward Tab navigation on the live surface.",
         evidenceLimitations: [],
-        evidenceUris: [screenshot, focusSequence, focusVisual, keyboardNavigation],
+        evidenceUris: [
+          screenshot,
+          focusSequence,
+          focusVisual,
+          keyboardNavigation,
+          interactionCoverage,
+        ],
       },
     ],
     blockers: [],
@@ -516,6 +631,200 @@ try {
     /keyboard-navigation evidence has an invalid schema/,
   );
   fs.writeFileSync(keyboardNavigation, validKeyboardNavigation);
+  const validInteractionCoverage = fs.readFileSync(interactionCoverage, "utf8");
+  const malformedInteractionCoverage = JSON.parse(validInteractionCoverage);
+  malformedInteractionCoverage.surfaces = [];
+  fs.writeFileSync(
+    interactionCoverage,
+    JSON.stringify(malformedInteractionCoverage),
+  );
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          evidence: result.evidence.map((entry) =>
+            entry.type === "interaction-coverage"
+              ? {
+                  ...entry,
+                  sha256: crypto
+                    .createHash("sha256")
+                    .update(fs.readFileSync(interactionCoverage))
+                    .digest("hex"),
+                }
+              : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /interaction-coverage evidence has an invalid schema/,
+  );
+  const duplicateSurfaceIds = JSON.parse(validInteractionCoverage);
+  duplicateSurfaceIds.surfaces.push({
+    ...duplicateSurfaceIds.surfaces[0],
+    triggerPath: "html>body>button:nth-of-type(1)",
+  });
+  fs.writeFileSync(interactionCoverage, JSON.stringify(duplicateSurfaceIds));
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          evidence: result.evidence.map((entry) =>
+            entry.type === "interaction-coverage"
+              ? {
+                  ...entry,
+                  sha256: crypto
+                    .createHash("sha256")
+                    .update(fs.readFileSync(interactionCoverage))
+                    .digest("hex"),
+                }
+              : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /interaction-coverage evidence has an invalid schema/,
+  );
+  fs.writeFileSync(interactionCoverage, validInteractionCoverage);
+  const fakeNavigation = JSON.parse(validInteractionCoverage);
+  fakeNavigation.controls[0].outcome = "navigation";
+  fakeNavigation.controls[0].scopeDecision = "in-scope";
+  fakeNavigation.controls[0].newSurfaceIds = ["page-2"];
+  fakeNavigation.controls[0].after.url = "https://example.test/";
+  fakeNavigation.surfaces.push({
+    id: "page-2",
+    triggerPath: "html>body>button:nth-of-type(1)",
+    type: "page",
+    route: "https://example.test/",
+    actionablePaths: [],
+    inventoryComplete: true,
+    tested: true,
+  });
+  fs.writeFileSync(interactionCoverage, JSON.stringify(fakeNavigation));
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          evidence: result.evidence.map((entry) =>
+            entry.type === "interaction-coverage"
+              ? {
+                  ...entry,
+                  sha256: crypto
+                    .createHash("sha256")
+                    .update(fs.readFileSync(interactionCoverage))
+                    .digest("hex"),
+                }
+              : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /interaction-coverage evidence has an invalid schema/,
+  );
+  fs.writeFileSync(interactionCoverage, validInteractionCoverage);
+  const executedOutOfScopeNavigation = JSON.parse(
+    validInteractionCoverage,
+  );
+  executedOutOfScopeNavigation.controls.push({
+    path: "html>body>a:nth-of-type(1)",
+    surfaceId: "root",
+    role: "link",
+    name: "External destination",
+    risk: "safe",
+    action: "Enter",
+    status: "executed",
+    outcome: "navigation",
+    before: {
+      url: "https://example.test",
+      focusPath: "html>body>a:nth-of-type(1)",
+      state: { focused: true },
+    },
+    after: {
+      url: "https://outside.example/",
+      focusPath: "html>body",
+      state: { loaded: true },
+    },
+    scopeDecision: "out-of-scope-user-confirmed",
+    newSurfaceIds: [],
+  });
+  executedOutOfScopeNavigation.surfaces[0].actionablePaths.push(
+    "html>body>a:nth-of-type(1)",
+  );
+  executedOutOfScopeNavigation.summary = {
+    discovered: 2,
+    executed: 2,
+    stoppedBeforeConfirmation: 0,
+    untestedSafe: 0,
+  };
+  fs.writeFileSync(
+    interactionCoverage,
+    JSON.stringify(executedOutOfScopeNavigation),
+  );
+  assert.doesNotThrow(() =>
+    validateCategoryResult(
+      {
+        ...result,
+        evidence: result.evidence.map((entry) =>
+          entry.type === "interaction-coverage"
+            ? {
+                ...entry,
+                sha256: crypto
+                  .createHash("sha256")
+                  .update(fs.readFileSync(interactionCoverage))
+                  .digest("hex"),
+              }
+            : entry,
+        ),
+      },
+      runDir,
+      "keyboard-focus",
+    ),
+  );
+  fs.writeFileSync(interactionCoverage, validInteractionCoverage);
+  const skippedWithFakeSurface = JSON.parse(
+    JSON.stringify(executedOutOfScopeNavigation),
+  );
+  skippedWithFakeSurface.surfaces.push({
+    id: "fake-external-surface",
+    triggerPath: "html>body>a:nth-of-type(1)",
+    type: "page",
+    route: "https://outside.example/",
+    actionablePaths: [],
+    inventoryComplete: true,
+    tested: true,
+  });
+  fs.writeFileSync(
+    interactionCoverage,
+    JSON.stringify(skippedWithFakeSurface),
+  );
+  assert.throws(
+    () =>
+      validateCategoryResult(
+        {
+          ...result,
+          evidence: result.evidence.map((entry) =>
+            entry.type === "interaction-coverage"
+              ? {
+                  ...entry,
+                  sha256: crypto
+                    .createHash("sha256")
+                    .update(fs.readFileSync(interactionCoverage))
+                    .digest("hex"),
+                }
+              : entry,
+          ),
+        },
+        runDir,
+        "keyboard-focus",
+      ),
+    /interaction-coverage evidence has an invalid schema/,
+  );
+  fs.writeFileSync(interactionCoverage, validInteractionCoverage);
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
     JSON.stringify(plan()),
@@ -594,8 +903,8 @@ try {
         scResults: [
           {
             wcagSc: "1.3.1",
-            standardRule: "MAS 1.3.1",
-            standardCheck: "authorized-source-consulted",
+            standardRule: "WCAG 2.2 SC 1.3.1",
+            standardCheck: "w3c-recommendation-consulted",
             status: "PASS",
             testMode: "real-at",
             stepsExecuted: ["Open the live page", "Navigate its structure with NVDA"],
@@ -623,8 +932,8 @@ try {
           scResults: [
             {
               wcagSc: "1.3.1",
-              standardRule: "MAS 1.3.1",
-              standardCheck: "authorized-source-consulted",
+              standardRule: "WCAG 2.2 SC 1.3.1",
+              standardCheck: "w3c-recommendation-consulted",
               status: "PASS",
               testMode: "real-at",
               stepsExecuted: ["Open the live page", "Navigate its structure with NVDA"],
@@ -666,8 +975,8 @@ try {
           scResults: [
             {
               wcagSc: "1.3.1",
-              standardRule: "MAS 1.3.1",
-              standardCheck: "authorized-source-consulted",
+              standardRule: "WCAG 2.2 SC 1.3.1",
+              standardCheck: "w3c-recommendation-consulted",
               status: "PASS",
               testMode: "real-at",
               stepsExecuted: ["Open the live page", "Navigate with NVDA and Narrator"],
@@ -687,10 +996,12 @@ try {
     () =>
       validatePlan({
         schemaVersion: 1,
-        standard: "MAS",
-        standardProfile: "web",
+        standard: "WCAG",
+        standardVersion: "2.2",
+        standardLevel: "AA",
         standardAttestation: {
-          sourceType: "authorized-mas-web",
+          sourceType: "w3c-recommendation",
+          sourceUrl: "https://www.w3.org/TR/WCAG22/",
           checkedAt: "2026-09-02T00:00:00.000Z",
           contentEmbedded: false,
         },
@@ -786,8 +1097,8 @@ try {
     scResults: [
       {
         wcagSc: "1.1.1",
-        standardRule: "MAS 1.1.1",
-        standardCheck: "authorized-source-consulted",
+        standardRule: "WCAG 2.2 SC 1.1.1",
+        standardCheck: "w3c-recommendation-consulted",
         status: "NOT_TESTED",
         testMode: "not-tested",
         stepsExecuted: ["Attempt NVDA in the Console session"],
@@ -862,7 +1173,7 @@ try {
     path.join(runDir, "plan.json"),
     JSON.stringify({ schemaVersion: 1, categories: [{ category: "keyboard-focus" }] }),
   );
-  assert.throws(() => aggregateResults(runDir), /does not satisfy the MAS Web explore plan schema/);
+  assert.throws(() => aggregateResults(runDir), /does not satisfy the WCAG 2\.2 A\/AA explore plan schema/);
   fs.writeFileSync(
     path.join(runDir, "plan.json"),
     JSON.stringify({
@@ -879,6 +1190,7 @@ try {
   fs.mkdirSync(dynamicDir, { recursive: true });
   const dynamicEvidence = path.join(dynamicDir, "dialog.png");
   const interactionEvidence = path.join(dynamicDir, "interaction.json");
+  const dynamicCoverage = path.join(dynamicDir, "interaction-coverage.json");
   fs.writeFileSync(dynamicEvidence, "dynamic fixture");
   fs.writeFileSync(
     interactionEvidence,
@@ -890,6 +1202,50 @@ try {
           at: "2026-09-02T00:00:02.000Z",
         },
       ],
+    }),
+  );
+  fs.writeFileSync(
+    dynamicCoverage,
+    JSON.stringify({
+      executedSteps: ["Open the live dialog"],
+      route: "https://example.test",
+      controls: [
+        {
+          path: "html>body>button:nth-of-type(1)",
+          surfaceId: "root",
+          role: "button",
+          name: "Open dialog",
+          risk: "safe",
+          action: "Enter",
+          status: "executed",
+          outcome: "ui-change",
+          before: { url: "https://example.test", focusPath: "html>body>button:nth-of-type(1)", state: { expanded: false } },
+          after: { url: "https://example.test", focusPath: "html>body>dialog:nth-of-type(1)", state: { expanded: true } },
+          scopeDecision: "not-navigation",
+          newSurfaceIds: ["dialog-1"],
+        },
+      ],
+      surfaces: [
+        {
+          id: "root",
+          triggerPath: null,
+          type: "page",
+          route: "https://example.test",
+          actionablePaths: ["html>body>button:nth-of-type(1)"],
+          inventoryComplete: true,
+          tested: true,
+        },
+        {
+          id: "dialog-1",
+          triggerPath: "html>body>button:nth-of-type(1)",
+          type: "dialog",
+          route: "https://example.test",
+          actionablePaths: [],
+          inventoryComplete: true,
+          tested: true,
+        },
+      ],
+      summary: { discovered: 1, executed: 1, stoppedBeforeConfirmation: 0, untestedSafe: 0 },
     }),
   );
   const dynamicHash = crypto
@@ -921,9 +1277,18 @@ try {
         sha256: interactionHash,
         producer: "copilot-browser",
       },
+      {
+        type: "interaction-coverage",
+        uri: dynamicCoverage,
+        sha256: crypto
+          .createHash("sha256")
+          .update(fs.readFileSync(dynamicCoverage))
+          .digest("hex"),
+        producer: "copilot-browser",
+      },
     ],
     claims: ["browser-dynamic-tested"],
-    scResults: scResults("dynamic-content", [dynamicEvidence, interactionEvidence], {
+    scResults: scResults("dynamic-content", [dynamicEvidence, interactionEvidence, dynamicCoverage], {
       "2.4.3": { status: "FAIL", details: "Dynamic focus issue observed." },
     }),
     findings: [
@@ -931,7 +1296,7 @@ try {
         ...result.findings[0],
         id: "VIOLATION-1",
         severity: "Critical",
-        evidenceUris: [dynamicEvidence, interactionEvidence],
+        evidenceUris: [dynamicEvidence, interactionEvidence, dynamicCoverage],
       },
     ],
   };
@@ -941,6 +1306,7 @@ try {
   const structureScreenshot = path.join(structureDir, "structure.png");
   const structureTree = path.join(structureDir, "accessibility-tree.json");
   const structureInteraction = path.join(structureDir, "interaction.json");
+  const structureCoverage = path.join(structureDir, "interaction-coverage.json");
   fs.writeFileSync(structureScreenshot, "structure screenshot");
   fs.writeFileSync(
     structureInteraction,
@@ -952,6 +1318,50 @@ try {
           at: "2026-09-02T00:00:02.000Z",
         },
       ],
+    }),
+  );
+  fs.writeFileSync(
+    structureCoverage,
+    JSON.stringify({
+      executedSteps: ["Activate the representative live control"],
+      route: "https://example.test",
+      controls: [
+        {
+          path: "html>body>main:nth-of-type(1)>button:nth-of-type(1)",
+          surfaceId: "root",
+          role: "button",
+          name: "Expand",
+          risk: "safe",
+          action: "Enter",
+          status: "executed",
+          outcome: "ui-change",
+          before: { url: "https://example.test", focusPath: "html>body>main:nth-of-type(1)>button:nth-of-type(1)", state: { expanded: false } },
+          after: { url: "https://example.test", focusPath: "html>body>main:nth-of-type(1)>button:nth-of-type(1)", state: { expanded: true } },
+          scopeDecision: "not-navigation",
+          newSurfaceIds: ["expanded-region-1"],
+        },
+      ],
+      surfaces: [
+        {
+          id: "root",
+          triggerPath: null,
+          type: "page",
+          route: "https://example.test",
+          actionablePaths: ["html>body>main:nth-of-type(1)>button:nth-of-type(1)"],
+          inventoryComplete: true,
+          tested: true,
+        },
+        {
+          id: "expanded-region-1",
+          triggerPath: "html>body>main:nth-of-type(1)>button:nth-of-type(1)",
+          type: "other",
+          route: "https://example.test",
+          actionablePaths: [],
+          inventoryComplete: true,
+          tested: true,
+        },
+      ],
+      summary: { discovered: 1, executed: 1, stoppedBeforeConfirmation: 0, untestedSafe: 0 },
     }),
   );
   fs.writeFileSync(
@@ -974,9 +1384,9 @@ try {
     claims: ["browser-semantics-tested"],
     scResults: scResults(
       "structure-semantics",
-      [structureScreenshot, structureTree, structureInteraction],
+      [structureScreenshot, structureTree, structureInteraction, structureCoverage],
       {
-      "1.3.1": { status: "PASS", details: "Headings and landmarks were captured." },
+        "1.3.1": { status: "PASS", details: "Headings and landmarks were captured." },
       },
     ),
     evidence: [
@@ -1001,6 +1411,15 @@ try {
           .digest("hex"),
         producer: "copilot-browser",
       },
+      {
+        type: "interaction-coverage",
+        uri: structureCoverage,
+        sha256: crypto
+          .createHash("sha256")
+          .update(fs.readFileSync(structureCoverage))
+          .digest("hex"),
+        producer: "copilot-browser",
+      },
     ],
     findings: [
       {
@@ -1016,7 +1435,12 @@ try {
         reproducibility: "always",
         testedScope: "Live heading, landmark, and representative control transition.",
         evidenceLimitations: [],
-        evidenceUris: [structureScreenshot, structureTree, structureInteraction],
+        evidenceUris: [
+          structureScreenshot,
+          structureTree,
+          structureInteraction,
+          structureCoverage,
+        ],
       },
     ],
   };
@@ -1202,11 +1626,15 @@ try {
   const html = fs.readFileSync(outputHtml, "utf8");
   assert.match(html, /&lt;script&gt;alert/);
   assert.doesNotMatch(html, /<script>alert/);
-  assert.match(html, /does not claim full MAS conformance/);
+  assert.match(html, /does not claim full WCAG conformance/);
   assert.match(html, /class="summary-grid"/);
   assert.match(html, /<link rel="icon" href="data:image\/svg\+xml,/);
-  assert.match(html, /MAS Web Evaluation/);
-  assert.match(html, /<strong>Standard:<\/strong> MAS Web/);
+  assert.match(html, /WCAG 2\.2 A\/AA Evaluation/);
+  assert.match(
+    html,
+    /<strong>Standard:<\/strong> <a href="https:\/\/www\.w3\.org\/TR\/WCAG22\/">WCAG 2\.2<\/a> Level A and AA/,
+  );
+  assert.match(html, /<strong>Standard checked:<\/strong> 2026-09-02T00:00:00\.000Z/);
   assert.match(html, /User impact/);
   assert.match(html, /Reproducibility/);
   assert.match(html, /Tested scope/);
