@@ -21,6 +21,10 @@ assert.deepEqual(
     tools: ["view", "grep", "glob", "shell"],
   },
 );
+assert.deepEqual(
+  parseFrontmatter('---\nname: sample\nmetadata:\n  author: vercel\n  version: "1.0.0"\n---\n'),
+  { name: "sample", metadata: { author: "vercel", version: "1.0.0" } },
+);
 assert.equal(parseFrontmatter("---\nname: sample\ndescription: |\n---\n").description, "");
 assert.throws(
   () => parseFrontmatter("---\nname: sample\ntools:\n  - view\n  [oops\n---\n"),
@@ -109,6 +113,16 @@ try {
         requiredFields: ["name", "description"],
       },
     ],
+    thirdPartySkills: [
+      {
+        directory: "copilot/skills/sample",
+        source: "https://example.com/upstream",
+        revision: "0123456789abcdef0123456789abcdef01234567",
+        version: "1.0.0",
+        license: "MIT",
+        sha256: { "SKILL.md": "0".repeat(64) },
+      },
+    ],
     rolePolicies: [
       { file: "copilot/agents/planner.agent.md", exactTools: ["view"] },
       { file: "copilot/agents/bad.agent.md", exactTools: ["view"] },
@@ -172,6 +186,8 @@ try {
   assert(rules.has("ROLE_EXACT_TOOLS"));
   assert(rules.has("FRONTMATTER_INVALID"));
   assert(rules.has("ROLE_FRONTMATTER_INVALID"));
+  assert(rules.has("THIRD_PARTY_SKILL_HASH"));
+  assert(rules.has("THIRD_PARTY_SKILL_PROVENANCE"));
   assert(rules.has("MCP_TOOL_REFERENCE"));
   assert(rules.has("AGENT_REFERENCE"));
   assert(rules.has("MARKETPLACE_PLUGIN_SET"));

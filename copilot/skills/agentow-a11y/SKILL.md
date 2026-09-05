@@ -186,10 +186,11 @@ After strict reproduction PASS or entry into `unverified-fallback`:
    `Verdict: INCONCLUSIVE` and stop before Step 4; do not implement a heading level.
 4. Read directly applicable routed project instructions.
 5. Identify the smallest source change that addresses the reproduced behavior.
+   For React or Next.js runtime code, read `skills/vercel-react-best-practices/SKILL.md` and its
+   compiled `AGENTS.md`; apply only version-compatible rules relevant to the changed path.
    When using Fluent V9 `useAnnounce()` under a guaranteed ancestor `AriaLiveAnnouncer`, call its
-   provider-backed `announce` function directly. Do not stabilize it through a ref plus an empty-
-   dependency callback unless the component can render without that provider and evidence proves
-   fallback identity causes a real problem.
+   provider-backed `announce` function directly. Fix missing provider or test setup at that
+   boundary instead of adding a feature-local announcer.
 6. Write a short implementation note, not a long general plan:
 
    ```markdown

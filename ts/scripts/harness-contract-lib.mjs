@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import ts from "typescript";
 
 function finding(rule, file, message) {
@@ -40,6 +41,7 @@ export function parseFrontmatter(content) {
 
   const data = {};
   let listKey = null;
+  let mappingKey = null;
   let blockScalarKey = null;
   let blockScalarStyle = null;
   for (const line of lines.slice(1, end)) {
@@ -56,6 +58,26 @@ export function parseFrontmatter(content) {
       continue;
     }
 
+    const nestedFieldMatch = line.match(/^\s+([A-Za-z][A-Za-z0-9_-]*):\s*(.+?)\s*$/);
+    if (nestedFieldMatch && mappingKey) {
+      const [, nestedKey, rawNestedValue] = nestedFieldMatch;
+      if (Array.isArray(data[mappingKey]) && data[mappingKey].length === 0) data[mappingKey] = {};
+      if (Array.isArray(data[mappingKey]) || Object.hasOwn(data[mappingKey], nestedKey)) {
+        throw new Error(`Duplicate or malformed nested frontmatter field: ${mappingKey}.${nestedKey}`);
+      }
+      const nestedValue = rawNestedValue.trim();
+      const nestedQuote = nestedValue[0] === '"' || nestedValue[0] === "'" ? nestedValue[0] : null;
+      if (
+        (nestedQuote && nestedValue.at(-1) !== nestedQuote)
+        || (!nestedQuote && (nestedValue.at(-1) === '"' || nestedValue.at(-1) === "'"))
+      ) {
+        throw new Error(`Unbalanced quoted frontmatter value for '${mappingKey}.${nestedKey}'.`);
+      }
+      data[mappingKey][nestedKey] = nestedQuote ? nestedValue.slice(1, -1) : nestedValue;
+      listKey = null;
+      continue;
+    }
+
     const fieldMatch = line.match(/^([A-Za-z][A-Za-z0-9_-]*):(?:\s*(.*))?$/);
     if (!fieldMatch) {
       throw new Error(`Unsupported or malformed frontmatter line: ${line}`);
@@ -66,6 +88,7 @@ export function parseFrontmatter(content) {
     if (value === "") {
       data[key] = [];
       listKey = key;
+      mappingKey = key;
       blockScalarKey = null;
       blockScalarStyle = null;
     } else {
@@ -98,6 +121,7 @@ export function parseFrontmatter(content) {
         blockScalarStyle = null;
       }
       listKey = null;
+      mappingKey = null;
     }
   }
   return data;
@@ -156,6 +180,46 @@ function validateFrontmatter(root, contract, findings, state) {
           findings.push(finding("FRONTMATTER_NAME_UNIQUE", file, `Name '${metadata.name}' is already declared by ${prior}.`));
         } else {
           names.set(metadata.name, file);
+        }
+      }
+    }
+  }
+}
+
+function validateThirdPartySkills(root, contract, findings, state) {
+  for (const policy of contract.thirdPartySkills ?? []) {
+    const skillPath = `${policy.directory}/SKILL.md`;
+    const metadata = state.frontmatter.get(skillPath);
+    if (!metadata) {
+      findings.push(finding("THIRD_PARTY_SKILL_FRONTMATTER", skillPath, "Pinned skill did not pass frontmatter validation."));
+    } else {
+      if (metadata.license !== policy.license) {
+        findings.push(finding("THIRD_PARTY_SKILL_LICENSE", skillPath, `Expected license '${policy.license}'.`));
+      }
+      if (metadata.metadata?.version !== policy.version) {
+        findings.push(finding("THIRD_PARTY_SKILL_VERSION", skillPath, `Expected metadata version '${policy.version}'.`));
+      }
+    }
+
+    for (const [relativePath, expectedHash] of Object.entries(policy.sha256 ?? {})) {
+      const file = `${policy.directory}/${relativePath}`;
+      const fullPath = path.join(root, file);
+      if (!fs.existsSync(fullPath)) {
+        findings.push(finding("THIRD_PARTY_SKILL_FILE", file, "Pinned upstream file does not exist."));
+        continue;
+      }
+      const actualHash = crypto.createHash("sha256").update(fs.readFileSync(fullPath)).digest("hex");
+      if (actualHash !== expectedHash.toLowerCase()) {
+        findings.push(finding("THIRD_PARTY_SKILL_HASH", file, `Expected SHA-256 '${expectedHash}', found '${actualHash}'.`));
+      }
+    }
+
+    const provenancePath = `${policy.directory}/PROVENANCE.md`;
+    const provenance = readText(root, provenancePath, findings, "THIRD_PARTY_SKILL_PROVENANCE");
+    if (provenance !== null) {
+      for (const marker of [policy.source, policy.revision, policy.version, policy.license]) {
+        if (!provenance.includes(marker)) {
+          findings.push(finding("THIRD_PARTY_SKILL_PROVENANCE", provenancePath, `Missing provenance marker '${marker}'.`));
         }
       }
     }
@@ -726,6 +790,7 @@ export function validateHarnessContract({ repoRoot, contract }) {
   };
   validateForbiddenPaths(root, contract, findings);
   validateFrontmatter(root, contract, findings, state);
+  validateThirdPartySkills(root, contract, findings, state);
   validateRolePolicies(root, contract, findings, state);
   validateMcpTools(root, contract, findings, state);
   validateAgentReferences(root, contract, findings, state);

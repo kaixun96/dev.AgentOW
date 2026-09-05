@@ -56,6 +56,20 @@
       "requiredFields": ["name", "description"]
     }
   ],
+  "thirdPartySkills": [
+    {
+      "directory": "copilot/skills/vercel-react-best-practices",
+      "source": "https://github.com/vercel-labs/agent-skills",
+      "revision": "dc8367e6f91c022d83361f03c3313fa05e848ee5",
+      "version": "1.0.0",
+      "license": "MIT",
+      "sha256": {
+        "SKILL.md": "71ed7794962fa6e803ee83030517b5b93a9f70fbfeb431ec4535c5480a8d8355",
+        "AGENTS.md": "fc93e7421177bbf869cce892bc60a6c83a4517d974bc3bf65c4e2c1e58a6ccf6",
+        "metadata.json": "c4e18bac3290fbe1b471a605867d4df68b03144ea26b8befdbe8f9d8fd124354"
+      }
+    }
+  ],
   "rolePolicies": [
     {
       "file": "copilot/agents/planner.agent.md",
