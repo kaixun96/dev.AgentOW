@@ -445,6 +445,10 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
      or stale. `<alias>` comes from the installed alias tool; do not guess it.
 2. **Write the code** yourself, following the planner's "patterns to follow". Surgical changes only — every line traces to the request.
    - Complete every context compliance item before build.
+  - When writing or refactoring React or Next.js runtime code, read
+    `skills/vercel-react-best-practices/SKILL.md` and its compiled `AGENTS.md`. Apply only guidance
+    supported by the installed framework version and current repository conventions; upstream
+    impact levels prioritize investigation and do not override agentOW scope or review severity.
   - When adding, moving, renaming, or changing a live killswitch, read and follow
     `docs/killswitch-guidance.md` before editing. Record the behavior owner, centralized module
     search, dependency boundary, original rollback expression, and expected diff size. Do not add

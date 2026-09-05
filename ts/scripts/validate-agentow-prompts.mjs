@@ -35,8 +35,10 @@ const commonReviewIssueSnippets = [
   "Gate behavior, not syntax",
   "The helper executing in both states is not itself a rollout defect",
   "For `Promise.all`, decide whether any failure should fail the feature",
-  "Vercel React Best",
+  "skills/vercel-react-best-practices/SKILL.md",
+  "compiled `AGENTS.md` as the performance review baseline",
   "https://agenticskills.io/skills/react-best-practices",
+  "not map to agentOW finding severity",
   "Use `useCallback` only when identity reaches a memoized/expensive child",
   "Keep reactive dependencies explicit",
   "ref during render to evade Hook dependencies",
@@ -570,6 +572,8 @@ const checks = [
       "nearest parent heading, relevant sibling headings, selected level, and",
       "`Verdict: INCONCLUSIVE` and stop before Step 4",
       "exact-scenario AFTER evidence must recapture the same complete live outline",
+      "skills/vercel-react-best-practices/SKILL.md",
+      "compiled `AGENTS.md`",
     ],
   },
   {
@@ -1018,6 +1022,10 @@ const checks = [
       "Apply `skills/ow-review/references/graduation.md` only to gates classified as retired",
       "load only `graduation.md` and stop reference routing",
       "this exclusive scope overrides every subsequent instruction"
+      ,"skills/vercel-react-best-practices/SKILL.md"
+      ,"investigation priority, not agentOW finding severity"
+      ,"Do not fetch this skill from the network"
+      ,"Graduation-only mode remains exclusive"
     ]
   },
   {
@@ -1027,6 +1035,8 @@ const checks = [
       "classify it as `reviewer-spec`",
       "REQUEST_CHANGES with any Critical or Important finding",
       "Draft status and AUTO mode do not bypass the review quality gate.",
+      "skills/vercel-react-best-practices/SKILL.md",
+      "impact levels prioritize investigation",
       "--diff-numstat",
       "sizeAuditStatus: passed-no-regression",
       "analyzer or search for speculative size issues"

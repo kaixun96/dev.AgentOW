@@ -121,14 +121,16 @@ into the helper: KS activated produces the exact old result, while KS not activa
 **Trigger:** changed hooks, render-time work, transient UI editing state, context/theme
 consumption, event-driven updates, or memoization.
 
-For every React or Next.js review, consult [Vercel React Best
-Practices](https://agenticskills.io/skills/react-best-practices) as the performance review baseline.
-Apply its rules by relevance and priority across waterfalls, bundle size, server/client data
-fetching, rerenders, rendering, JavaScript hot paths, and advanced patterns. Verify each candidate
-against the repository's React version, framework, compiler configuration, and measured code path;
-the reference does not justify mechanical findings or Next.js-specific advice in a non-Next.js
-surface. Repository contracts and current official React guidance remain authoritative when a rule
-does not apply or conflicts with the installed stack.
+For every React or Next.js review, read `skills/vercel-react-best-practices/SKILL.md` and its
+compiled `AGENTS.md` as the performance review baseline. This pinned local package comes from
+[Vercel React Best Practices](https://agenticskills.io/skills/react-best-practices); use its local
+`PROVENANCE.md` for the exact upstream revision. Apply its rules by relevance and priority across
+waterfalls, bundle size, server/client data fetching, rerenders, rendering, JavaScript hot paths,
+and advanced patterns. Verify each candidate against the repository's React version, framework,
+compiler configuration, and measured code path; the skill does not justify mechanical findings or
+Next.js-specific advice in a non-Next.js surface. Its impact labels prioritize investigation and do
+not map to agentOW finding severity. Repository contracts and current official React guidance
+remain authoritative when a rule does not apply or conflicts with the installed stack.
 
 - Use `useCallback` only when identity reaches a memoized/expensive child or another
   identity-sensitive API. A local handler does not need stable identity by default.

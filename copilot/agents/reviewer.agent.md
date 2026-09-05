@@ -77,6 +77,12 @@ references by default.
 | `graduation.md` | The diff removes a Flight/KS/experiment, removes its fallback, permanently selects one rollout branch, or replaces rollout-controlled behavior with a fixed value | A new gate, a still-live gate, or an ordinary behavior change that merely mentions a gate |
 
 If no positive trigger matches, load none of these references. A data-provider-only PR loads `common-review-issues.md` only when one of its positive runtime triggers applies, and loads none of the UI-focused references unless it also changes user-facing strings, rendered UX, or interaction/accessibility behavior. Record which optional references were applied, or that none were applicable, in the review evidence.
+For every non-graduation review that changes React or Next.js runtime source, also read
+`skills/vercel-react-best-practices/SKILL.md` and its compiled `AGENTS.md`. Apply only rules relevant
+to the installed React/framework version and changed code path. Treat upstream impact levels as
+investigation priority, not agentOW finding severity; every finding still requires concrete diff
+evidence and the severity rules from the review contract. Do not fetch this skill from the network
+during review. Graduation-only mode remains exclusive and must not load this skill.
 Apply `skills/ow-review/references/graduation.md` only to gates classified as retired by the diff. If a PR
 also adds or changes a live gate, review that gate separately under the normal rollout rules.
 In graduation-only mode, this exclusive scope overrides every subsequent instruction to inspect
