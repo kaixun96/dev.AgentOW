@@ -183,7 +183,13 @@ Re-run `/ow-init` once that finishes.
 | Single task, requirements and plan need confirming | `/agentow` | yes |
 | Single task, context is already sufficient | `/agentow --auto` | none |
 | Runnable proof of concept, quality gates deferred | `/agentow --poc` | optional |
+| Explore a surface for Accessibility issues | `/agentow-a11y-explore-test` | optional |
 | Several independent tasks | `/ow-batch` | none after launch |
+
+`/agentow-a11y-explore-test` is discovery-only: it selects applicable WCAG 2.2 AA categories,
+executes browser-safe categories with bounded isolation, keeps real AT serial on the Windows host,
+and generates deterministic JSON/HTML reports. It can optionally file validated violations to ADO.
+Use `/agentow-a11y` afterward to remediate a concrete finding.
 
 ### Interactive: for filling context gaps
 

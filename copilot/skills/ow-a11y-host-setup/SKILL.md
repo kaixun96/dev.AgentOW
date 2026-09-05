@@ -104,29 +104,68 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
    `remote-audio-active`, or `unresolved`; final readiness still requires an end-to-end harmless
    command played through `CABLE Input` and recognized by Voice Access after RDP disconnect.
 
-8. Install the one-time Console transfer task when unattended recording or Voice Access evidence is
-   required:
+   Voice Access is agent-controlled after first-run setup. Disable automatic startup before any
+   non-Voice-Access AT run:
 
    ```powershell
-   $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$setup`" -Action InstallConsoleTransferTask"
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
+    -Action DisableVoiceAccessAutoStart
+   ```
+
+   This preserves other Accessibility startup entries, removes only `voiceaccess`, sets its
+   `RunningState` to 0, and stops only the discovered Voice Access process IDs. `OpenVoiceAccess`
+   explicitly sets `RunningState` to 1 when a Voice Access scenario needs it.
+
+8. Install the persistent user worker and one-time Console transfer task when real AT, unattended
+   recording, or Voice Access evidence is required:
+
+   ```powershell
+   $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$setup`" -Action InstallSessionAutomation"
    Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList $arguments
    ```
 
-   The task runs as the current interactive user with `InteractiveToken + Highest`. Its fixed
-   service-start and `tscon` logic is embedded in the protected task definition; it does not execute
-   a user-writable elevated script. The owner completes the one-time elevation.
+   This creates an `AtLogOn + Interactive + Limited` user worker with unlimited execution time and
+   a `SYSTEM + ServiceAccount + Highest` transfer task. Both scripts are embedded in their protected
+   task definitions. The worker prevents idle display/system sleep and publishes a five-second
+   readiness heartbeat; the SYSTEM task dynamically selects exactly one
+   `<expected user> + Active + rdp-sxs*` session. It never hard-codes a session ID or treats
+   `tscon` exit 0 as sufficient proof. The owner completes the one-time elevation.
+   `-Action InstallConsoleTransferTask` remains a compatibility alias for this same installation.
 
-9. Before a real audio or desktop-capture run, invoke:
+9. While a visible Windows App/Chromium remote connection owns an authenticated `rdp-sxs` desktop,
+   bootstrap the user worker:
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
+    -Action RunSessionBootstrap
+   ```
+
+   Password, MFA, Windows Hello, and consent surfaces require owner action. Otherwise bootstrap must
+   complete automatically. It requires a fresh heartbeat with `authenticated=true` and
+   `atReady=true`.
+
+10. Before a real-AT, audio, or desktop-capture run, invoke:
 
    ```powershell
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
      -Action RunConsoleTransfer
    ```
 
-   The RDP client disconnects. The command waits for the task's final result and fails if the
-   transfer did not complete.
+   The RDP client disconnects and must not reconnect. The SYSTEM task waits for a heartbeat newer
+   than the transfer and requires `consoleUnlocked=true`, `atReady=true`, `authenticated=true`, and
+   `legacyLockPresent=false`. For screen-reader runs, stop Voice Access first; its presence makes
+   `atReady=false`. A missing user, ambiguous session, `No User exists for *`, stale
+   heartbeat, LockApp/LogonUI state, or task exit failure makes the host unavailable; do not start
+   NVDA or use lock-screen output as evidence.
 
-10. Run the deterministic host validation after the session becomes Console:
+11. Inspect readiness directly when diagnosing the session:
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
+     -Action GetSessionReadiness -OutputPath ".aero\ow-a11y-host-setup-<timestamp>\readiness.json"
+   ```
+
+12. Run the deterministic host validation after the verified readiness heartbeat:
 
    ```powershell
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
@@ -136,12 +175,12 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
    This captures a composed desktop frame and requires non-zero image variance, then plays a fixed
    tone into `CABLE Input`, records `CABLE Output`, and requires non-silent RMS and peak values.
 
-11. Re-run `Probe` after every restart or manual setup step. Report:
+13. Re-run `Probe` after every restart or manual setup step. Report:
    - installed versions and command paths;
    - persisted VB-CABLE render/capture endpoints and whether the current session exposes them;
    - personal evaluator script/profile presence and authentication check result;
    - Voice Access executable and process state;
-   - session type (`Console`, `RDP`, or unknown);
+   - session type and fresh worker readiness fields;
    - which scenario groups are ready;
    - exact remaining setup or restart steps.
 

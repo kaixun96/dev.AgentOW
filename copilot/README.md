@@ -21,6 +21,7 @@ initialization changes plugins or settings. If Azure authentication is missing, 
 
 - `/agentow` runs the STANDARD or POC feature pipeline.
 - `/agentow-a11y` runs isolated evidence-first Accessibility remediation.
+- `/agentow-a11y-explore-test` discovers WCAG issues and produces deterministic reports.
 - `/ow-a11y-host-setup` prepares a Windows evaluator for real-AT and audio evidence.
 - `/ow-batch` executes tasks serially with durable checkpoints.
 - `/ow-review` reviews without editing or shipping.

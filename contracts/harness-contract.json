@@ -90,6 +90,14 @@
     {
       "file": "copilot/agents/a11y-evaluator.agent.md",
       "exactTools": ["view", "grep", "glob", "shell"]
+    },
+    {
+      "file": "copilot/agents/a11y-explore-planner.agent.md",
+      "exactTools": ["view", "grep", "glob"]
+    },
+    {
+      "file": "copilot/agents/a11y-explore-category-tester.agent.md",
+      "exactTools": ["view", "grep", "glob", "shell"]
     }
   ],
   "mcpTools": {

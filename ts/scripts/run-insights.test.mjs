@@ -6,6 +6,9 @@ import { spawnSync } from 'node:child_process';
 import { sendEmail } from '../../tools/run-insights.mjs';
 
 const repoRoot = path.resolve(new URL('../..', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1'));
+const agentowVersion = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, 'copilot', '.claude-plugin', 'plugin.json'), 'utf8')
+).version;
 const runStateTool = path.join(repoRoot, 'tools', 'run-state.mjs');
 const insightsTool = path.join(repoRoot, 'tools', 'run-insights.mjs');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentow-run-insights-'));
@@ -281,7 +284,7 @@ assert.equal(report.blockers[0].durationMs, 900_000);
 assert.equal(report.blockers[0].attemptCount, 2);
 assert.equal(report.blockers[0].attempts[1].outcome, 'succeeded');
 assert.equal(report.blockers[0].automatedResolution, true);
-assert.equal(report.run.agentowVersion, '0.1.41');
+assert.equal(report.run.agentowVersion, agentowVersion);
 assert.equal(report.metrics.evaluationCycles, 1);
 assert.equal(report.privacy.containsPromptText, false);
 for (const forbidden of [

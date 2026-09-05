@@ -16,9 +16,18 @@ const scriptPath = path.join(
   "scripts",
   "setup-windows-a11y.ps1",
 );
+const sessionContractPath = path.join(
+  repoRoot,
+  "copilot",
+  "skills",
+  "ow-a11y-host-setup",
+  "scripts",
+  "session-readiness-contract.ps1",
+);
 
 const skill = fs.readFileSync(skillPath, "utf8");
 const script = fs.readFileSync(scriptPath, "utf8");
+const sessionContract = fs.readFileSync(sessionContractPath, "utf8");
 
 for (const action of [
   "Probe",
@@ -28,6 +37,10 @@ for (const action of [
   "StageVbCable",
   "LaunchVbCableInstaller",
   "OpenVoiceAccess",
+  "DisableVoiceAccessAutoStart",
+  "InstallSessionAutomation",
+  "RunSessionBootstrap",
+  "GetSessionReadiness",
   "InstallConsoleTransferTask",
   "RunConsoleTransfer",
   "ValidateHost",
@@ -44,6 +57,30 @@ assert.match(script, /\$env:CODESPACES -eq 'true'/);
 assert.match(script, /\$env:CODESPACE_NAME/);
 assert.match(skill, /not supported in a Codespace/);
 assert.match(script, /-LogonType Interactive/);
+assert.match(script, /-RunLevel Limited/);
+assert.match(script, /-UserId 'SYSTEM'/);
+assert.match(script, /-LogonType ServiceAccount/);
+assert.match(script, /New-ScheduledTaskTrigger -AtLogOn/);
+assert.match(script, /SetThreadExecutionState\(`\$executionFlags\)/);
+assert.match(script, /'rdp-sxs'/);
+assert.match(script, /consoleUnlocked/);
+assert.match(script, /legacyLockPresent/);
+assert.match(script, /Get-Process consent/);
+assert.match(script, /CredentialUIBroker/);
+assert.match(script, /OpenInputDesktop/);
+assert.match(script, /\$inputDesktop -ne 'Default'/);
+assert.match(script, /Get-Process VoiceAccess, VoiceAccessHost/);
+assert.match(script, /function Disable-VoiceAccessAutoStart/);
+assert.match(script, /Stop-Process -Id \$process\.Id/);
+assert.match(skill, /Voice Access is agent-controlled/);
+assert.match(sessionContract, /function Select-AgentOWActiveRdpSession/);
+assert.match(sessionContract, /function Test-AgentOWReadinessHeartbeat/);
+assert.match(script, /atReady = `\$nvda -and `\$edge -and `\$voiceAccess\.Count -eq 0/);
+assert.match(script, /\$template = \$template\.Replace\('__EXPECTED_USER__'/);
+assert.match(sessionContract, /\[int\]\$Heartbeat\.sessionId -eq \$ExpectedSessionId/);
+assert.match(sessionContract, /\$Heartbeat\.sessionName -match '\^rdp-sxs'/);
+assert.match(sessionContract, /\$heartbeatAt -gt \$NotBefore/);
+assert.match(skill, /must not reconnect/);
 assert.match(script, /-EncodedCommand \$encodedTask/);
 assert.match(script, /Get-Process explorer/);
 assert.match(script, /showSpeechViewerAtStartup = True/);
@@ -62,6 +99,59 @@ assert.match(script, /LastTaskResult -ne 0/);
 assert.doesNotMatch(script, /Restart-Computer/);
 
 if (process.platform === "win32") {
+  const contractCommand = `
+    . '${sessionContractPath.replaceAll("'", "''")}';
+    $lines = @(
+      '>rongqizhou rdp-sxs260519750#0 2 Active . 9/2/2026 5:11 PM',
+      'other rdp-sxs260519750#1 3 Active . 9/2/2026 5:12 PM'
+    );
+    $selected = Select-AgentOWActiveRdpSession -Lines $lines -ExpectedUser 'rongqizhou';
+    if ($selected.sessionId -ne 2) { throw 'wrong session selected' }
+    $now = [DateTimeOffset]::UtcNow;
+    $heartbeat = [pscustomobject]@{
+      heartbeatAt = $now.ToString('o'); user = 'rongqizhou'; sessionId = 2;
+      sessionName = 'rdp-sxs260519750#0'; sessionState = 'Active';
+      consoleUnlocked = $false; atReady = $true; authenticated = $true;
+      legacyLockPresent = $false; secureSurfacePresent = $false;
+      voiceAccessStopped = $true
+    };
+    if (-not (Test-AgentOWReadinessHeartbeat -Heartbeat $heartbeat -ExpectedUser 'rongqizhou' -ExpectedSessionId 2 -Phase Bootstrap -NotBefore $now.AddSeconds(-1))) {
+      throw 'valid bootstrap heartbeat rejected'
+    }
+    $heartbeat.sessionId = 9;
+    if (Test-AgentOWReadinessHeartbeat -Heartbeat $heartbeat -ExpectedUser 'rongqizhou' -ExpectedSessionId 2 -Phase Bootstrap -NotBefore $now.AddSeconds(-1)) {
+      throw 'wrong-session heartbeat accepted'
+    }
+    $heartbeat.sessionId = 2; $heartbeat.sessionName = 'console'; $heartbeat.consoleUnlocked = $true;
+    if (-not (Test-AgentOWReadinessHeartbeat -Heartbeat $heartbeat -ExpectedUser 'rongqizhou' -ExpectedSessionId 2 -Phase Console -NotBefore $now.AddSeconds(-1))) {
+      throw 'valid Console heartbeat rejected'
+    }
+    $heartbeat.voiceAccessStopped = $false;
+    if (Test-AgentOWReadinessHeartbeat -Heartbeat $heartbeat -ExpectedUser 'rongqizhou' -ExpectedSessionId 2 -Phase Console -NotBefore $now.AddSeconds(-1)) {
+      throw 'Voice Access heartbeat accepted'
+    }
+  `;
+  execFileSync(
+    "powershell.exe",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", contractCommand],
+    { encoding: "utf8", stdio: "pipe" },
+  );
+  assert.throws(
+    () =>
+      execFileSync(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          `. '${sessionContractPath.replaceAll("'", "''")}'; Select-AgentOWActiveRdpSession -Lines @('>rongqizhou rdp-sxs0 2 Active', 'rongqizhou rdp-sxs1 3 Active') -ExpectedUser 'rongqizhou'`,
+        ],
+        { encoding: "utf8", stdio: "pipe" },
+      ),
+    (error) => error.status !== 0,
+  );
+
   const outputPath = path.join(os.tmpdir(), `agentow-a11y-host-${process.pid}.json`);
   try {
     execFileSync(

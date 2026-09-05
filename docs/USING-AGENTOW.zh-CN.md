@@ -181,7 +181,12 @@ CODESPACES=false az login
 | 单任务、需要确认需求和计划 | `/agentow` | 有 |
 | 单任务、Context 已充分 | `/agentow --auto` | 零交互 |
 | 快速生成可运行 POC、暂缓质量门槛 | `/agentow --poc` | 可选 |
+| 探索页面中的 Accessibility 问题 | `/agentow-a11y-explore-test` | 可选 |
 | 多个独立任务 | `/ow-batch` | 启动后零交互 |
+
+`/agentow-a11y-explore-test` 只负责发现问题：选择适用的 WCAG 2.2 AA 类别，对可隔离的浏览器
+类别做有界执行，把真实 AT 串行保留在 Windows host，并生成确定性的 JSON/HTML 报告。它可以
+选择性地把已验证的 violation 建成 ADO Bug。发现具体问题后使用 `/agentow-a11y` 进入修复流程。
 
 ### Interactive：用于补齐 Context
 
