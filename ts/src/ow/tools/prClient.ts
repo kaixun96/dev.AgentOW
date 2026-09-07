@@ -145,6 +145,11 @@ export class PrClient {
     } catch {
       throw new Error(`Failed to parse az output as JSON:\n${prResult.stdout}`);
     }
+    if (parsed.isDraft !== true) {
+      throw new Error(
+        `Azure DevOps created a non-Draft PR despite --draft true:\n${prResult.stdout}`
+      );
+    }
 
     const prId = parsed.pullRequestId as number;
     const prUrl = `${ADO_ORG}/${ADO_PROJECT}/_git/odsp-web/pullrequest/${prId}`;
@@ -178,8 +183,20 @@ export class PrClient {
       throw new Error(`az repos pr update failed (exit ${result.exitCode}):\n${result.stderr}`);
     }
 
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(result.stdout);
+    } catch {
+      throw new Error(`Failed to parse az update output as JSON:\n${result.stdout}`);
+    }
+    if (parsed.isDraft !== true) {
+      throw new Error(
+        `Azure DevOps returned a non-Draft PR despite --draft true:\n${result.stdout}`
+      );
+    }
+
     const prUrl = `${ADO_ORG}/${ADO_PROJECT}/_git/odsp-web/pullrequest/${input.prId}`;
     this.logger?.info("pr-update", `PR #${input.prId} updated: ${prUrl}`);
-    return { prId: input.prId, prUrl, draft };
+    return { prId: input.prId, prUrl, draft: parsed.isDraft };
   }
 }

@@ -173,7 +173,8 @@ The following numbered flow applies only to the non-A11y route:
 3. Use a new agentOW `.aero/<session>` directory for this task.
 4. Pass the batch `capabilities.json` to the task planner and downstream pipeline.
 5. Run in AUTO mode: record assumptions instead of asking the user.
-6. Complete or update the task's draft PR.
+6. Complete or update the task's Draft PR, then query live ADO and require `isDraft=true`. Never
+   auto-promote it to Ready for review.
 7. Do not end the batch after obtaining the PR URL. Continue to result capture and checkpointing.
 
 Write concise task-level state transitions to:
