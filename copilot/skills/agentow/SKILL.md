@@ -842,7 +842,10 @@ No-update, patch-only, disabled, dirty-worktree, read-only, auth, or conflict ou
 
 1. **Push** the branch. For a new run, create the draft PR with `ow-pr-create`. When promoting an
    existing POC, call `ow-pr-update` with its existing `prId`; never call `ow-pr-create`, never create
-   a second PR, and keep it draft. Use the title from the plan spec and a Summary + Changes
+   a second PR, and keep it draft. After every create or update, query the live ADO PR and require
+   `isDraft=true`; do not trust the requested flag, command exit code, or tool response alone.
+   AgentOW must never auto-promote a PR to Ready for review. A non-Draft result blocks completion
+   until the same PR is restored to Draft and live ADO confirms it. Use the title from the plan spec and a Summary + Changes
    description (no generic auto-generated "Testing" section). POC titles start with `[POC]` and the
    first description block must be:
 

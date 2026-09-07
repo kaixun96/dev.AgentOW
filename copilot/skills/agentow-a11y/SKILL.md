@@ -303,6 +303,10 @@ Create the draft PR after review passes. Strict mode also requires verification 
 may create a draft PR with no real-AT PASS only when all bounded attempts, blockers, supporting
 checks, and residual risks are recorded. Prefix the validation section heading with
 `UNVERIFIED A11Y` and do not present the PR as accessibility-validated or ready for final approval.
+Immediately query the live ADO PR after every create or update and require `isDraft=true`; do not
+trust the requested flag, command exit code, or tool response alone. The PR must remain Draft for
+human review when the workflow finishes. AgentOW must never auto-promote it to Ready for review,
+and a non-Draft result blocks completion until the same PR is restored to Draft and re-verified.
 
 The PR description must stand alone and include:
 

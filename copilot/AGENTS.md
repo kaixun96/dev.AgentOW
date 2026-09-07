@@ -2,7 +2,7 @@ If you were dispatched as a subagent to execute a specific task, skip this guida
 
 # agentOW (Copilot CLI) — odsp-web feature pipeline
 
-Take a feature/bug description and produce a draft PR on Azure DevOps for the odsp-web monorepo, inside a GitHub Codespace.
+Take a feature/bug description and produce a Draft PR on Azure DevOps for the odsp-web monorepo, inside a GitHub Codespace. Every created or updated PR must remain Draft for human review. Verify live ADO reports `isDraft=true`; never auto-promote it to Ready for review.
 
 ## Architecture: you are the implementer
 
