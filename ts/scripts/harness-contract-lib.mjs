@@ -511,6 +511,7 @@ function validateDraftOnlyPrClient(sourceFile, policy, findings) {
     let validDraftArguments = 0;
     let invalidArgumentMutation = false;
     let expectedExecution = false;
+    let verifiedDraftResponse = false;
     visit(method.body, (node) => {
       if (
         ts.isVariableDeclaration(node)
@@ -627,6 +628,20 @@ function validateDraftOnlyPrClient(sourceFile, policy, findings) {
               expectedExecution = true;
             }
           }
+          if (
+            ts.isIfStatement(node)
+            && ts.isBinaryExpression(node.expression)
+            && node.expression.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+            && ts.isPropertyAccessExpression(node.expression.left)
+            && node.expression.left.name.text === "isDraft"
+            && node.expression.right.kind === ts.SyntaxKind.TrueKeyword
+          ) {
+            let throwsOnMismatch = false;
+            visit(node.thenStatement, (child) => {
+              if (ts.isThrowStatement(child)) throwsOnMismatch = true;
+            });
+            if (throwsOnMismatch) verifiedDraftResponse = true;
+          }
     });
     if (draftDeclarations !== 1) {
       findings.push(finding(policy.id, policy.file, `Method '${methodName}' must define exactly one draft constant.`));
@@ -645,6 +660,9 @@ function validateDraftOnlyPrClient(sourceFile, policy, findings) {
     }
     if (!expectedExecution) {
       findings.push(finding(policy.id, policy.file, `Method '${methodName}' does not execute the validated argument path.`));
+    }
+    if (!verifiedDraftResponse) {
+      findings.push(finding(policy.id, policy.file, `Method '${methodName}' does not fail closed when ADO returns isDraft != true.`));
     }
   }
 }

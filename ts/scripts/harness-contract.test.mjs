@@ -182,7 +182,8 @@ try {
     ],
     sourcePolicies: [{ id: "TEST_POLICY", file: "policy.txt", forbidden: ["caller-controlled"] }],
   };
-  const rules = new Set(validateHarnessContract({ repoRoot: fixtureRoot, contract: fixtureContract }).map((item) => item.rule));
+  const fixtureFindings = validateHarnessContract({ repoRoot: fixtureRoot, contract: fixtureContract });
+  const rules = new Set(fixtureFindings.map((item) => item.rule));
   assert(rules.has("ROLE_EXACT_TOOLS"));
   assert(rules.has("FRONTMATTER_INVALID"));
   assert(rules.has("ROLE_FRONTMATTER_INVALID"));
@@ -195,6 +196,9 @@ try {
   assert(rules.has("TEST_COMMAND"));
   assert(!rules.has("TEST_VALID_COMMAND"));
   assert(rules.has("TEST_DRAFT"));
+  assert(fixtureFindings.some(
+    (item) => item.rule === "TEST_DRAFT" && item.message.includes("does not fail closed"),
+  ));
   assert(rules.has("TEST_COMMENT"));
   assert(rules.has("TEST_PROPERTY"));
   assert(rules.has("TEST_POLICY"));

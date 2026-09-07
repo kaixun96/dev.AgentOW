@@ -374,7 +374,7 @@ export function registerOwTools(
 
   // ── 15. ow-pr-create ─────────────────────────────────────────────────────
   registerMcpTool(server, "ow-pr-create", {
-    description: "Push current branch to origin and create a draft PR on Azure DevOps. Branch must match 'user/<alias>/<feature>' pattern. Returns PR URL.",
+    description: "Push current branch to origin, create a Draft PR on Azure DevOps, and fail unless ADO confirms isDraft=true. Branch must match 'user/<alias>/<feature>' pattern. Returns PR URL.",
     inputSchema: {
       title: z.string().describe("PR title (keep under 70 chars)"),
       description: z.string().describe("PR body in markdown"),
@@ -393,7 +393,7 @@ export function registerOwTools(
 
   // ── 16. ow-pr-update ─────────────────────────────────────────────────────
   registerMcpTool(server, "ow-pr-update", {
-    description: "Update an existing Azure DevOps PR title, description, and draft state. Use this when promoting a POC so the same PR is retained.",
+    description: "Update an existing Azure DevOps PR title and description while forcing Draft state, and fail unless ADO confirms isDraft=true. Use this when promoting a POC so the same PR is retained.",
     inputSchema: {
       prId: z.number().describe("Pull request ID to update"),
       title: z.string().describe("Replacement PR title"),
