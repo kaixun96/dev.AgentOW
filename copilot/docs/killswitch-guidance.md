@@ -10,9 +10,12 @@ behavior. It supplements the rollout-isolation rules in
   new behavior.
 - Evaluate the killswitch at call time. Do not cache it at module scope, in static state, or during
   early chunk initialization.
-- Use the canonical lowercase GUID and the owning package's rollout abstraction.
-- Name the wrapper for the fix or behavior being rolled back, not as though activating the
-  killswitch enables the new behavior. The comment must say that activation rolls back the change.
+- Check GUID case: use uppercase for most projects and lowercase for `sp-client` only.
+- Before adding a KS in the odsp-web repository, read the repository-relative canonical skill at
+  `.ai/killswitches/skills/killswitches/SKILL.md` and apply every applicable killswitch rule in it,
+  including but not limited to project/folder-specific format and workflow. If that exact path is
+  absent, search only `.ai/killswitches/**/SKILL.md` for its replacement, record the resolved path,
+  and read it before proceeding. Do not silently skip the skill or invent its requirements.
 
 ## Ownership decision tree
 
@@ -69,6 +72,7 @@ lines or creates a public API change, stop and simplify.
 Before editing, record:
 
 - behavior-owning package and decision site;
+- resolved killswitch skill path (normally `.ai/killswitches/skills/killswitches/SKILL.md`);
 - every centralized killswitch module found in that package and host;
 - whether the owning package already imports a rollout SDK;
 - why host injection is necessary, if proposed;
@@ -109,8 +113,8 @@ Request changes when any of these are evidenced:
 - the value is cached before reliable rollout initialization;
 - a synthetic callback-absent state, unnecessary helper, duplicated state/tree/handler, or broad
   churn replaces a local two-state gate;
-- the raw GUID is duplicated, non-lowercase, or attributed with a tool name instead of an owner
-  alias;
+- the GUID uses the wrong case for its project, or the implementation violates the resolved
+  killswitch skill;
 - meaningful new/rollback behavior lacks consumer-level tests.
 
 These are maintainability and rollback-safety defects, not optional style preferences.

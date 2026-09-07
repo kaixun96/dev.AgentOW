@@ -324,9 +324,12 @@ Style preference and speculative redesign are not findings.
 
 Repository instruction compliance does not automatically imply `Important`. Verify the cited source exactly. A harmless metadata or comment-format mismatch is `Minor`/`Nit:` at most; it is `Important` only when concrete evidence shows a required tool, runtime/rollback operation, contract, or consumer would be affected. Compliant code receives no finding.
 
-Exception: an uppercase or mixed-case KS GUID for a KS that gates SP-Client behavior is `Important`, including KS implementations in `odsp-common`, because the activation lookup does not match the GUID used by product code and the KS cannot activate its fallback behavior. A Debug Link error is only a symptom of that production rollout-control failure.
-
-KS method comment, date, alias, and description conventions are documentation-only; report deviations only as `Minor`/`Nit:` and never let them block the PR.
+For an added KS, read `.ai/killswitches/skills/killswitches/SKILL.md` from the odsp-web review tree
+and apply every applicable killswitch rule in that skill. Do not limit its use to format checks. If
+the canonical path is absent, search only
+`.ai/killswitches/**/SKILL.md`, record and read the resolved replacement, and report the missing
+guidance if no replacement exists; never silently skip this step or invent requirements. Check GUID
+case explicitly: uppercase for most projects and lowercase for `sp-client` only.
 
 Default rule: Any Critical or Important → `REQUEST_CHANGES`.
 - Any Critical or Important outside `reviewability` → `REQUEST_CHANGES`.
