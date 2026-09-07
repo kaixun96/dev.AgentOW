@@ -34,9 +34,9 @@ echo "[$(date +%H:%M:%S)] 🚀 Session started: review-${reviewTs}" >> "$session
 ## Step 2a: PR mode — resolve and materialize the PR head
 
 ```bash
-az repos pr show --id <prId> \
-  --org https://dev.azure.com/onedrive --project ODSP-Web \
-  --output json > "$sessionDir/pr.json"
+node "${CLAUDE_PLUGIN_ROOT}/tools/ado-pr-show.mjs" \
+  --id <prId> --out "$sessionDir/pr.json" \
+  --org https://dev.azure.com/onedrive --project ODSP-Web
 ```
 
 If `az` is missing or unauthenticated, stop and tell the user to run `CODESPACES=false az login` (plus `az extension add --name azure-devops`) in this Codespace. Do not silently fall back to reviewing the current branch when a PR was requested.
@@ -47,10 +47,14 @@ Read `pr.json` and take `sourceRefName`, `targetRefName`, `lastMergeSourceCommit
 node -e 'const p=process.argv[1],fs=require("fs");const pr=JSON.parse(fs.readFileSync(p+"/pr.json","utf8"));fs.writeFileSync(p+"/pr-description.md",(pr.description??"").toString())' "$sessionDir"
 ```
 
-Fetch both refs, then decide where to review:
+Refresh both refs through the short-lived fetch cache, then decide where to review. The cache is
+scoped to this checkout's Git object store, verifies the exact PR head, and retries throttled
+fetches. Do not run another fetch for these refs during this review:
 
 ```bash
-git -C /workspaces/odsp-web fetch origin <sourceBranch> <targetBranch>
+node "${CLAUDE_PLUGIN_ROOT}/tools/cached-fetch.mjs" \
+  --repo /workspaces/odsp-web --ref <sourceBranch> --ref <targetBranch> \
+  --ensure-commit <headSha>
 git -C /workspaces/odsp-web rev-parse HEAD
 git -C /workspaces/odsp-web status --porcelain
 ```
@@ -79,7 +83,7 @@ echo "[$(date +%H:%M:%S)] 🔎 Review target — PR <prId> (<sourceBranch> → <
 reviewRoot=/workspaces/odsp-web
 git -C "$reviewRoot" rev-parse --abbrev-ref HEAD
 git -C "$reviewRoot" status --porcelain
-git -C "$reviewRoot" fetch origin main
+node "${CLAUDE_PLUGIN_ROOT}/tools/cached-fetch.mjs" --repo "$reviewRoot" --ref main
 ```
 
 Set `baseRef=origin/main` unless the user passed `--base`. Stop if the current branch is `main` or the branch has no unique commits — there is nothing to review. If the worktree is dirty, tell the user that only committed work is reviewed, then continue.

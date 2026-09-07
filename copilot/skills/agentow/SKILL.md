@@ -438,8 +438,10 @@ Append `[HH:MM:SS] 🔨 Implementation started (cycle N)` before editing.
      from the latest implementation/final/checkpoint artifact or recorded PR. If the current branch
      differs, fetch it when necessary and check it out without `-B`; verify it matches the recorded
      run before editing. Never reset or recreate an existing same-run branch.
-   - For a new run on `main`, fetch `origin/main`, create `user/<alias>/<feature>` from that exact
-     ref with `ow-git`, then verify `git merge-base origin/main HEAD` equals
+   - For a new run on `main`, refresh `origin/main` with
+     `node "${CLAUDE_PLUGIN_ROOT}/tools/cached-fetch.mjs" --repo <repoRoot> --ref main`. Reuse a
+     fresh cache hit instead of fetching again. Create `user/<alias>/<feature>` from that exact ref
+     with `ow-git`, then verify `git merge-base origin/main HEAD` equals
      `git rev-parse origin/main` before the first commit.
    - After changing the branch base, run `rush install` once when the Rush install state is missing
      or stale. `<alias>` comes from the installed alias tool; do not guess it.

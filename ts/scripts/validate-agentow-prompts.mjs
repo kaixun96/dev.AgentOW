@@ -536,6 +536,8 @@ const checks = [
   {
     file: "copilot/skills/agentow/SKILL.md",
     snippets: [
+      "tools/cached-fetch.mjs",
+      "fresh cache hit instead of fetching again",
       "`git merge-base origin/main HEAD` equals",
       "`git rev-parse origin/main` before the first commit",
       "For a resumed run, requirement revision, or POC promotion",
@@ -548,6 +550,7 @@ const checks = [
   {
     file: "copilot/skills/agentow-a11y/SKILL.md",
     snippets: [
+      "tools/cached-fetch.mjs",
       "Make up to three meaningful attempts to acquire and validate real-AT reproduction evidence",
       "capability discovery exhausts the available routes immediately",
       "validationMode: \"unverified-fallback\"",
@@ -618,6 +621,8 @@ const checks = [
   {
     file: "copilot/skills/ow-batch/SKILL.md",
     snippets: [
+      "tools/cached-fetch.mjs",
+      "Do not run `git pull`: its implicit fetch duplicates",
       "exhaust the available real-AT routes or at most three",
       "explicitly labeled `unverified-fallback`",
       "A demonstrated unresolved product",
@@ -626,6 +631,9 @@ const checks = [
   {
     file: "copilot/skills/ow-review/SKILL.md",
     snippets: [
+      "tools/ado-pr-show.mjs",
+      "tools/cached-fetch.mjs",
+      "verifies the exact PR head",
       "Before reading any review contract, inspect the immutable diff and classify it",
       "`reviewPolicy=graduation-only`",
       "Do not read",
@@ -927,9 +935,12 @@ const checks = [
       "Runtime behavior and styling changes must be protected by a flight or killswitch.",
       "Activated means old/fallback behavior; not activated means new behavior.",
       "common-review-issues.md",
-      "call-time evaluation requirement",
-      "`08/11/2026` already satisfies `MM/DD/YYYY`",
-      "A harmless comment-format deviation is at most a `Minor` finding prefixed `Nit:`",
+      "call-time evaluation",
+      "Check GUID case: use lowercase for `sp-client`; most other projects use uppercase",
+      "`.ai/killswitches/skills/killswitches/SKILL.md`",
+      "apply every applicable killswitch rule in it, not only its format guidance",
+      "`.ai/killswitches/**/SKILL.md`",
+      "do not silently skip the skill or invent its requirements",
       "bundle delta of 2 KB or more is a review trigger",
       "server-side filtering, transport pagination/continuation, and bounded viewport rendering",
       "typographyStyles",

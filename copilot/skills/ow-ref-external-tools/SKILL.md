@@ -10,10 +10,13 @@ Use installed ODSP-Web tools instead of reimplementing them. Tool availability c
 
 ## Baseline tools
 
-- `odsp-generate-guid`: generate UUIDs; lowercase for `sp-client`, uppercase for ODSP
-  common/next/service-worker conventions.
+- `odsp-generate-guid`: generate UUIDs; use uppercase for most projects and lowercase for
+  `sp-client` only.
 - `odsp-get-user-alias` and `odsp-get-timestamp`: obtain attribution values instead of guessing.
-- `odsp-add-killswitch-*`: select the blueprint for the behavior-owning package.
+- Before using `odsp-add-killswitch-*`, read the odsp-web repository skill at
+  `.ai/killswitches/skills/killswitches/SKILL.md` and apply every applicable killswitch rule in it,
+  not only format guidance. If absent, resolve its replacement only under
+  `.ai/killswitches/**/SKILL.md`; never silently skip this prerequisite.
 - `odsp-remove-killswitch-sp-client`: graduation guidance for SP-Client.
 
 ## Bluebird

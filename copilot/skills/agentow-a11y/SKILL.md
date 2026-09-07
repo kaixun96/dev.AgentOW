@@ -47,7 +47,8 @@ On an unsupported host, run only host-supported browser/static checks and mark W
 
 1. Resolve `repoRoot`: use `/workspaces/odsp-web` in a Codespace; otherwise use the current odsp-web
    Git worktree root. Confirm it is clean. Stop on pre-existing changes; never auto-stash them.
-2. Fetch `origin/main`, then unconditionally run
+2. Refresh `origin/main` once with
+   `node "${CLAUDE_PLUGIN_ROOT}/tools/cached-fetch.mjs" --repo "<repoRoot>" --ref main`, then unconditionally run
    `git -C "<repoRoot>" switch --detach origin/main`. Reproduction must not be attached to `main`
    or any other branch.
 3. Create:
