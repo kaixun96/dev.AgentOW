@@ -1,12 +1,17 @@
 ---
 name: ow-a11y-host-setup
-description: "Prepare a Windows evaluator host for agentOW Accessibility testing. Installs scriptable dependencies, stages and launches the signed VB-CABLE driver installer, opens Voice Access first-run setup, and writes a capability report. Use for ow-a11y-host-setup, configure A11Y host, install VB-CABLE, configure Voice Access, or prepare Windows AT."
+description: "Prepare or recover a Windows evaluator host for agentOW Accessibility testing. Uses an approved Windows App controller to restore a disconnected session before Console handoff, installs missing scriptable dependencies, and checks real desktop/audio readiness. Use for ow-a11y-host-setup, configure A11Y host, recover disconnected DevBox, install VB-CABLE, configure Voice Access, or prepare Windows AT."
 ---
 
 # Prepare a Windows Accessibility evaluator host
 
-This command performs one-time host setup only. It does not run an Accessibility test, modify
+This command performs one-time host setup or recovery of an already-provisioned session. It does not run an Accessibility test, modify
 product code, create a branch, or create a pull request.
+
+For a disconnected, locked, or non-interactive desktop, read
+`references/unattended-session-recovery.md` before asking the owner to reconnect. Missing Windows
+App connection recovery is not proof that every run requires manual desktop access. The controller
+restores the connection; the worker, bootstrap, and `tscon` do not unlock Windows.
 
 The setup script is:
 
@@ -36,6 +41,10 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
      -Action Probe -OutputPath $capabilities
    ```
+
+   If prerequisites are already installed but the session is unavailable, use the recovery procedure
+   rather than repeating installation or sending native input to a locked desktop. Only genuine
+   authentication, consent, or one-time provisioning requirements require owner intervention.
 
 4. If any scriptable prerequisite is missing, run:
 
@@ -132,8 +141,15 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
    `tscon` exit 0 as sufficient proof. The owner completes the one-time elevation.
    `-Action InstallConsoleTransferTask` remains a compatibility alias for this same installation.
 
-9. While a visible Windows App/Chromium remote connection owns an authenticated `rdp-sxs` desktop,
-   bootstrap the user worker:
+9. Establish or recover an interactive session using the approved controller and visible Chromium
+   Windows App profile. Match the selected device's actual machine identity to the expected host;
+   do not guess from its display name. Use existing sign-in state and normal Connect/Reconnect.
+   Disable unnecessary clipboard, file, printer, microphone, camera, and location redirection.
+   Follow `references/unattended-session-recovery.md`; stop for explicit password, Windows Hello,
+   MFA, certificate, or consent prompts rather than bypassing them.
+
+   Once the remote connection owns an authenticated `rdp-sxs` desktop, bootstrap the user worker
+   if its fresh readiness heartbeat does not already satisfy this step:
 
    ```powershell
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup `
@@ -142,7 +158,9 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
 
    Password, MFA, Windows Hello, and consent surfaces require owner action. Otherwise bootstrap must
    complete automatically. It requires a fresh heartbeat with `authenticated=true` and
-   `atReady=true`.
+   `atReady=true`. Portal sign-in alone is not proof that the Windows desktop or the selected
+   evaluator profile is authenticated. Match the expected user and actual active RDP session to
+   the worker's session ID before transfer.
 
 10. Before a real-AT, audio, or desktop-capture run, invoke:
 
@@ -151,12 +169,22 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
      -Action RunConsoleTransfer
    ```
 
+   Use only the provisioned, owner-approved transfer task; never construct an ad hoc elevated
+   command or broaden its allowed session selection during a test. A disconnected session must
+   first pass connection recovery in step 9; the task intentionally requires active RDP.
+
    The RDP client disconnects and must not reconnect. The SYSTEM task waits for a heartbeat newer
    than the transfer and requires `consoleUnlocked=true`, `atReady=true`, `authenticated=true`, and
    `legacyLockPresent=false`. For screen-reader runs, stop Voice Access first; its presence makes
    `atReady=false`. A missing user, ambiguous session, `No User exists for *`, stale
-   heartbeat, LockApp/LogonUI state, or task exit failure makes the host unavailable; do not start
-   NVDA or use lock-screen output as evidence.
+   heartbeat, inaccessible input desktop, secure surface, or task exit failure makes the host
+   unavailable; do not start NVDA or use lock-screen output as evidence. Verify the outcome over a
+   non-RDP control channel, not by reconnecting to inspect it. A later RDP connection/disconnection
+   invalidates the old readiness result and requires the recovery sequence again.
+
+   A resident LockApp process alone does not establish that the desktop is locked. In this worker,
+   `legacyLockPresent` aliases `secureSurfacePresent`; it is not a task-mutex flag. Other producers
+   may define that field differently, so inspect their contract rather than importing its meaning.
 
 11. Inspect readiness directly when diagnosing the session:
 
@@ -187,3 +215,8 @@ $setup = "${CLAUDE_PLUGIN_ROOT}\skills\ow-a11y-host-setup\scripts\setup-windows-
 Do not treat package installation, a running process, or an output file alone as proof that
 recording works. The first real scenario must still validate non-silent audio, image variance,
 visible focus, and the applicable AT transcript or ETW evidence.
+
+For screen-reader evidence, correlate native input with actual NVDA `Speaking` output and the
+correct browser foreground/route. When audio/video proof is required, preserve continuous desktop
+capture and real speech audio; a debug log alone does not prove audio was played. DOM/UIA evidence
+can corroborate focus, but never substitute for a screen-reader result.

@@ -12,6 +12,13 @@ setup below incorporates Jimu team guidance and the ADO `odsp-automation-test-to
 
 ## Preflight
 
+For an already-provisioned but disconnected/non-interactive session, follow
+`skills/ow-a11y-host-setup/references/unattended-session-recovery.md` (relative to the plugin root)
+before asking the owner to reconnect. Use an approved Windows App controller to restore the
+connection, then the existing protected Console transfer and fresh desktop/audio checks. Neither
+`tscon` nor a worker unlocks Windows; explicit authentication or consent prompts remain manual
+boundaries. Twin owns this recovery on Twin-managed hosts.
+
 1. Confirm the current host is Windows and record whether the session is `Console` or RDP.
 2. Confirm Microsoft Edge and the commands required by the selected procedure are available.
    For authenticated SharePoint browser evidence, install and check the dedicated personal evaluator
