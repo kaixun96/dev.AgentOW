@@ -104,7 +104,7 @@ Before the first task:
 
 1. Run `git -C /workspaces/odsp-web status --short`.
 2. If the worktree has pre-existing user changes, stop and ask the user to clean, stash, or commit them. Never auto-stash changes that existed before the batch.
-3. Run `git -C /workspaces/odsp-web fetch origin`.
+3. Run `node "${CLAUDE_PLUGIN_ROOT}/tools/cached-fetch.mjs" --repo /workspaces/odsp-web --ref main` once. Per-task skills must reuse that fresh result instead of fetching again.
 
 ## Step 4: Run each task
 
@@ -137,11 +137,12 @@ For the standard route, prefer:
 
 ```bash
 git -C /workspaces/odsp-web checkout main
-git -C /workspaces/odsp-web pull --ff-only origin main
 ```
 
-If local `main` has diverged from `origin/main`, do not reset, rebase, or rewrite it. The standard
-route may create a temporary baseline branch:
+Do not run `git pull`: its implicit fetch duplicates the preflight refresh. The standard skill
+creates its feature branch from `origin/main`, so local `main` need not be updated. If local `main`
+has diverged from `origin/main`, do not reset, rebase, or rewrite it. The standard route may create
+a temporary baseline branch:
 
 ```bash
 git -C /workspaces/odsp-web switch -c agentow-batch/<timestamp>-task<i> origin/main

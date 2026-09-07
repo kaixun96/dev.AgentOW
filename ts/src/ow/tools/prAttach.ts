@@ -1,7 +1,7 @@
-import * as cp from "node:child_process";
 import * as fs from "node:fs/promises";
 import { OW } from "../../shared/constants.js";
 import type { FileLogger } from "../../shared/logger.js";
+import { fetchAdoWithRetry, getAdoAuthorizationHeader } from "./adoHttp.js";
 import { preparePrDescriptionUpdate } from "./prDescriptionBudget.js";
 
 export interface PrAttachInput {
@@ -27,55 +27,6 @@ const ODSP_WEB_REPO_ID = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
 const ADO_ORG = "https://dev.azure.com/onedrive";
 const ADO_PROJECT = "ODSP-Web";
 const API_VERSION = "7.0";
-
-function execCmd(cmd: string, cwd: string, signal?: AbortSignal): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const proc = cp.exec(cmd, { cwd, signal, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
-    });
-  });
-}
-
-async function getAdoAuthorizationHeader(cwd: string, signal?: AbortSignal): Promise<string> {
-  const result = await execCmd(
-    "az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv",
-    cwd,
-    signal,
-  );
-  if (result.exitCode === 0 && result.stdout.trim()) {
-    return `Bearer ${result.stdout.trim()}`;
-  }
-
-  const credentialResult = await execCmd(
-    "printf 'protocol=https\\nhost=onedrive.visualstudio.com\\n\\n' | git credential fill",
-    cwd,
-    signal,
-  );
-  const credentialPassword: string | undefined = extractCredentialPassword(credentialResult.stdout);
-  if (credentialResult.exitCode === 0 && credentialPassword) {
-    return `Basic ${Buffer.from(`:${credentialPassword}`).toString("base64")}`;
-  }
-
-  throw new Error(
-    `Failed to authenticate to Azure DevOps. Tried 'az account get-access-token' and git credential fill for onedrive.visualstudio.com.\n` +
-    `az stderr:\n${result.stderr}\n\n` +
-    `git credential stderr:\n${credentialResult.stderr}`,
-  );
-}
-
-function extractCredentialPassword(credentialOutput: string): string | undefined {
-  let position = 0;
-  while (position < credentialOutput.length) {
-    const nextNewline = credentialOutput.indexOf("\n", position);
-    const end = nextNewline === -1 ? credentialOutput.length : nextNewline;
-    const line = credentialOutput.slice(position, end);
-    if (line.startsWith("password=")) {
-      return line.slice("password=".length);
-    }
-    position = end + 1;
-  }
-  return undefined;
-}
 
 function replacePlaceholders(text: string, uploaded: Array<{ name: string; url: string }>): string {
   let out = text;
@@ -138,7 +89,7 @@ export class PrAttach {
     if (descriptionAppend) {
       // Fetch current PR to get existing description
       const getUrl = `${baseUrl}?api-version=${API_VERSION}`;
-      const getResp = await fetch(getUrl, {
+      const getResp = await fetchAdoWithRetry(getUrl, {
         headers: { "Authorization": authorizationHeader },
         signal,
       });
