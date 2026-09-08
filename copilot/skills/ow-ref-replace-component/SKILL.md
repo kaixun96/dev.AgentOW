@@ -1,9 +1,18 @@
 ---
 name: ow-ref-replace-component
-description: "Use for ODSP-Web UI component migrations, v8-to-SPDS replacements, Panel/Drawer conversion, stable-bundle adoption, or ReplaceComponent work."
+description: "Use for explicitly requested or demonstrably necessary ODSP-Web UI component migrations, v8-to-SPDS replacements, Panel/Drawer conversion, stable-bundle adoption, or ReplaceComponent work; not routine A11y fixes."
 ---
 
 # ReplaceComponent migration reference
+
+## A11y invocation boundary
+
+Do not invoke this skill by default during `/agentow-a11y`. A focus, contrast, accessible-name,
+ARIA, heading, or keyboard fix to an existing control is not itself a migration task. Invoke only
+for a user-requested migration or when recorded failure/API evidence proves migration is necessary
+to meet the accessibility acceptance criteria. An available SPDS export or a generic reviewer
+package-preference finding is not authorization. Otherwise return to the minimal A11y fix without
+changing the component package, dependencies, or lockfile.
 
 Use the highest supported ODSP-Web design-system layer and read the routed project context before
 choosing a migration pattern. Do not infer the target component, gate, or expected geometry from a

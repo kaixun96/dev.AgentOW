@@ -494,9 +494,35 @@ const sizeRegressionSnippets = [
 ];
 
 const checks = [
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    [
+      "## A11y scope boundary",
+      "do not require SPDS migration or invocation",
+      "a retained component/import",
+      "not omit inventoried rule results",
+      "Do not raise a blocking finding, demand a capability-gap waiver",
+      "concrete failure/API evidence proves the existing component cannot satisfy",
+      "Apply normal package-selection rules to newly introduced or actually replaced components",
+    ],
+  ),
+  {
+    file: "copilot/agents/reviewer.agent.md",
+    snippets: [
+      "For A11y bug fixes, apply the **A11y scope boundary**",
+      "Do not invoke the ReplaceComponent skill or make migration a Critical/Important",
+      "Record migration-only inventoried checks as not applicable",
+      "A retained Fluent V9 import in a focused A11y fix is not an Important finding solely because SPDS exports an alternative",
+    ],
+  },
   {
     file: "copilot/skills/ow-ref-replace-component/SKILL.md",
     snippets: [
+      "## A11y invocation boundary",
+      "Do not invoke this skill by default during `/agentow-a11y`",
+      "package-preference finding is not authorization",
+      "changing the component package, dependencies, or lockfile",
       "Select one migration shape",
       "established PanelShim behavior",
       "@msinternal/sharepoint-ui-react-stable/lib/LazyComponents",
@@ -550,6 +576,12 @@ const checks = [
   {
     file: "copilot/skills/agentow-a11y/SKILL.md",
     snippets: [
+      "### A11y scope: no default SPDS migration",
+      "Do not invoke `skills/ow-ref-replace-component/SKILL.md`",
+      "Reading the existing SPDS or Fluent API/source for accessibility behavior is not migration",
+      "Migration is in scope only when the user explicitly requests it or concrete failure/API evidence",
+      "Pass this scope decision and its evidence to the reviewer",
+      "Keep all directly relevant accessibility, API-correctness, rollout, and regression checks",
       "tools/cached-fetch.mjs",
       "Make up to three meaningful attempts to acquire and validate real-AT reproduction evidence",
       "capability discovery exhausts the available routes immediately",

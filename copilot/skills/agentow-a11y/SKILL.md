@@ -175,6 +175,26 @@ reproduce result file bytes; it becomes `baselineEvidenceSha256`.
 
 ## Step 3: Minimal source investigation
 
+### A11y scope: no default SPDS migration
+
+Do not invoke `skills/ow-ref-replace-component/SKILL.md` or perform SPDS/stable-bundle
+migration merely because an accessibility fix touches a rendered control, its styles, or ARIA.
+Preserve the existing component and package when they can satisfy the acceptance criteria.
+Reading the existing SPDS or Fluent API/source for accessibility behavior is not migration
+authorization.
+
+Migration is in scope only when the user explicitly requests it or concrete failure/API evidence
+proves it is necessary to fix the reported accessibility behavior. Before invoking the migration
+skill, record that request or causal evidence, why the existing component cannot support the fix,
+and the smallest required migration scope in the implementation note. An available SPDS export,
+a general package preference, or a reviewer recommendation alone is not sufficient.
+
+Pass this scope decision and its evidence to the reviewer. The A11y scope boundary in
+`skills/ow-review/references/sharepoint-design-system-and-ux-components.md` takes precedence over
+generic component-fit and package-migration requirements for existing controls. Do not add a
+dependency, lockfile change, or broader subtree migration solely to satisfy those requirements.
+Keep all directly relevant accessibility, API-correctness, rollout, and regression checks.
+
 After strict reproduction PASS or entry into `unverified-fallback`:
 
 1. Trace the failing element/event to its implementation.

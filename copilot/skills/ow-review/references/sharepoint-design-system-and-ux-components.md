@@ -2,6 +2,26 @@
 
 Use this reference when a change adds or modifies a user-facing component, interactive UX pattern, layout, styling, or imports from SharePoint design-system or Fluent UI component packages.
 
+## A11y scope boundary
+
+For an accessibility bug fix to an existing control, do not require SPDS migration or invocation
+of `skills/ow-ref-replace-component/SKILL.md` by default. This boundary overrides the component-fit
+matrix and package-selection requirements below for a retained component/import. Touching focus,
+contrast, ARIA, headings, names, or keyboard behavior does not make the pre-existing package choice
+a new defect. Mark migration-only checks not applicable with the unchanged-import evidence; do
+not omit inventoried rule results.
+
+Do not raise a blocking finding, demand a capability-gap waiver, or request dependency/lockfile
+changes merely because SPDS exports an alternative. A generic reviewer recommendation is not
+migration authorization. Migration is in scope only if explicitly requested by the user or if
+concrete failure/API evidence proves the existing component cannot satisfy the accessibility
+acceptance criteria. Cite that evidence and bound the migration before recommending it.
+
+This is not an accessibility or correctness exemption: continue reviewing semantics, supported
+APIs, focus/keyboard behavior, contrast, theme behavior, rollback, and regressions caused by the
+diff. Apply normal package-selection rules to newly introduced or actually replaced components
+and normal migration checks to explicitly requested or demonstrably necessary migrations.
+
 ## Component-fit analysis before implementation
 
 Do not select a component from the request's nouns alone. A request for a "list", for example, may require a semantic list, `Table`, `DataGrid`, tree, grouped collection, or another purpose-built control. Before planning imports or JSX:
