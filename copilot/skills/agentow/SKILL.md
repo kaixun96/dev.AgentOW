@@ -705,6 +705,12 @@ general-review metric; applicability is reported per rule rather than by omittin
 `<sessionDir>/review-rule-inventory.json` and freeze it before dispatch. The reviewer must not create,
 edit, or narrow it.
 
+For `reviewPolicy=general`, write the immutable diff to `<sessionDir>/review.diff` and run
+`tools/build-review-skill-routing.mjs` with the repository root, current HEAD, merge base, diff
+digest, `<sessionDir>/review-changed-files.txt`, and that diff. Write the caller-owned result to
+`<sessionDir>/specialized-review-routing.json`. A missing `.agentow/review-skills.json` manifest
+must produce an unconfigured artifact and preserve generic review behavior.
+
 The remaining Step 7 procedure applies only to STANDARD profile.
 
 Only when `reviewPolicy=general`, resolve the branch's review ledger first, so a finding already
@@ -730,6 +736,7 @@ reviewPolicy: <graduation-only or general>
 gateInventoryPath: <sessionDir>/review-gates.txt               # graduation-only
 deletedFilesPath: <sessionDir>/review-deleted-files.txt         # graduation-only
 ruleInventoryPath: <sessionDir>/review-rule-inventory.json      # both policies
+specializedReviewRoutingPath: <sessionDir>/specialized-review-routing.json # general only; caller-owned immutable routing evidence
 prDescriptionPath: <sessionDir>/pr-description.md               # when available
 changedFiles: <changed files>
 sessionDir: /workspaces/odsp-web/.aero/<session>
@@ -750,11 +757,15 @@ evaluationArtifactPaths:
 ```
 
 For `reviewPolicy=graduation-only`, omit `reviewLedgerPath`, `contextDocuments`, `planPath`,
-`implementationEvidencePaths`, and `evaluationArtifactPaths`. Pass only the immutable diff identity,
+`implementationEvidencePaths`, `evaluationArtifactPaths`, and `specializedReviewRoutingPath`. Pass only the immutable diff identity,
 changed-file/session/report paths, review artifact paths, and `prDescriptionPath` when a PR
 description is available. The reviewer uses it as trusted selected-branch intent, not rollout
 authorization evidence. Do not require a description or request external state proof. Instruct the reviewer to use only `graduation.md`, produce its minimal report, and
 return without entering generic review passes.
+
+For `reviewPolicy=general`, require the reviewer to consume the immutable routing artifact, load
+only its selected skills and knowledge packs, and reconstruct each selected domain's non-local
+decision flow.
 
 Read the final evaluator NDJSON record immediately before dispatch. Pass only artifact paths that the record actually returned and that exist; do not synthesize conventional paths. If the final evaluator record or its required artifacts are missing, classify it as `evaluator-spec` and stop or retry under Step 6 rather than reviewing stale evidence.
 
@@ -791,6 +802,7 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   --expected-diff-digest "$(git diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)" \
   --rule-inventory <sessionDir>/review-rule-inventory.json \
   --rule-registry "${CLAUDE_PLUGIN_ROOT}/review-rule-registry.json" \
+  --review-skill-routing <sessionDir>/specialized-review-routing.json \
   --changed-files <sessionDir>/review-changed-files.txt \
   --diff-numstat <sessionDir>/review-numstat.txt \
   --ledger "$reviewLedgerPath" \

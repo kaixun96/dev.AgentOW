@@ -100,6 +100,7 @@ reviewedHead=$(git -C "$reviewRoot" rev-parse HEAD)
 git -C "$reviewRoot" diff --no-renames --name-only "$mergeBase"...HEAD > "$sessionDir/review-changed-files.txt"
 git -C "$reviewRoot" diff --no-renames --diff-filter=D --name-only "$mergeBase"...HEAD > "$sessionDir/review-deleted-files.txt"
 git -C "$reviewRoot" diff --no-renames --numstat "$mergeBase"...HEAD > "$sessionDir/review-numstat.txt"
+git -C "$reviewRoot" diff --no-renames "$mergeBase"...HEAD > "$sessionDir/review.diff"
 diffDigest=$(git -C "$reviewRoot" diff --no-renames "$mergeBase"...HEAD | sha256sum | cut -d' ' -f1)
 ```
 
@@ -153,6 +154,20 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/build-review-rule-inventory.mjs" \
 
 Do not let the reviewer create, edit, or narrow this caller-owned inventory.
 
+Also build the repository-owned specialized review routing artifact. An absent manifest is valid
+and records an unconfigured result without changing generic review behavior:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/tools/build-review-skill-routing.mjs" \
+  --repo "$reviewRoot" \
+  --expected-head "$reviewedHead" \
+  --expected-merge-base "$mergeBase" \
+  --expected-diff-digest "$diffDigest" \
+  --changed-files "$sessionDir/review-changed-files.txt" \
+  --diff "$sessionDir/review.diff" \
+  --out "$sessionDir/specialized-review-routing.json"
+```
+
 ## Step 4: Resolve the review ledger for general review
 
 Skip this step when `reviewPolicy=graduation-only`. For general review, a finding already accepted
@@ -194,6 +209,7 @@ gateInventoryPath: <sessionDir>/review-gates.txt             # graduation-only
 deletedFilesPath: <sessionDir>/review-deleted-files.txt       # graduation-only
 residualCandidatesPath: <sessionDir>/review-residual-candidates.jsonl # graduation-only
 ruleInventoryPath: <sessionDir>/review-rule-inventory.json           # general and graduation-only
+specializedReviewRoutingPath: <sessionDir>/specialized-review-routing.json # general only; caller-owned immutable routing evidence
 reviewLedgerPath: <resolved reviewLedgerPath>
 prDescriptionPath: <sessionDir>/pr-description.md   # PR mode only
 contextDocuments:
@@ -203,8 +219,10 @@ contextDocuments:
 For graduation-only, instruct the reviewer to use only the graduation reference's review procedure
 and minimal report contract, then return without generic review passes. For general review, state
 explicitly that this is a standalone, adversarial review with no plan, implementation, or evaluation
-artifacts. Require the reviewer to apply the general contract's challenge protocol and evidence
-requirements. Strictness never permits unsupported findings or inflated severity.
+artifacts. Require the reviewer to consume `specializedReviewRoutingPath`, load only its selected
+skills and knowledge packs, and
+apply the general contract's non-local decision-flow, challenge, and evidence requirements.
+Strictness never permits unsupported findings or inflated severity.
 
 Do not dispatch planner or evaluator, and do not start the `agentow` pipeline from this command.
 
@@ -236,6 +254,7 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/validate-review-report.mjs" \
   --expected-diff-digest "$diffDigest" \
   --rule-inventory "$sessionDir/review-rule-inventory.json" \
   --rule-registry "${CLAUDE_PLUGIN_ROOT}/review-rule-registry.json" \
+  --review-skill-routing "$sessionDir/specialized-review-routing.json" \
   --changed-files "$sessionDir/review-changed-files.txt" \
   --diff-numstat "$sessionDir/review-numstat.txt" \
   --ledger "$reviewLedgerPath" \

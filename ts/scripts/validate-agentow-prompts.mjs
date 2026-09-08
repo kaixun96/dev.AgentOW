@@ -664,6 +664,9 @@ const checks = [
       "--registry",
       "review-rule-inventory.json",
       "ruleInventoryPath",
+      "specializedReviewRoutingPath",
+      "build-review-skill-routing.mjs",
+      "caller-owned immutable routing evidence",
       "prDescriptionPath",
       "--rule-inventory",
       "--rule-registry",
@@ -926,7 +929,13 @@ const checks = [
       "cannot produce `APPROVE`",
       "Test observable contracts and regression risk, not every changed file or function",
       "A trivial Flight/KS constant or pass-through wrapper does not need its own unit test",
-      "nearest stable consumer rather than testing a trivial gate wrapper"
+      "nearest stable consumer rather than testing a trivial gate wrapper",
+      "Repository specialized review skills",
+      "build-review-skill-routing.mjs",
+      ".agentow/review-skills.json",
+      "specialized-review-routing.json",
+      "load only the packs applicable to the changed policy, feature, or",
+      "Reconstruct the complete affected decision"
     ]
   },
   {
@@ -973,6 +982,11 @@ const checks = [
       "reaching a changed pure abstraction is not a defect by itself",
       "Repository instruction compliance does not automatically imply `Important`",
       "Compliant code receives no finding",
+      "Repository specialized review skill routing",
+      "immutable caller-owned input",
+      "do not guess or search for undeclared skills",
+      "load only matching",
+      "preReview.specializedReview",
       "do not equate reading every line with reliable exhaustive review",
       "before reading any review contract",
       "Do not read",

@@ -56,6 +56,23 @@ facts from Git. Perform that import/provider inventory yourself before writing c
 profile check that says the provider flow is sufficient does not override a conflicting source
 fact; report the blocking finding instead.
 
+### Repository specialized review skill routing
+
+Consume `specializedReviewRoutingPath` as an immutable caller-owned input. Do not create, modify,
+or narrow it. Verify that its `reviewedHead`, `mergeBase`, and `diffDigest` match the review and that
+every selected path still has the recorded SHA-256 digest. `discovery.status: "unconfigured"` is a
+valid no-specialization outcome; do not guess or search for undeclared skills.
+
+Read each selected skill fully and apply every applicable review instruction. When it routes to
+knowledge packs, classify the exact changed policy, feature, or scenario and load only matching
+packs. Record both selected and explicitly ignored packs, reasons, paths, and content digests. Do
+not load unrelated packs or invent missing guidance. In `preReview.specializedReview`, reconstruct
+the complete affected decision flow required by each selected skill, including non-local callers,
+input or identity variants, gates, bypass/fail-closed paths, cross-boundary enforcement, telemetry,
+rollout, and tests where applicable. Findings must identify the scenario and consequence, cite the
+responsible code, and give a concrete correction or test tier. These skills supplement, and never
+replace, required human engineering or security review.
+
 ### Reference routing
 
 Classify the changed behavior from the Git diff before loading optional reference documents. If it
@@ -114,6 +131,7 @@ The dispatcher gives you:
 - `branch`, `sessionDir`, `reportFile`, `reportWriterCommand`, and `progressLog`;
 - `artifactPath` (`review.md`) and `artifactJsonPath` (`review.json`);
 - `contextDocuments`;
+- `specializedReviewRoutingPath` — caller-owned `<sessionDir>/specialized-review-routing.json` for general review;
 - the actual `planPath`, `implementationEvidencePaths` (the deduplicated main + recovery journal
   union), and `evaluationArtifactPaths` extracted from the latest planner/evaluator records; never
   infer conventional artifact paths;
