@@ -2,6 +2,17 @@
 
 Use this reference when a change adds or modifies a user-facing component, interactive UX pattern, layout, styling, or imports from SharePoint design-system or Fluent UI component packages.
 
+## A11y capability routing
+
+In A11y mode, apply `docs/a11y/skill-routing.md` before the checks below. Existing-control
+accessibility and component selection are separate include decisions. Apply component-fit
+comparisons, preferred-package requirements, and capability-gap waivers only when the component
+selection trigger matches: a newly introduced/replaced component, an explicit migration request,
+or evidence that the existing component cannot satisfy the accessibility acceptance criteria.
+Apply the included semantic/API, interaction, styling, and regression checks to retained controls.
+Record the matching trigger and evidence; account for every inventoried rule, marking requirements
+outside the include scope not applicable. Other workflows retain the full reference's policy.
+
 ## Component-fit analysis before implementation
 
 Do not select a component from the request's nouns alone. A request for a "list", for example, may require a semantic list, `Table`, `DataGrid`, tree, grouped collection, or another purpose-built control. Before planning imports or JSX:

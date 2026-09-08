@@ -494,6 +494,45 @@ const sizeRegressionSnippets = [
 ];
 
 const checks = [
+  ...mirroredSnippetChecks(
+    "skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    "copilot/skills/ow-review/references/sharepoint-design-system-and-ux-components.md",
+    [
+      "## A11y capability routing",
+      "apply `docs/a11y/skill-routing.md` before the checks below",
+      "accessibility and component selection are separate include decisions",
+      "selection trigger matches: a newly introduced/replaced component",
+      "account for every inventoried rule",
+      "Other workflows retain the full reference's policy",
+    ],
+  ),
+  {
+    file: "copilot/agents/reviewer.agent.md",
+    snippets: [
+      "For A11y bug fixes, read `docs/a11y/skill-routing.md`",
+      "Consume the caller's `capabilityIncludes` and verify each positive trigger",
+      "request it before optional skill invocation",
+      "without narrowing the immutable inventory",
+      "existing-control accessibility alone does not activate package-selection requirements",
+    ],
+  },
+  {
+    file: "copilot/docs/a11y/skill-routing.md",
+    snippets: [
+      "# A11y capability include policy",
+      "Before loading an optional skill, record its exact path, capability, phase, positive trigger",
+      "Use `capabilityIncludes`",
+      "Every skill not selected by a positive trigger is absent from the include set",
+      "installed in the future",
+      "An additional capability needs an explicit inclusion decision before use",
+      "main session and every reviewer/evaluator handoff, including resumed runs",
+      "Reading a reference for one included capability does not",
+      "Emit every required",
+      "Non-A11y workflows retain their existing routing policy",
+      "A new unrelated skill is installed during the run | Include set is unchanged",
+      "Add a focus outline to an existing Button, retaining its import | Existing-control accessibility; component selection is not triggered",
+    ],
+  },
   {
     file: "copilot/skills/ow-ref-replace-component/SKILL.md",
     snippets: [
@@ -550,6 +589,12 @@ const checks = [
   {
     file: "copilot/skills/agentow-a11y/SKILL.md",
     snippets: [
+      "Before loading optional skills, read `docs/a11y/skill-routing.md`",
+      "capability include set. Pass it to every evaluator/reviewer handoff",
+      "newly available skills do not automatically become part of an existing run",
+      "Record `capabilityIncludes` according to `docs/a11y/skill-routing.md`",
+      "Refresh `capabilityIncludes` from the acceptance criteria and evidence before source work",
+      "`capabilityIncludes`, refreshed against the actual diff",
       "tools/cached-fetch.mjs",
       "Make up to three meaningful attempts to acquire and validate real-AT reproduction evidence",
       "capability discovery exhausts the available routes immediately",

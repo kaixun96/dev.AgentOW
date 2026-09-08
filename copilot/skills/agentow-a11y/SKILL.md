@@ -12,6 +12,10 @@ The main session is the orchestrator and implementer. Dispatch only
 `@agentow-copilot:a11y-evaluator` for Twin evidence validation and the existing
 `@agentow-copilot:reviewer` after strict verification passes.
 
+Before loading optional skills, read `docs/a11y/skill-routing.md` and build the run's explicit
+capability include set. Pass it to every evaluator/reviewer handoff. Apply the same policy on
+continuation; newly available skills do not automatically become part of an existing run.
+
 ## Execution environment contract
 
 Detect the execution environment before creating the run:
@@ -80,7 +84,8 @@ On an unsupported host, run only host-supported browser/static checks and mark W
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/windows-host-testing.md`
    - `${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/accessibility.md`
 5. Write `knowledge-manifest.json` listing exact documents, versions/URLs when known, and why each
-   applies. Keep this manifest A11y-only.
+   applies. Record `capabilityIncludes` according to `docs/a11y/skill-routing.md`, including exact
+   resources, phases, positive triggers, and evidence. Keep this manifest A11y-only.
 6. Write concise progress lines for every gate.
 
 ## Step 1: Intake — no planner
@@ -174,6 +179,11 @@ Preserve the approved reproduce request/result as immutable files. Record the SH
 reproduce result file bytes; it becomes `baselineEvidenceSha256`.
 
 ## Step 3: Minimal source investigation
+
+Refresh `capabilityIncludes` from the acceptance criteria and evidence before source work.
+Use only the positively selected capabilities in `docs/a11y/skill-routing.md`; reading existing
+API/source to understand behavior does not by itself include a new implementation capability.
+Record any additional inclusion and its causal evidence in the implementation note before use.
 
 After strict reproduction PASS or entry into `unverified-fallback`:
 
@@ -286,6 +296,7 @@ After strict verify PASS or completion of the `unverified-fallback` supporting c
 - original bug and implementation note;
 - changed files and actual diff;
 - A11y knowledge manifest;
+- `capabilityIncludes`, refreshed against the actual diff using `docs/a11y/skill-routing.md`;
 - reproduce and verify evaluator reports;
 - evidence metadata and hashes;
 - validation mode, exhausted attempt log, unavailable evidence types, and supporting checks;

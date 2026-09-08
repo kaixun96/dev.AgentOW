@@ -3,6 +3,10 @@
 This directory is the versioned knowledge and contract boundary for `/agentow-a11y`. The standard
 agentOW planner/evaluator flow does not load it unless Accessibility is the primary bug.
 
+Use the [capability include policy](skill-routing.md) to select skills and review requirements
+from explicit positive triggers. The run's knowledge manifest carries that selection through
+implementation, verification, review, and continuation.
+
 ## Responsibilities
 
 | Layer | Owns |

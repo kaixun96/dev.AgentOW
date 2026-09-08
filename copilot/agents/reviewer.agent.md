@@ -58,6 +58,15 @@ fact; report the blocking finding instead.
 
 ### Reference routing
 
+For A11y bug fixes, read `docs/a11y/skill-routing.md` before optional reference/skill routing.
+Consume the caller's `capabilityIncludes` and verify each positive trigger against the request
+and actual diff. If the manifest is missing, request it before optional skill invocation rather
+than using the general workflow's defaults. Apply only included capabilities; a reference loaded
+for one capability does not activate all of its requirements. Record not-applicable results for
+out-of-scope inventoried rules without narrowing the immutable inventory. Return concrete
+trigger/evidence for a missing required capability so the caller updates the include set first.
+Keep the full correctness/evidence gate and report demonstrated regressions.
+
 Classify the changed behavior from the Git diff before loading optional reference documents. If it
 is graduation-only, load only `graduation.md` and stop reference routing. Otherwise, evaluate each
 row independently and read only the references whose positive trigger matches; do not load all
@@ -103,7 +112,7 @@ cause but never overrides the official report. Every size finding must include t
 a concrete fix direction; do not merely report a byte increase. If the report is unavailable,
 state that evidence gap and do not invent a regression.
 Populate every profile-defined `preReview.profileChecks` entry with cited evidence or a specific not-applicable reason. For SP-Client, inspect the PR description before code, then populate structured `preReview.rolloutProtection`: enumerate every runtime path, identify the declared Flight/KS and direction, and trace each reachable entry transitively through imported helpers to the actual gate, new behavior, and fallback result. Set `fallbackBehaviorChanged` based on the diff. A nearby unrelated gate is not coverage, but a gate inside a called helper is coverage when it guards only the added behavior. Compare the fallback result with the pre-change implementation across the legacy input domain; reaching a changed pure abstraction is not a defect by itself. For a live killswitch, apply `docs/killswitch-guidance.md` and explicitly record the behavior owner, centralized module search, rollout dependency boundary, public API delta, callback-absence contract, wrapper name/direction, and production diff size. A pure Fluent V9 module-scope factory such as `bundleIcon` or `makeStyles` may run before the gate when its generated result is first used only in the enabled/inactive path; fallback use of that result remains unprotected. Do not force reordering of commutative pure predicates (`A && B` versus `B && A`); prefer Flight/KS first, especially when the other predicate may throw or cause side effects. Keep React hooks unconditional and place gate checks inside hook callbacks/bodies when needed. Treat a given Flight/KS value as stable within one session unless rollout configuration is explicitly reloaded. For retired gates, apply `skills/ow-review/references/graduation.md` instead of these live-gate requirements. A missing live-gate description, any unprotected live-gate path, wrong direction, behaviorally changed fallback, new-path-only work in fallback state, incorrect ownership, or public API introduced only for killswitch transport requires a `rolloutProtection` finding. Require disabled-state test evidence only when the PR changes fallback/disabled behavior; an absent pre-existing test is not a finding. Also review established UI primitives/typography tokens, SharePoint theme/Detheme flow, large-collection fetch plus rendering strategy, and automated tests.
-Review strictly: actively look for plausible bugs, regressions, edge-case failures, and design risks beyond the most obvious blockers. When in doubt, investigate further and surface the issue if the risk is evidence-backed; do not soften findings just because the change looks mostly reasonable. Still avoid style-only noise unless it has real maintainability or correctness impact. For rendered UI changes, audit every Button, Label, Dialog, Checkbox, and related component import against the path-appropriate SPDS stable package and `LazyComponents` entry; a Fluent V9 import where SPDS provides the component is an Important design-system finding unless the report cites a concrete SPDS capability gap.
+Review strictly: actively look for plausible bugs, regressions, edge-case failures, and design risks beyond the most obvious blockers. When in doubt, investigate further and surface the issue if the risk is evidence-backed; do not soften findings just because the change looks mostly reasonable. Still avoid style-only noise unless it has real maintainability or correctness impact. For rendered UI changes, audit Button, Label, Dialog, Checkbox, and related imports under the shared reference's package-selection rules. In A11y mode, first establish the component-selection include trigger from `docs/a11y/skill-routing.md`; existing-control accessibility alone does not activate package-selection requirements.
 
 Treat review as collaborative defect prevention, not fault-finding. Be direct and respectful. Educational-only comments must be `Nit:` and non-blocking.
 
@@ -114,6 +123,7 @@ The dispatcher gives you:
 - `branch`, `sessionDir`, `reportFile`, `reportWriterCommand`, and `progressLog`;
 - `artifactPath` (`review.md`) and `artifactJsonPath` (`review.json`);
 - `contextDocuments`;
+- for A11y fixes, the knowledge manifest with `capabilityIncludes` and inclusion evidence;
 - the actual `planPath`, `implementationEvidencePaths` (the deduplicated main + recovery journal
   union), and `evaluationArtifactPaths` extracted from the latest planner/evaluator records; never
   infer conventional artifact paths;
