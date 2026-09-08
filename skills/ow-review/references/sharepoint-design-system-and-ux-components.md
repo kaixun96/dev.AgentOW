@@ -2,25 +2,16 @@
 
 Use this reference when a change adds or modifies a user-facing component, interactive UX pattern, layout, styling, or imports from SharePoint design-system or Fluent UI component packages.
 
-## A11y scope boundary
+## A11y capability routing
 
-For an accessibility bug fix to an existing control, do not require SPDS migration or invocation
-of `skills/ow-ref-replace-component/SKILL.md` by default. This boundary overrides the component-fit
-matrix and package-selection requirements below for a retained component/import. Touching focus,
-contrast, ARIA, headings, names, or keyboard behavior does not make the pre-existing package choice
-a new defect. Mark migration-only checks not applicable with the unchanged-import evidence; do
-not omit inventoried rule results.
-
-Do not raise a blocking finding, demand a capability-gap waiver, or request dependency/lockfile
-changes merely because SPDS exports an alternative. A generic reviewer recommendation is not
-migration authorization. Migration is in scope only if explicitly requested by the user or if
-concrete failure/API evidence proves the existing component cannot satisfy the accessibility
-acceptance criteria. Cite that evidence and bound the migration before recommending it.
-
-This is not an accessibility or correctness exemption: continue reviewing semantics, supported
-APIs, focus/keyboard behavior, contrast, theme behavior, rollback, and regressions caused by the
-diff. Apply normal package-selection rules to newly introduced or actually replaced components
-and normal migration checks to explicitly requested or demonstrably necessary migrations.
+In A11y mode, apply `docs/a11y/skill-routing.md` before the checks below. Existing-control
+accessibility and component selection are separate include decisions. Apply component-fit
+comparisons, preferred-package requirements, and capability-gap waivers only when the component
+selection trigger matches: a newly introduced/replaced component, an explicit migration request,
+or evidence that the existing component cannot satisfy the accessibility acceptance criteria.
+Apply the included semantic/API, interaction, styling, and regression checks to retained controls.
+Record the matching trigger and evidence; account for every inventoried rule, marking requirements
+outside the include scope not applicable. Other workflows retain the full reference's policy.
 
 ## Component-fit analysis before implementation
 
