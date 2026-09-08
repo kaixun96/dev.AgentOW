@@ -11,6 +11,7 @@ const tempDir = fs.mkdtempSync(`${os.tmpdir()}/agentow-review-contract-`);
 const changedFilesPath = `${tempDir}/changed-files.txt`;
 const diffNumstatPath = `${tempDir}/numstat.txt`;
 const ruleInventoryPath = `${tempDir}/review-rule-inventory.json`;
+const skillRoutingPath = `${tempDir}/specialized-review-routing.json`;
 const ruleRegistryPath = `${tempDir}/review-rule-registry.json`;
 const reportPath = `${tempDir}/review.json`;
 const ruleReferencePath = `${tempDir}/docs/review-contract.md`;
@@ -48,6 +49,14 @@ const makeRuleInventory = (reviewedHead = contractHead, mergeBase = contractBase
   ],
 });
 fs.writeFileSync(ruleInventoryPath, JSON.stringify(makeRuleInventory()));
+fs.writeFileSync(skillRoutingPath, JSON.stringify({
+  schemaVersion: 1,
+  reviewedHead: contractHead,
+  mergeBase: contractBase,
+  diffDigest: "c".repeat(64),
+  discovery: { status: "unconfigured", manifestPath: ".agentow/review-skills.json", reason: "repository manifest not found" },
+  skills: [],
+}));
 
 const dimensionNames = [
   "behavior",
@@ -123,6 +132,7 @@ function makeReport() {
       necessityAndScope: "The focused change is necessary to prevent valid empty results from crashing callers",
       intentMatch: "The implementation matches the stated behavior and does not expand beyond the affected path",
       profiles: ["global"],
+      specializedReview: { status: "unconfigured", skills: [] },
       ruleChecks: structuredClone(generalRuleChecks),
       reviewLedger: { status: "absent", ledgerPath: null, entryCount: 0, carriedCount: 0 },
       priorArt: [],
@@ -225,6 +235,14 @@ function validate(
   if (!preserveRuleInventory) {
     fs.writeFileSync(ruleInventoryPath, JSON.stringify(makeRuleInventory(report.reviewedHead, report.mergeBase, report.diffDigest)));
   }
+  fs.writeFileSync(skillRoutingPath, JSON.stringify({
+    schemaVersion: 1,
+    reviewedHead: report.reviewedHead,
+    mergeBase: report.mergeBase,
+    diffDigest: report.diffDigest,
+    discovery: { status: "unconfigured", manifestPath: ".agentow/review-skills.json", reason: "repository manifest not found" },
+    skills: [],
+  }));
   if (!preserveRuleLinks && report.findings.length > 0) {
     report.ruleResults[0] = {
       ...report.ruleResults[0],
@@ -250,6 +268,8 @@ function validate(
     ruleInventoryPath,
     "--rule-registry",
     ruleRegistryPath,
+    "--review-skill-routing",
+    skillRoutingPath,
   ];
   if (repoRoot) args.push("--repo", repoRoot);
   return spawnSync(

@@ -49,6 +49,32 @@ A `must-split` review still performs a preliminary risk scan so known defects ar
 3. Classify each file as low, medium, or high risk with a concrete rationale.
 4. Identify affected contracts, direct callers/consumers, tests, configuration, generated artifacts, and routed instructions/context.
 
+### Repository specialized review skills
+
+For a general review, the caller runs `tools/build-review-skill-routing.mjs` before dispatch. The
+reviewed repository may declare `.agentow/review-skills.json` with `schemaVersion: 1` and a `skills`
+array. Every skill has a unique `id`, repo-relative `path`, and `triggers` containing `paths` and/or
+`terms`; optional `packs` use the same `id`, `path`, and `triggers` shape. The builder deterministically
+matches those triggers against the immutable changed-file list and diff. It records every skill and
+pack as selected or ignored with evidence, exact paths, content digests, manifest digest, and diff
+identity in `<sessionDir>/specialized-review-routing.json`. Missing configuration produces
+`discovery.status: "unconfigured"` and preserves generic review behavior. Never search arbitrary
+user or home-directory locations or guess a domain skill path.
+
+Read every selected specialized skill completely and follow its full review workflow. If it routes
+to domain knowledge packs, load only the packs applicable to the changed policy, feature, or
+scenario; record selected and ignored packs with reasons and content digests. Do not load every
+pack defensively, and do not invent a pack when no repository-owned match exists. A repository with
+no matching specialized skill continues through the generic review normally.
+
+Specialized review is not limited to changed lines. Reconstruct the complete affected decision
+flow required by the selected skill across callers, identities or input variants, applicability
+gates, bypass and fail-closed paths, managed/native or client/server boundaries, telemetry,
+rollout controls, and tests as applicable. Record that reconstruction and any unresolved edge in
+`preReview.specializedReview`. Findings must name the affected scenario and consequence, cite the
+responsible code, and recommend a concrete correction or appropriate test tier. A specialized
+skill supplements required engineering or security review; it does not replace it.
+
 ### Pass 2: adversarial verification
 
 Trace the risky paths through the full changed files and relevant consumers. Check every canonical dimension:
@@ -358,7 +384,9 @@ canonical registry covers every general-review metric; callers cannot narrow it 
 routing decision. The validator re-reads the registry and source files. Missing, changed, or extra
 references fail validation.
 
-The caller passes the immutable inventory to the reviewer and validator. `ruleResults` must contain
+The caller passes the immutable rule inventory and specialized-review routing artifact to the
+reviewer and validator. The reviewer must not create, modify, or narrow either artifact.
+`ruleResults` must contain
 exactly every inventoried rule ID: missing, extra, or duplicate IDs fail validation. Each result
 needs concrete evidence and a specific conclusion; `finding` links current finding IDs and
 `carried` links accepted ledger fingerprints. Every current or carried finding must also be linked

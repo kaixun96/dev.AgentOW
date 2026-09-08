@@ -1074,6 +1074,45 @@ function validate(report, options) {
   if (!expectedMergeBase || report.mergeBase !== expectedMergeBase) errors.push("mergeBase does not match the caller-owned merge base");
   const expectedDigest = options.get("--expected-diff-digest");
   if (!expectedDigest || report.diffDigest !== expectedDigest) errors.push("diffDigest does not match the caller-owned diff");
+  const skillRoutingPath = options.get("--review-skill-routing");
+  if (!skillRoutingPath || !fs.existsSync(skillRoutingPath)) {
+    errors.push("--review-skill-routing must reference caller-owned specialized review routing");
+  } else {
+    try {
+      const routing = JSON.parse(fs.readFileSync(skillRoutingPath, "utf8"));
+      const repoRoot = path.resolve(options.get("--repo") ?? process.cwd());
+      const skills = Array.isArray(routing.skills) ? routing.skills : [];
+      const selected = skills.filter((skill) => skill?.disposition === "selected");
+      const routedFiles = skills.flatMap((skill) => [skill, ...(Array.isArray(skill?.packs) ? skill.packs : [])]);
+      const validFiles = routedFiles.every((entry) => {
+        if (!isObject(entry) || !nonEmpty(entry.path) || !HASH_64.test(entry.sourceDigest ?? "") || !Array.isArray(entry.evidence) || entry.evidence.length === 0) return false;
+        const sourcePath = path.resolve(repoRoot, entry.path);
+        const relativePath = path.relative(repoRoot, sourcePath);
+        return !relativePath.startsWith("..") && fs.existsSync(sourcePath) && digest(fs.readFileSync(sourcePath, "utf8")) === entry.sourceDigest;
+      });
+      if (
+        routing.schemaVersion !== 1 ||
+        routing.reviewedHead !== report.reviewedHead ||
+        routing.mergeBase !== report.mergeBase ||
+        routing.diffDigest !== report.diffDigest ||
+        !isObject(routing.discovery) ||
+        !["configured", "unconfigured"].includes(routing.discovery.status) ||
+        !validFiles
+      ) errors.push("specialized review routing identity, schema, evidence, or source digests are invalid");
+      const specialized = report.preReview?.specializedReview;
+      if (!isObject(specialized) || specialized.status !== routing.discovery.status || !Array.isArray(specialized.skills)) {
+        errors.push("preReview.specializedReview must report the caller-owned routing status and selected skills");
+      } else {
+        const covered = specialized.skills.map((entry) => entry?.id);
+        const expected = selected.map((entry) => entry.id);
+        if (!sameStrings([...covered].sort(), [...expected].sort()) || specialized.skills.some((entry) => !specific(entry?.decisionFlow) || !Array.isArray(entry?.evidence) || entry.evidence.length === 0)) {
+          errors.push("preReview.specializedReview must exactly cover selected skills with evidence and a specific decision flow");
+        }
+      }
+    } catch (error) {
+      errors.push(`cannot validate specialized review routing: ${error.message}`);
+    }
+  }
   const ruleInventoryPath = options.get("--rule-inventory");
   const ruleRegistryPath = options.get("--rule-registry");
   let expectedRuleIds = [];
