@@ -184,7 +184,7 @@
     },
     {
       "id": "PR_ATTACH_NEVER_COMMENTS",
-      "file": "ts/src/ow/tools/prAttach.ts",
+      "file": "ts/src/ow/tools/shared-a11y/ado-attachments.mjs",
       "kind": "no-pr-comment-write"
     }
   ],

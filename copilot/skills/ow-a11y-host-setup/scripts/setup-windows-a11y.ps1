@@ -1,10 +1,14 @@
+# Generated from kaixun96/dev.A11yAssist@aa78521e19bd9a69ffc6ad0a00e21f8bc230e546:native/windows-host.ps1. Do not edit; use ts/scripts/sync-a11y-capabilities.mjs.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('Probe', 'InstallSafeDependencies', 'InstallPersonalEvaluatorBrowser', 'CheckPersonalEvaluatorBrowser', 'StageVbCable', 'LaunchVbCableInstaller', 'OpenVoiceAccess', 'InstallConsoleTransferTask', 'RunConsoleTransfer', 'ValidateHost')]
     [string]$Action,
 
-    [string]$OutputPath
+    [string]$OutputPath,
+    [string]$SetupRoot,
+    [string]$ConsoleTaskName = 'AgentOW-A11Y-TransferToConsole',
+    [string]$PersonalEvaluatorSource
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,10 +23,15 @@ if ($env:OS -ne 'Windows_NT') {
 
 $vbCableUrl = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip'
 $vbCableSha256 = 'B950E39F01AF1D04EA623C8F6D8EB9B6EA5C477C637295FABF20631C85116BFB'
-$setupRoot = Join-Path $env:LOCALAPPDATA 'agentow\a11y-host'
+if ([string]::IsNullOrWhiteSpace($SetupRoot)) {
+    $SetupRoot = Join-Path $env:LOCALAPPDATA 'agentow\a11y-host'
+}
+$setupRoot = $SetupRoot
 $vbCableRoot = Join-Path $setupRoot 'vb-cable-pack45'
-$consoleTaskName = 'AgentOW-A11Y-TransferToConsole'
+$consoleTaskName = $ConsoleTaskName
 $personalEvaluatorSources = @(
+    $PersonalEvaluatorSource,
+    (Join-Path $PSScriptRoot '..\integrations\agentow\runtime\personal-evaluator-browser.py'),
     (Join-Path $PSScriptRoot '..\..\..\tools\personal-evaluator-browser.py'),
     (Join-Path $PSScriptRoot '..\..\..\..\tools\personal-evaluator-browser.py')
 )

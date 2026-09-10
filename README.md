@@ -73,6 +73,11 @@ a commit-pinned generated copy. AgentOW keeps its own orchestration and can
 also call independently installed capability MCP tools. See
 [shared A11y capabilities](copilot/docs/a11y/shared-capabilities.md).
 
+Windows host setup, the personal-browser compatibility script and PR evidence
+attachment/description implementation also use pinned shared sources.
+AgentOW retains only its project/authentication adapter for publication; active
+workers are not updated by a repository release.
+
 - [Detailed usage guide](docs/USING-AGENTOW.md)
 - [中文使用指南](docs/USING-AGENTOW.zh-CN.md)
 - [Copilot plugin architecture](copilot/README.md)

@@ -413,15 +413,18 @@ export function registerOwTools(
     description: "Upload files (typically PNG screenshots) to an Azure DevOps PR, then replace its generated visual-validation description block. Keeps the 4000-character limit by removing only explicitly disposable generated sections; never drops human-authored content or posts comments. Use {{name}} placeholders in appendToDescription.",
     inputSchema: {
       prId: z.number().describe("Pull request ID to attach files to"),
+      expectedHead: z.string().regex(/^[a-f0-9]{40}$/).optional().describe("Exact source commit bound to the evidence; rejects a stale PR HEAD"),
       attachments: z.array(z.object({
         name: z.string().describe("Filename used on ADO, e.g. 'before-pr2219557.png'"),
         localPath: z.string().describe("Absolute path to the local file to upload"),
+        sha256: z.string().regex(/^[a-f0-9]{64}$/).optional().describe("Expected SHA-256 of the approved attachment bytes"),
       })).describe("Files to upload as PR attachments"),
       appendToDescription: z.string().optional().describe("Markdown for the generated visual-validation block. Replaces the prior block. Use {{name}} placeholders for attachment URLs. If omitted, a simple attachment section is generated."),
     },
   }, async (input, extras) => {
     const result = await prAttach.attach({
       prId: input.prId,
+      expectedHead: input.expectedHead,
       attachments: input.attachments,
       appendToDescription: input.appendToDescription,
     }, extras.signal);
