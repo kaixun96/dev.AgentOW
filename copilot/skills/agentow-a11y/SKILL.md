@@ -75,6 +75,8 @@ On an unsupported host, run only host-supported browser/static checks and mark W
 
 4. Read:
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/README.md`
+   - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/shared-capabilities.md` and
+     `${CLAUDE_PLUGIN_ROOT}/a11y-capabilities.lock.json` for the shared validator's pinned source identity
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/evidence-contract.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/pr-evidence-capture-guide.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/windows-host-testing.md`

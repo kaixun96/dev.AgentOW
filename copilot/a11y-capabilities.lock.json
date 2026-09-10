@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "repository": "kaixun96/dev.A11yAssist",
+  "commit": "4082266fbe6a5c057d49dab20c2cae951276889e",
+  "manifestSha256": "f2156ecd7a7825d847ff9c5b0124eb8832ca3bd6324c207c92c5e6c559c7398c",
+  "manifestText": "{\n  \"schemaVersion\": 1,\n  \"repository\": \"kaixun96/dev.A11yAssist\",\n  \"version\": \"0.4.0\",\n  \"files\": [\n    {\n      \"source\": \"runtime/evidence-v1.mjs\",\n      \"target\": \"tools/validate-a11y-evidence.mjs\",\n      \"sha256\": \"be6191c09d21c84baaf0e04cd4576fe84545836c81a1ae34124b7870403c6f6f\"\n    }\n  ]\n}\n"
+}
