@@ -55,6 +55,12 @@ requirement changes checkpoint the prior revision and reopen the existing run.
 
 ## Shared MCP server
 
+The evidence-v1 validator is a pinned generated dependency from dev.A11yAssist,
+not another manually maintained implementation. The packaged
+`a11y-capabilities.lock.json` records its source identity. Existing A11y calls
+remain offline and keep their original interface. See
+[shared capability consumption](docs/a11y/shared-capabilities.md).
+
 The TypeScript MCP source lives at repository root under `ts/`. `npm run build` compiles it and
 copies the self-contained bundle to `copilot/ts/dist/`. Root `tools/` and selected shared docs,
 review references, and registries are mirrored into this directory for packaging.

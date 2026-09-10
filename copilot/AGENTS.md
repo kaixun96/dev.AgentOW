@@ -6,6 +6,12 @@ Take a feature/bug description and produce a Draft PR on Azure DevOps for the od
 
 ## Architecture: you are the implementer
 
+The deterministic A11y validator is generated from the pinned dev.A11yAssist
+source recorded in `a11y-capabilities.lock.json`. Do not hand-edit its tool
+mirror; use the source checkout's shared-capability updater. AgentOW still
+owns its orchestration and may call small capability plugins without starting
+another complete workflow.
+
 Unlike a multi-agent team, **the main session (you) is the orchestrator AND the implementer.** You retain full context across the whole task — including every fix cycle. You do NOT hand coding off to a subagent, because a fresh subagent would lose the context of what it already tried.
 
 Subagents are **stateless verifiers** you dispatch as tools. They look, they report, they vanish:

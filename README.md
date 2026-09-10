@@ -67,6 +67,12 @@ and attachments update the PR description rather than posting comment threads.
 
 ## Documentation
 
+The deterministic A11y evidence validator is maintained in
+[dev.A11yAssist](https://github.com/kaixun96/dev.A11yAssist) and consumed here as
+a commit-pinned generated copy. AgentOW keeps its own orchestration and can
+also call independently installed capability MCP tools. See
+[shared A11y capabilities](copilot/docs/a11y/shared-capabilities.md).
+
 - [Detailed usage guide](docs/USING-AGENTOW.md)
 - [中文使用指南](docs/USING-AGENTOW.zh-CN.md)
 - [Copilot plugin architecture](copilot/README.md)

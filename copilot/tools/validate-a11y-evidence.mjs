@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Generated from kaixun96/dev.A11yAssist@4082266fbe6a5c057d49dab20c2cae951276889e:runtime/evidence-v1.mjs. Do not edit; use ts/scripts/sync-a11y-capabilities.mjs.
 
 import fs from "node:fs";
 import crypto from "node:crypto";
