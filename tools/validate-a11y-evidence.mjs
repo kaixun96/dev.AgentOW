@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Generated from kaixun96/dev.A11yAssist@4082266fbe6a5c057d49dab20c2cae951276889e:runtime/evidence-v1.mjs. Do not edit; use ts/scripts/sync-a11y-capabilities.mjs.
+// Generated from kaixun96/dev.A11yAssist@8c7800278cdd31368abe9f27b89cea785af194d2:runtime/evidence-v1.mjs. Do not edit; use ts/scripts/sync-a11y-capabilities.mjs.
 
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -198,7 +198,8 @@ function compareCaptureStates(before, after) {
 
 function load(path, label) {
   try {
-    return JSON.parse(fs.readFileSync(path, "utf8"));
+    const bytes = fs.readFileSync(path);
+    return { value: JSON.parse(bytes.toString("utf8")), bytes };
   } catch (error) {
     fail(`${label} is not valid JSON: ${error.message}`);
   }
@@ -533,15 +534,18 @@ export function validateA11yEvidence(
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try {
-    const args = parseArgs(process.argv.slice(2));
+export function validateA11yEvidenceFiles(args) {
+    if (!PHASE_OUTCOMES[args.phase]) fail(`unsupported phase: ${args.phase}`);
+    const request = load(args.request, "request");
+    const result = load(args.result, "result");
+    const baselineRequest = args.phase === "verify" ? load(args["baseline-request"], "baseline request") : null;
+    const baselineResult = args.phase === "verify" ? load(args["baseline-result"], "baseline result") : null;
     const baseline =
       args.phase === "verify"
         ? {
-            request: load(args["baseline-request"], "baseline request"),
-            result: load(args["baseline-result"], "baseline result"),
-            resultBytes: fs.readFileSync(args["baseline-result"]),
+            request: baselineRequest.value,
+            result: baselineResult.value,
+            resultBytes: baselineResult.bytes,
           }
         : null;
     const expectedCommit =
@@ -549,19 +553,31 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         ? spawnSync(
             "git",
             ["-C", args["repo-root"], "rev-parse", "HEAD"],
-            { encoding: "utf8" },
+            { encoding: "utf8", timeout: 15000, maxBuffer: 1024 * 1024, windowsHide: true },
           )
         : null;
     if (expectedCommit && expectedCommit.status !== 0) {
-      fail(`unable to resolve repository HEAD: ${expectedCommit.stderr.trim()}`);
+      fail(`unable to resolve repository HEAD: ${expectedCommit.error?.message ?? expectedCommit.stderr.trim()}`);
     }
     const summary = validateA11yEvidence(
       args.phase,
-      load(args.request, "request"),
-      load(args.result, "result"),
+      request.value,
+      result.value,
       baseline,
       expectedCommit?.stdout.trim() ?? null,
     );
+    return {
+      summary, result: result.value, baseline,
+      documentSha256: {
+        request: digest(request.bytes), result: digest(result.bytes),
+        ...(baseline ? { baselineRequest: digest(baselineRequest.bytes), baselineResult: digest(baselineResult.bytes) } : {}),
+      },
+    };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    const { summary } = validateA11yEvidenceFiles(parseArgs(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify(summary)}\n`);
   } catch (error) {
     process.stderr.write(`A11y evidence invalid: ${error.message}\n`);

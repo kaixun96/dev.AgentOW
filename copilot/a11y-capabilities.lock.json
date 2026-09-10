@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "kaixun96/dev.A11yAssist",
-  "commit": "4082266fbe6a5c057d49dab20c2cae951276889e",
-  "manifestSha256": "f2156ecd7a7825d847ff9c5b0124eb8832ca3bd6324c207c92c5e6c559c7398c",
-  "manifestText": "{\n  \"schemaVersion\": 1,\n  \"repository\": \"kaixun96/dev.A11yAssist\",\n  \"version\": \"0.4.0\",\n  \"files\": [\n    {\n      \"source\": \"runtime/evidence-v1.mjs\",\n      \"target\": \"tools/validate-a11y-evidence.mjs\",\n      \"sha256\": \"be6191c09d21c84baaf0e04cd4576fe84545836c81a1ae34124b7870403c6f6f\"\n    }\n  ]\n}\n"
+  "commit": "8c7800278cdd31368abe9f27b89cea785af194d2",
+  "manifestSha256": "ab55d7380c0fd206fc0b31b3e1f51480c9e628492be4a67cab7f7a845b74202a",
+  "manifestText": "{\n  \"schemaVersion\": 1,\n  \"repository\": \"kaixun96/dev.A11yAssist\",\n  \"version\": \"0.7.0\",\n  \"files\": [\n    {\n      \"source\": \"runtime/evidence-v1.mjs\",\n      \"target\": \"tools/validate-a11y-evidence.mjs\",\n      \"sha256\": \"6a087bd37a4e83ef3f71fead22a88cc83160776bc671fdaf8e93afc2792b1ff2\"\n    }\n  ]\n}\n"
 }
