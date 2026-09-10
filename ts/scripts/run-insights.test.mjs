@@ -281,7 +281,8 @@ assert.equal(report.blockers[0].durationMs, 900_000);
 assert.equal(report.blockers[0].attemptCount, 2);
 assert.equal(report.blockers[0].attempts[1].outcome, 'succeeded');
 assert.equal(report.blockers[0].automatedResolution, true);
-assert.equal(report.run.agentowVersion, '0.1.41');
+assert.equal(report.run.agentowVersion,
+  JSON.parse(fs.readFileSync(path.join(repoRoot, 'copilot', '.claude-plugin', 'plugin.json'), 'utf8')).version);
 assert.equal(report.metrics.evaluationCycles, 1);
 assert.equal(report.privacy.containsPromptText, false);
 for (const forbidden of [

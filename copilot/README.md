@@ -61,6 +61,11 @@ not another manually maintained implementation. The packaged
 remain offline and keep their original interface. See
 [shared capability consumption](docs/a11y/shared-capabilities.md).
 
+`a11y-execution.lock.json` separately pins Windows host setup, the personal-browser
+compatibility profile and PR attachment/description implementation. Their original
+entry paths remain available. The PR writer checks active Draft/HEAD and uploaded
+bytes; it does not replace independent media/behavior validation.
+
 The TypeScript MCP source lives at repository root under `ts/`. `npm run build` compiles it and
 copies the self-contained bundle to `copilot/ts/dist/`. Root `tools/` and selected shared docs,
 review references, and registries are mirrored into this directory for packaging.

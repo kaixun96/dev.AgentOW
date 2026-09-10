@@ -76,7 +76,8 @@ On an unsupported host, run only host-supported browser/static checks and mark W
 4. Read:
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/README.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/shared-capabilities.md` and
-     `${CLAUDE_PLUGIN_ROOT}/a11y-capabilities.lock.json` for the shared validator's pinned source identity
+     `${CLAUDE_PLUGIN_ROOT}/a11y-capabilities.lock.json` for the shared validator's pinned source identity;
+     `${CLAUDE_PLUGIN_ROOT}/a11y-execution.lock.json` for shared Windows/browser/publication source identity
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/evidence-contract.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/pr-evidence-capture-guide.md`
    - `${CLAUDE_PLUGIN_ROOT}/docs/a11y/windows-host-testing.md`
@@ -346,7 +347,10 @@ Do not include a fabricated BEFORE/AFTER evidence table, evidence hashes, or `PA
 fallback PR. State what was not run as plainly as what did run.
 
 Attach reviewer-safe evidence through `ow-pr-attach` so it updates the PR description, never a
-comment thread. Every screenshot, recording, annotation, attachment URL, and actual PR-page check
+comment thread. Supply `expectedHead` from the accepted evidence and each attachment's SHA-256;
+the shared writer checks Draft/HEAD and downloads the uploaded bytes for hash comparison.
+This does not replace actual media/behavior inspection.
+Every screenshot, recording, annotation, attachment URL, and actual PR-page check
 must satisfy `${CLAUDE_PLUGIN_ROOT}/docs/a11y/pr-evidence-capture-guide.md`. Prefer:
 
 - annotated BEFORE/AFTER screenshots;

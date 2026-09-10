@@ -6785,12 +6785,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs6, exportName) {
+    function addFormats(ajv, list, fs5, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs6[f]);
+        ajv.addFormat(f, fs5[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -6799,7 +6799,7 @@ var require_dist = __commonJS({
 });
 
 // src/ow/index.ts
-import * as fs5 from "fs";
+import * as fs4 from "fs";
 import * as path3 from "path";
 import * as url2 from "url";
 
@@ -30190,8 +30190,8 @@ var RawOutputLog = class {
 };
 
 // src/ow/mcp/owTools.ts
-import * as cp7 from "child_process";
-import * as fs4 from "fs";
+import * as cp6 from "child_process";
+import * as fs3 from "fs";
 
 // src/shared/constants.ts
 var OW = {
@@ -30496,9 +30496,9 @@ ${prResult.stdout}`
       );
     }
     const prId = parsed.pullRequestId;
-    const prUrl = `${ADO_ORG}/${ADO_PROJECT}/_git/odsp-web/pullrequest/${prId}`;
-    this.logger?.info("pr-create", `PR #${prId} created: ${prUrl}`);
-    return { prId, prUrl, branch, draft };
+    const prUrl2 = `${ADO_ORG}/${ADO_PROJECT}/_git/odsp-web/pullrequest/${prId}`;
+    this.logger?.info("pr-create", `PR #${prId} created: ${prUrl2}`);
+    return { prId, prUrl: prUrl2, branch, draft };
   }
   async updatePr(input, signal) {
     const draft = true;
@@ -30547,17 +30547,98 @@ ${result.stdout}`);
 ${result.stdout}`
       );
     }
-    const prUrl = `${ADO_ORG}/${ADO_PROJECT}/_git/odsp-web/pullrequest/${input.prId}`;
-    this.logger?.info("pr-update", `PR #${input.prId} updated: ${prUrl}`);
-    return { prId: input.prId, prUrl, draft: parsed.isDraft };
+    const prUrl2 = `${ADO_ORG}/${ADO_PROJECT}/_git/odsp-web/pullrequest/${input.prId}`;
+    this.logger?.info("pr-update", `PR #${input.prId} updated: ${prUrl2}`);
+    return { prId: input.prId, prUrl: prUrl2, draft: parsed.isDraft };
   }
 };
 
-// src/ow/tools/prAttach.ts
+// src/ow/tools/adoHttp.ts
 import * as cp5 from "child_process";
-import * as fs3 from "fs/promises";
+var RETRYABLE_STATUS = /* @__PURE__ */ new Set([429, 500, 502, 503, 504]);
+var AUTH_CACHE_MS = 5 * 60 * 1e3;
+var MAX_ATTEMPTS = 4;
+var authorizationCache = /* @__PURE__ */ new Map();
+function exec5(command2, cwd, signal) {
+  return new Promise((resolve) => cp5.exec(command2, { cwd, signal, maxBuffer: 32 * 1024 * 1024 }, (error48, stdout, stderr) => {
+    resolve({ exitCode: error48?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
+  }));
+}
+async function resolveAuthorization(cwd, signal) {
+  const token = await exec5("az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv", cwd, signal);
+  if (token.exitCode === 0 && token.stdout.trim()) return `Bearer ${token.stdout.trim()}`;
+  const credential = await exec5("printf 'protocol=https\\nhost=onedrive.visualstudio.com\\n\\n' | git credential fill", cwd, signal);
+  const password = credential.stdout.split(/\r?\n/).find((line) => line.startsWith("password="))?.slice("password=".length);
+  if (credential.exitCode === 0 && password) return `Basic ${Buffer.from(`:${password}`).toString("base64")}`;
+  throw new Error(`Failed to authenticate to Azure DevOps.
+az stderr:
+${token.stderr}
 
-// src/ow/tools/prDescriptionBudget.js
+git credential stderr:
+${credential.stderr}`);
+}
+function getAdoAuthorizationHeader(cwd, signal) {
+  let cached2 = authorizationCache.get(cwd);
+  if (cached2 && Date.now() - cached2.createdAt > AUTH_CACHE_MS) {
+    authorizationCache.delete(cwd);
+    cached2 = void 0;
+  }
+  if (!cached2) {
+    const value = resolveAuthorization(cwd, signal);
+    cached2 = { createdAt: Date.now(), value };
+    authorizationCache.set(cwd, cached2);
+    value.catch(() => authorizationCache.delete(cwd));
+  }
+  return cached2.value;
+}
+function adoRetryDelayMs(response, attempt, random = Math.random) {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1e3, 12e4);
+    const dateDelay = Date.parse(retryAfter) - Date.now();
+    if (dateDelay > 0) return Math.min(dateDelay, 12e4);
+  }
+  const base = Math.min(1e3 * 2 ** (attempt - 1), 3e4);
+  return base + Math.floor(random() * Math.min(1e3, base / 2));
+}
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    }, { once: true });
+  });
+}
+async function fetchAdoWithRetry(input, init = {}, options = {}) {
+  const method = (init.method ?? "GET").toUpperCase();
+  const retryableMethod = method === "GET" || method === "HEAD";
+  const attempts = retryableMethod ? options.maxAttempts ?? MAX_ATTEMPTS : 1;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(input, init);
+    } catch (error48) {
+      if (attempt === attempts || init.signal?.aborted) throw error48;
+      await (options.sleepImpl ?? sleep)(1e3 * 2 ** (attempt - 1), init.signal ?? void 0);
+      continue;
+    }
+    if (!RETRYABLE_STATUS.has(response.status) || attempt === attempts) return response;
+    const delay = adoRetryDelayMs(response, attempt, options.random);
+    await response.body?.cancel();
+    await (options.sleepImpl ?? sleep)(delay, init.signal ?? void 0);
+  }
+  throw new Error("Unreachable retry state");
+}
+
+// src/ow/tools/shared-a11y/ado-attachments.mjs
+import { readFile, stat } from "fs/promises";
+import { isAbsolute } from "path";
+import { createHash } from "crypto";
+
+// src/ow/tools/shared-a11y/pr-description.mjs
 var ADO_PR_DESCRIPTION_MAX_LENGTH = 4e3;
 var VISUAL_SECTION_START = "<!-- agentow:visual-validation:start -->";
 var VISUAL_SECTION_END = "<!-- agentow:visual-validation:end -->";
@@ -30627,65 +30708,145 @@ ${VISUAL_SECTION_END}`;
   };
 }
 
-// src/ow/tools/prAttach.ts
-var ODSP_WEB_REPO_ID2 = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
-var ADO_ORG2 = "https://dev.azure.com/onedrive";
-var ADO_PROJECT2 = "ODSP-Web";
-var API_VERSION = "7.0";
-function execCmd2(cmd, cwd, signal) {
-  return new Promise((resolve) => {
-    const proc = cp5.exec(cmd, { cwd, signal, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
-    });
-  });
+// src/ow/tools/shared-a11y/ado-attachments.mjs
+function demand(condition, message) {
+  if (!condition) throw new Error(message);
 }
-async function getAdoAuthorizationHeader(cwd, signal) {
-  const result = await execCmd2(
-    "az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv",
-    cwd,
-    signal
-  );
-  if (result.exitCode === 0 && result.stdout.trim()) {
-    return `Bearer ${result.stdout.trim()}`;
-  }
-  const credentialResult = await execCmd2(
-    "printf 'protocol=https\\nhost=onedrive.visualstudio.com\\n\\n' | git credential fill",
-    cwd,
-    signal
-  );
-  const credentialPassword = extractCredentialPassword(credentialResult.stdout);
-  if (credentialResult.exitCode === 0 && credentialPassword) {
-    return `Basic ${Buffer.from(`:${credentialPassword}`).toString("base64")}`;
-  }
-  throw new Error(
-    `Failed to authenticate to Azure DevOps. Tried 'az account get-access-token' and git credential fill for onedrive.visualstudio.com.
-az stderr:
-${result.stderr}
-
-git credential stderr:
-${credentialResult.stderr}`
-  );
+function prUrl(configuration, prId) {
+  const organization = new URL(configuration.organization);
+  demand(organization.protocol === "https:" && !organization.username && !organization.password && !organization.search && !organization.hash, "Expected an HTTPS ADO organization URL without credentials or query");
+  demand(typeof configuration.project === "string" && configuration.project.trim() && typeof configuration.repositoryId === "string" && configuration.repositoryId.trim(), "ADO project and repository are required");
+  demand(Number.isSafeInteger(prId) && prId > 0, "Expected a positive PR ID");
+  return `${organization.href.replace(/\/$/, "")}/${encodeURIComponent(configuration.project)}/_apis/git/repositories/${encodeURIComponent(configuration.repositoryId)}/pullRequests/${prId}`;
 }
-function extractCredentialPassword(credentialOutput) {
-  let position = 0;
-  while (position < credentialOutput.length) {
-    const nextNewline = credentialOutput.indexOf("\n", position);
-    const end = nextNewline === -1 ? credentialOutput.length : nextNewline;
-    const line = credentialOutput.slice(position, end);
-    if (line.startsWith("password=")) {
-      return line.slice("password=".length);
+function descriptionAppend(input, uploaded) {
+  const sections = [input.appendToDescription, input.commentMarkdown].filter((text) => text?.trim()).map((text) => text.trim());
+  const template = sections.length ? sections.join("\n\n") : uploaded.length ? "## Visual Validation Attachments\n\n" + uploaded.map(({ name }) => `- [${name}]({{${name}}})`).join("\n") : "";
+  return uploaded.reduce((text, { name, url: url3 }) => text.split(`{{${name}}}`).join(url3), template);
+}
+async function responseJson(response, operation) {
+  demand(response.ok, `${operation} failed (HTTP ${response.status}); no automatic mutation retry`);
+  return response.json();
+}
+async function attachPrEvidence(configuration, input, options = {}) {
+  const commentPosted = false;
+  const baseUrl = prUrl(configuration, input.prId);
+  demand(
+    typeof configuration.authorization === "string" && configuration.authorization.trim(),
+    "An ephemeral ADO authorization header is required"
+  );
+  demand(Array.isArray(input.attachments), "Expected an attachment array");
+  const names = /* @__PURE__ */ new Set();
+  for (const attachment of input.attachments) {
+    demand(
+      typeof attachment.name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(attachment.name),
+      "Attachment names must be plain file names"
+    );
+    demand(!names.has(attachment.name), "Duplicate attachment name");
+    names.add(attachment.name);
+    demand(typeof attachment.localPath === "string" && isAbsolute(attachment.localPath), "Attachment path must be absolute");
+    demand((await stat(attachment.localPath)).isFile(), "Attachment must be a file");
+    demand(attachment.sha256 === void 0 || /^[a-f0-9]{64}$/.test(attachment.sha256), "Invalid attachment SHA-256");
+  }
+  for (const field of ["commentMarkdown", "appendToDescription"]) {
+    demand(input[field] === void 0 || typeof input[field] === "string", `Invalid ${field}`);
+  }
+  if (input.expectedHead !== void 0) demand(/^[a-f0-9]{40}$/.test(input.expectedHead), "Invalid expected HEAD");
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const readFetch = options.readFetch ?? fetchImpl;
+  const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(12e4)]) : AbortSignal.timeout(12e4);
+  const headers = { Authorization: configuration.authorization };
+  const url3 = `${baseUrl}?api-version=7.0`;
+  async function readPr() {
+    const pr = await responseJson(await readFetch(url3, { headers, signal, redirect: "error" }), "Read PR");
+    demand(
+      pr.pullRequestId === input.prId && pr.isDraft === true && pr.status === "active",
+      "Publication requires the exact active Draft PR"
+    );
+    demand(typeof pr.lastMergeSourceCommit?.commitId === "string" && /^[a-f0-9]{40}$/.test(pr.lastMergeSourceCommit.commitId), "Live PR source HEAD is unavailable");
+    return pr;
+  }
+  const initial = await readPr();
+  const expectedHead = input.expectedHead ?? initial.lastMergeSourceCommit.commitId;
+  demand(initial.lastMergeSourceCommit.commitId === expectedHead, "Live PR HEAD does not match requested evidence");
+  const uploaded = [];
+  const organization = new URL(configuration.organization);
+  for (const attachment of input.attachments) {
+    const bytes = await readFile(attachment.localPath);
+    const expectedHash = createHash("sha256").update(bytes).digest("hex");
+    if (attachment.sha256) demand(
+      expectedHash === attachment.sha256,
+      "Attachment bytes no longer match the requested SHA-256"
+    );
+    options.log?.(`Uploading ${attachment.name} (${bytes.length} bytes) to PR #${input.prId}`);
+    const result = await responseJson(await fetchImpl(
+      `${baseUrl}/attachments/${encodeURIComponent(attachment.name)}?api-version=7.0`,
+      {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/octet-stream" },
+        body: new Uint8Array(bytes),
+        signal,
+        redirect: "error"
+      }
+    ), "Upload attachment");
+    demand(typeof result.url === "string", "ADO did not return an attachment URL");
+    const mediaUrl = new URL(result.url);
+    demand(
+      mediaUrl.origin === organization.origin && !mediaUrl.username && !mediaUrl.password && !mediaUrl.hash && mediaUrl.pathname.startsWith(`${organization.pathname.replace(/\/$/, "")}/`),
+      "ADO returned an unexpected attachment URL; reconcile the upload before continuing"
+    );
+    const downloaded = await readFetch(mediaUrl.href, { headers, signal, redirect: "error" });
+    demand(downloaded.ok && downloaded.body, `Attachment readback failed (HTTP ${downloaded.status}); reconcile the upload`);
+    const downloadedHash = createHash("sha256");
+    let downloadedBytes = 0;
+    for await (const chunk of downloaded.body) {
+      downloadedBytes += chunk.length;
+      demand(downloadedBytes <= bytes.length, "Uploaded attachment readback exceeds the original size");
+      downloadedHash.update(chunk);
     }
-    position = end + 1;
+    demand(
+      downloadedBytes === bytes.length && downloadedHash.digest("hex") === expectedHash,
+      "Uploaded attachment bytes do not match the original SHA-256"
+    );
+    uploaded.push({ name: attachment.name, url: result.url });
   }
-  return void 0;
-}
-function replacePlaceholders(text, uploaded) {
-  let out = text;
-  for (const { name, url: url3 } of uploaded) {
-    out = out.split(`{{${name}}}`).join(url3);
+  const append = descriptionAppend(input, uploaded);
+  let descriptionUpdated = false;
+  let update = { prunedSections: [] };
+  if (append) {
+    const current = await readPr();
+    demand(current.lastMergeSourceCommit.commitId === expectedHead, "PR HEAD changed during evidence upload");
+    demand(current.description === void 0 || typeof current.description === "string", "Invalid live PR description");
+    update = preparePrDescriptionUpdate(current.description ?? "", append);
+    const response = await fetchImpl(url3, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ description: update.description, isDraft: true }),
+      signal,
+      redirect: "error"
+    });
+    demand(response.ok, `Update PR description failed (HTTP ${response.status}); reconcile before retrying`);
+    await response.body?.cancel();
+    const final = await readPr();
+    demand(
+      final.lastMergeSourceCommit.commitId === expectedHead && final.description === update.description,
+      "Live PR does not match the requested HEAD/description; reconcile before retrying"
+    );
+    descriptionUpdated = true;
+  } else {
+    demand((await readPr()).lastMergeSourceCommit.commitId === expectedHead, "PR HEAD changed during publication");
   }
-  return out;
+  return {
+    prId: input.prId,
+    uploaded,
+    commentPosted,
+    descriptionUpdated,
+    descriptionPruned: update.prunedSections.length > 0,
+    prunedDescriptionSections: update.prunedSections
+  };
 }
+
+// src/ow/tools/prAttach.ts
 var PrAttach = class {
   constructor(cwd = OW.odspWebRoot, logger2) {
     this.cwd = cwd;
@@ -30694,130 +30855,25 @@ var PrAttach = class {
   cwd;
   logger;
   async attach(input, signal) {
-    const authorizationHeader = await getAdoAuthorizationHeader(this.cwd, signal);
-    const baseUrl = `${ADO_ORG2}/${ADO_PROJECT2}/_apis/git/repositories/${ODSP_WEB_REPO_ID2}/pullRequests/${input.prId}`;
-    const uploaded = [];
-    for (const att of input.attachments) {
-      const fileData = await fs3.readFile(att.localPath);
-      this.logger?.info("pr-attach", `uploading ${att.name} (${fileData.byteLength} bytes) to PR #${input.prId}`);
-      const uploadUrl = `${baseUrl}/attachments/${encodeURIComponent(att.name)}?api-version=${API_VERSION}`;
-      const resp = await fetch(uploadUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": authorizationHeader,
-          "Content-Type": "application/octet-stream"
-        },
-        body: new Uint8Array(fileData),
-        signal
-      });
-      if (!resp.ok) {
-        const errBody = await resp.text();
-        throw new Error(`Failed to upload attachment '${att.name}' (HTTP ${resp.status}): ${errBody}`);
-      }
-      const parsed = await resp.json();
-      const url3 = parsed.url;
-      if (!url3) {
-        throw new Error(`ADO did not return a URL for attachment '${att.name}'. Response: ${JSON.stringify(parsed)}`);
-      }
-      uploaded.push({ name: att.name, url: url3 });
-      this.logger?.info("pr-attach", `uploaded ${att.name} -> ${url3}`);
-    }
-    let commentPosted = false;
-    let descriptionUpdated = false;
-    let descriptionPruned = false;
-    let prunedDescriptionSections = [];
-    const descriptionAppend = buildDescriptionAppend(input, uploaded);
-    if (descriptionAppend) {
-      const getUrl = `${baseUrl}?api-version=${API_VERSION}`;
-      const getResp = await fetch(getUrl, {
-        headers: { "Authorization": authorizationHeader },
-        signal
-      });
-      if (!getResp.ok) {
-        const errBody = await getResp.text();
-        throw new Error(`Failed to fetch PR for description update (HTTP ${getResp.status}): ${errBody}`);
-      }
-      const pr = await getResp.json();
-      const existing = pr.description ?? "";
-      const append = replacePlaceholders(descriptionAppend, uploaded);
-      const descriptionUpdate = preparePrDescriptionUpdate(existing, append);
-      const newDescription = descriptionUpdate.description;
-      descriptionPruned = descriptionUpdate.prunedSections.length > 0;
-      prunedDescriptionSections = descriptionUpdate.prunedSections;
-      const patchResp = await fetch(getUrl, {
-        method: "PATCH",
-        headers: {
-          "Authorization": authorizationHeader,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ description: newDescription }),
-        signal
-      });
-      if (!patchResp.ok) {
-        const errBody = await patchResp.text();
-        throw new Error(`Failed to update PR description (HTTP ${patchResp.status}): ${errBody}`);
-      }
-      descriptionUpdated = true;
-      this.logger?.info("pr-attach", `description updated on PR #${input.prId}`);
-    }
-    return {
-      prId: input.prId,
-      uploaded,
-      commentPosted,
-      descriptionUpdated,
-      descriptionPruned,
-      prunedDescriptionSections
-    };
+    return attachPrEvidence({
+      organization: "https://dev.azure.com/onedrive",
+      project: "ODSP-Web",
+      repositoryId: "3829bdd7-1ab6-420c-a8ec-c30955da3205",
+      authorization: await getAdoAuthorizationHeader(this.cwd, signal)
+    }, input, {
+      signal,
+      readFetch: fetchAdoWithRetry,
+      log: (message) => this.logger?.info("pr-attach", message)
+    });
   }
 };
-function buildDescriptionAppend(input, uploaded) {
-  const sections = [];
-  if (input.appendToDescription?.trim()) {
-    sections.push(input.appendToDescription.trim());
-  }
-  if (input.commentMarkdown?.trim()) {
-    sections.push(input.commentMarkdown.trim());
-  }
-  if (sections.length > 0) {
-    return sections.join("\n\n");
-  }
-  if (uploaded.length === 0) {
-    return void 0;
-  }
-  const lines = ["## Visual Validation Attachments", ""];
-  for (const { name } of uploaded) {
-    lines.push(`- [${name}]({{${name}}})`);
-  }
-  return lines.join("\n");
-}
 
 // src/ow/tools/adoClient.ts
-import * as cp6 from "child_process";
-var ODSP_WEB_REPO_ID3 = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
-var ADO_ORG3 = "https://dev.azure.com/onedrive";
-var ADO_PROJECT3 = "ODSP-Web";
-var API_VERSION2 = "7.1";
+var ODSP_WEB_REPO_ID2 = "3829bdd7-1ab6-420c-a8ec-c30955da3205";
+var ADO_ORG2 = "https://dev.azure.com/onedrive";
+var ADO_PROJECT2 = "ODSP-Web";
+var API_VERSION = "7.1";
 var DEBUG_QUERY_PATTERN = /\?debug=true&noredir=true&loader=[^`\s]+&debugManifestsFile=[^`\s]+/;
-function execCmd3(cmd, cwd, signal) {
-  return new Promise((resolve) => {
-    cp6.exec(cmd, { cwd, signal, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ exitCode: err?.code ?? 0, stdout: stdout.toString(), stderr: stderr.toString() });
-    });
-  });
-}
-function extractCredentialPassword2(credentialOutput) {
-  let position = 0;
-  while (position < credentialOutput.length) {
-    const nextNewline = credentialOutput.indexOf("\n", position);
-    const end = nextNewline === -1 ? credentialOutput.length : nextNewline;
-    const line = credentialOutput.slice(position, end);
-    if (line.startsWith("password=")) {
-      return line.slice("password=".length);
-    }
-    position = end + 1;
-  }
-  return void 0;
-}
 function splitDebugQueryUrls(debugQuery) {
   const query = new URLSearchParams(debugQuery.replace(/^\?/, ""));
   return {
@@ -30830,7 +30886,7 @@ async function fetchStatus(url3, signal) {
     return void 0;
   }
   try {
-    const response = await fetch(url3, { method: "HEAD", signal });
+    const response = await fetchAdoWithRetry(url3, { method: "HEAD", signal });
     return response.status;
   } catch {
     return void 0;
@@ -30842,36 +30898,12 @@ var AdoClient = class {
   }
   cwd;
   async getAuthorizationHeader(signal) {
-    const tokenResult = await execCmd3(
-      "az account get-access-token --resource=499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv",
-      this.cwd,
-      signal
-    );
-    if (tokenResult.exitCode === 0 && tokenResult.stdout.trim()) {
-      return `Bearer ${tokenResult.stdout.trim()}`;
-    }
-    const credentialResult = await execCmd3(
-      "printf 'protocol=https\\nhost=onedrive.visualstudio.com\\n\\n' | git credential fill",
-      this.cwd,
-      signal
-    );
-    const credentialPassword = extractCredentialPassword2(credentialResult.stdout);
-    if (credentialResult.exitCode === 0 && credentialPassword) {
-      return `Basic ${Buffer.from(`:${credentialPassword}`).toString("base64")}`;
-    }
-    throw new Error(
-      `Failed to authenticate to Azure DevOps via az token or git credential.
-az stderr:
-${tokenResult.stderr}
-
-git credential stderr:
-${credentialResult.stderr}`
-    );
+    return getAdoAuthorizationHeader(this.cwd, signal);
   }
   async getPullRequestThreads(prId, signal) {
     const authorization = await this.getAuthorizationHeader(signal);
-    const url3 = `${ADO_ORG3}/${ADO_PROJECT3}/_apis/git/repositories/${ODSP_WEB_REPO_ID3}/pullRequests/${prId}/threads?api-version=${API_VERSION2}`;
-    const response = await fetch(url3, {
+    const url3 = `${ADO_ORG2}/${ADO_PROJECT2}/_apis/git/repositories/${ODSP_WEB_REPO_ID2}/pullRequests/${prId}/threads?api-version=${API_VERSION}`;
+    const response = await fetchAdoWithRetry(url3, {
       headers: { "Authorization": authorization },
       signal
     });
@@ -31003,7 +31035,7 @@ function truncateLines(lines, max = 20) {
 // src/ow/mcp/owTools.ts
 function execSimple(cmd) {
   return new Promise((resolve, reject) => {
-    cp7.exec(cmd, (err, stdout) => {
+    cp6.exec(cmd, (err, stdout) => {
       if (err) reject(err);
       else resolve(stdout.trim());
     });
@@ -31023,7 +31055,7 @@ function registerOwTools(server2, logger2, logDir) {
       git.branch(extras.signal).catch(() => "unknown"),
       execSimple("node -v").catch(() => "unknown"),
       tmux.listWindows(extras.signal),
-      fs4.promises.access(`${OW.odspWebRoot}/common/temp/last-install.flag`).then(() => true).catch(() => false)
+      fs3.promises.access(`${OW.odspWebRoot}/common/temp/last-install.flag`).then(() => true).catch(() => false)
     ]);
     return successResultWithDebug(logger2, "ow-status", {
       branch,
@@ -31273,8 +31305,8 @@ function registerOwTools(server2, logger2, logDir) {
     let version2 = "unknown";
     try {
       const directManifest = `${pluginRoot}/.claude-plugin/plugin.json`;
-      const manifestPath = fs4.existsSync(directManifest) ? directManifest : `${pluginRoot}/copilot/.claude-plugin/plugin.json`;
-      const pkg = JSON.parse(await fs4.promises.readFile(manifestPath, "utf8"));
+      const manifestPath = fs3.existsSync(directManifest) ? directManifest : `${pluginRoot}/copilot/.claude-plugin/plugin.json`;
+      const pkg = JSON.parse(await fs3.promises.readFile(manifestPath, "utf8"));
       version2 = pkg.version ?? "unknown";
     } catch {
     }
@@ -31340,15 +31372,18 @@ function registerOwTools(server2, logger2, logDir) {
     description: "Upload files (typically PNG screenshots) to an Azure DevOps PR, then replace its generated visual-validation description block. Keeps the 4000-character limit by removing only explicitly disposable generated sections; never drops human-authored content or posts comments. Use {{name}} placeholders in appendToDescription.",
     inputSchema: {
       prId: external_exports3.number().describe("Pull request ID to attach files to"),
+      expectedHead: external_exports3.string().regex(/^[a-f0-9]{40}$/).optional().describe("Exact source commit bound to the evidence; rejects a stale PR HEAD"),
       attachments: external_exports3.array(external_exports3.object({
         name: external_exports3.string().describe("Filename used on ADO, e.g. 'before-pr2219557.png'"),
-        localPath: external_exports3.string().describe("Absolute path to the local file to upload")
+        localPath: external_exports3.string().describe("Absolute path to the local file to upload"),
+        sha256: external_exports3.string().regex(/^[a-f0-9]{64}$/).optional().describe("Expected SHA-256 of the approved attachment bytes")
       })).describe("Files to upload as PR attachments"),
       appendToDescription: external_exports3.string().optional().describe("Markdown for the generated visual-validation block. Replaces the prior block. Use {{name}} placeholders for attachment URLs. If omitted, a simple attachment section is generated.")
     }
   }, async (input, extras) => {
     const result = await prAttach.attach({
       prId: input.prId,
+      expectedHead: input.expectedHead,
       attachments: input.attachments,
       appendToDescription: input.appendToDescription
     }, extras.signal);
@@ -31435,7 +31470,7 @@ if (command !== "mcp") {
 var distDir = path3.dirname(url2.fileURLToPath(import.meta.url));
 var logsDir = path3.join(distDir, "logs");
 var toolLogDir = path3.join(logsDir, "tools");
-fs5.mkdirSync(toolLogDir, { recursive: true });
+fs4.mkdirSync(toolLogDir, { recursive: true });
 purgeLogs(logsDir, 7);
 var logger = new FileLogger(logsDir, "ow-mcp");
 var server = new McpServer(

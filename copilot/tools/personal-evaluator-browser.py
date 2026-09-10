@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Generated from kaixun96/dev.A11yAssist@aa78521e19bd9a69ffc6ad0a00e21f8bc230e546:integrations/agentow/runtime/personal-evaluator-browser.py. Do not edit; use ts/scripts/sync-a11y-capabilities.mjs.
 """Persistent personal-account browser for long-running visual evaluators."""
 
 from __future__ import annotations

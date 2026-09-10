@@ -27,6 +27,26 @@ the export and source hashes, and generates both copies. Build validation
 rejects drift. Publish a new plugin version through review; existing running
 sessions remain on their recorded version.
 
+## Shared execution sources
+
+Windows host setup, the retained personal-browser profile, ADO attachment writes
+and description budgeting now have one maintained source in dev.A11yAssist.
+`a11y-execution.lock.json` pins their exact source commit and hashes. Update with
+`node ts/scripts/sync-a11y-capabilities.mjs --update-execution <reviewed-commit>`;
+the normal A11y validation rejects drift, including generated Python/PowerShell.
+
+`PrAttach` now only supplies the existing project, authentication and logging.
+The shared implementation verifies the active Draft and source HEAD before
+upload, checks downloaded attachment bytes, updates only the description and
+confirms live Draft/HEAD/description afterward. The existing input/result API and
+description budget markers remain. An optional `expectedHead` binds the caller's
+evidence commit; supply it when available. There is no automatic mutation retry.
+
+These are source changes, not a live plugin/worker cutover. The retained browser
+script is still the AgentOW campaign compatibility scenario, not a generic AT
+recorder. Resource ownership/recovery, real AT handlers and independent media
+evaluation remain deployment responsibilities.
+
 ## Optional direct MCP calls
 
 When the user installs a small capability in the SAME Copilot session, its
