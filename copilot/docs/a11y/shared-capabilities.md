@@ -15,6 +15,11 @@ preserved. Existing evaluator calls continue to work offline, with no runtime
 network fetch or additional plugin installation. Include the lock's source
 commit/version identity in the run's knowledge manifest.
 
+The v0.7 shared source also provides the single-read file loader used by its
+CLI and direct checker. Baseline parsing and hashing use the same bytes.
+The mirrored CLI remains structural-only; local artifact hashing is available
+through the explicitly selected small-plugin tool below, not an invented CLI flag.
+
 Do not hand-edit either mirror. In an AgentOW source checkout, update through:
 
 ```powershell
@@ -56,14 +61,19 @@ an installation changed a currently running session.
 
 - `a11y_validate_evidence`: structural evidence-v1 checking from request/result
   paths, plus baseline paths and repository root for verify. No provider
-  configuration or global workflow run is needed.
+  configuration or global workflow run is needed. With A11yAssist v0.7, explicit
+  `artifactRoot` (and `baselineArtifactRoot` for verify) additionally hashes all
+  root-relative local evidence files using the same shared artifact verifier.
 - `a11y_capture_invoke`: one caller-requested capture through an authorized
   Windows connection, with stable operationId and scenario/evaluator/build context.
 - `a11y_publish_invoke`: one caller-authorized Draft publication through an
   authorized connection. Do not create a competing PR writer.
 
-The structural checker does not inspect media, verify every evidence URI's
-bytes or replace independent behavior evaluation. Direct calls do not waive
+Without those roots the checker does not verify evidence URI bytes. The opt-in
+requires local relative URIs and rejects missing/changed/escaping files or
+remote schemes; it never downloads a URI or silently falls back. Even successful
+byte checks do not prove runtime/AT/media provenance or independently interpreted
+behavior. Direct calls do not waive
 AgentOW's existing phase/evidence policy, the dispatcher's stricter restrictions,
 or resource ownership. A tool installed in a Codespace does not grant DevBox
 control.
