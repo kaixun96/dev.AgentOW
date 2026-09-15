@@ -6,7 +6,7 @@ Use this reference when a change adds or modifies visible UI text, non-visible a
 
 1. Flag hard-coded user-visible strings and non-visible assistive text, including tooltips, accessible names and descriptions, `aria-label` values, screen-reader-only text, announcements, and live-region content. Define them in `.resx` and import them from the generated resource module. Do not flag dynamic data from an API, such as a user name.
 2. Require a translator comment for each string that describes where and how the string appears.
-3. Require the translator comment to explain every placeholder, such as `{0}` and `{1}`. Do not lock placeholders; the formatter utility replaces them at runtime. Verify each formatter argument matches the placeholder described in the comment. Never require placeholder-lock metadata such as `{Locked={0}}` or `{Locked="{0}"}`.
+3. Require the translator comment to explain every placeholder, such as `{0}` and `{1}`. Do not lock placeholders; the formatter utility replaces them at runtime. Verify each formatter argument matches the placeholder described in the comment. Never require placeholder-lock metadata such as `{Locked={0}}` or `{Locked="{0}"}`. When the PR adds unnecessary placeholder-lock metadata, report a non-blocking Nit rather than accepting it as harmless metadata. Apply the same Nit to equivalent locks for other placeholders, and cover all newly added occurrences in the current diff; do not flag unchanged pre-existing locks.
 4. Keep punctuation inside the localized string. For user-visible lists, reject hard-coded separators such as `names.join(', ')`; format the list with `Intl.ListFormat` and the user's locale so conjunctions, punctuation, and ordering follow locale rules.
 5. Localize complete sentences, not fragments assembled in code. When placeholders contain React elements, keep the whole sentence in one resource and use a ReactNode-aware formatter such as `StringHelper.formatToArray` instead of concatenation or plain string formatting.
 6. For counts in visible UI and screen-reader announcements, use sentence-level interval strings with `StringHelper.formatWithLocalizedCountValue`. Apply this rule only when the placeholder represents a numeric count.
@@ -54,6 +54,14 @@ Example `.resx` resource:
 Use this pattern when you review newly authored strings with approval-lock metadata. The reviewer should verify that the comment gives translators usable context, and that any lock or approval marker follows the repository's machine-readable metadata format instead of freeform prose. For newly added strings, if approval status is unclear, leave a comment prompting the author to lock the string when it is not yet approved; do not raise missing lock metadata alone as a blocking issue.
 
 Do not report placeholder metadata as missing lock tags. Placeholder tokens (`{0}`, `{1}`) should remain unlockable and described in the translator comment; lock tagging applies to whole-string approval workflows, not placeholder substitution.
+
+For a newly added placeholder lock, suggest removing only the unnecessary lock metadata as a Nit. Preserve the placeholder explanation and any legitimate whole-string approval lock such as `{Locked}`; this Nit is not a blocking localization defect.
+
+Suggested review comment (adapt the metadata and placeholder names to the actual occurrence; `{0}` is only an example):
+
+> Nit: The placeholder-lock metadata `{Locked="{0}"}` is unnecessary. Please remove it while keeping the translator comment, including the explanation of `{0}`. Whole-string approval locks (`{Locked}`) serve a separate purpose and should be preserved where applicable.
+
+Do not suggest replacing a placeholder lock with `{Locked}` unless the string independently requires a whole-string approval lock.
 
 ### Separators and fragments
 
