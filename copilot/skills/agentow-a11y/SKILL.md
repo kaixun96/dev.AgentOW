@@ -223,6 +223,21 @@ No planner approval phase exists in A11y mode.
 5. Run the smallest existing build/lint/test commands that cover the changed package.
 6. Commit without pushing.
 7. Write `a11y/implementation/iter<N>.md` with commit, diff scope, and build result.
+8. Before an external evaluator loads changed resources, write a private
+   `a11y/implementation/build-handoff.json` from the actual build dependency graph
+   and run `tools/validate-build-handoff.mjs --manifest <manifest> --repo-root <repoRoot>
+   --artifact-root <builtResources>`. Schema 1 binds `head`, `dependencyBasis`,
+   `entrypoints` (resource IDs), and `resources` with unique `id`, `kind`, relative
+   `path`, intended HTTPS `url`, file `sha256`, and `dependencies` (resource IDs).
+   `coverage` must explicitly account for `script`, `style`, `localization`, `font`
+   and `data`, each with `status` (`included` or justified `not-applicable`) and
+   `reason`. Include transitive chunks, localization and fonts, not only the entry
+   bundle. Missing dependencies, unresolved LFS pointers, byte drift or a different
+   HEAD block handoff; fix the build in the source environment, not on the evaluator.
+   Keep the manifest and validator result with the implementation artifacts.
+   Declared local closure is not proof of exhaustive inventory or browser loading:
+   the evidence producer must still prove the changed resources loaded for the
+   canonical route/fixture. Never mark unknown coverage not-applicable to pass.
 
 Maximum three implementation cycles. A11y mode is not a broad refactoring loop.
 
