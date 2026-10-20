@@ -21,8 +21,9 @@ Initialize trusted prerequisites before the first task:
 /ow-init
 ```
 
-Restart Copilot CLI when initialization installs or enables plugins. If Azure authentication is
-missing, run `CODESPACES=false az login` in the current Codespace terminal and rerun `/ow-init`.
+Restart Copilot CLI when initialization installs or enables plugins. PR review first attempts to
+install and use Azure CLI, then falls back to the current Git credential. Run `az login` only when
+neither route can access Azure DevOps.
 
 ## Commands
 

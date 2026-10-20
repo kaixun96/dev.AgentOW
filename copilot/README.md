@@ -14,8 +14,9 @@ copilot plugin install agentow-copilot@agentOW
 ### Recommended first run
 
 Enter `/ow-init`. This does not start planning or modify product code. Restart Copilot CLI if
-initialization changes plugins or settings. If Azure authentication is missing, run
-`CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init`.
+initialization changes plugins or settings. PR review first attempts to install and use Azure CLI,
+then falls back to the current Git credential when CLI installation or authentication is
+unavailable. Interactive `az login` is needed only when neither route can access Azure DevOps.
 
 ## Execution model
 

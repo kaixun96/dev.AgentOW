@@ -874,7 +874,7 @@ const checks = [
       "Context maintenance never adds a user gate.",
       "`/ow-context-feedback`",
       "### Recommended first run: initialize prerequisites",
-      "CODESPACES=false az login"
+      "falls back to the current Git credential"
     ]
   },
   {
@@ -883,7 +883,7 @@ const checks = [
       "### Recommended first run",
       "Enter `/ow-init`",
       "This does not start planning or modify product code.",
-      "CODESPACES=false az login"
+      "falls back to the current Git credential"
     ]
   },
   {

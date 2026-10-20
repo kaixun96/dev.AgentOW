@@ -39,7 +39,7 @@ node "${CLAUDE_PLUGIN_ROOT}/tools/ado-pr-show.mjs" \
   --org https://dev.azure.com/onedrive --project ODSP-Web
 ```
 
-If `az` is missing or unauthenticated, stop and tell the user to run `CODESPACES=false az login` (plus `az extension add --name azure-devops`) in this Codespace. Do not silently fall back to reviewing the current branch when a PR was requested.
+The PR resolver first tries Azure CLI. When Azure CLI is missing, it attempts a supported package-manager installation and installs the Azure DevOps extension. If installation, authentication, or the CLI request fails, it uses the existing Git credential through `git credential fill` and the ADO REST API. Stop only when both routes fail; never silently fall back to reviewing the current branch when a PR was requested. Do not print or persist credential output.
 
 Read `pr.json` and take `sourceRefName`, `targetRefName`, `lastMergeSourceCommit.commitId`, `title`, `description`, `status`, and `isDraft`. Strip the `refs/heads/` prefix from both ref names. Save the PR description, because the review contract requires inspecting it:
 

@@ -34,6 +34,7 @@ Only fixed packages from the trusted local marketplace `/workspaces/odsp-web/.ai
 | `odsp-web-mcp-servers-opt-in` (Figma, ADO, Bluebird, Learn) | When the request references those sources |
 | `sharp`, `pngjs`, `pixelmatch` | For UI/visual tasks |
 | Azure DevOps CLI extension | Only for ADO-signaled tasks, when `az` exists and the extension is missing |
+| Azure CLI for PR review | Through `winget` on Windows or Homebrew on macOS; Git credentials are the fallback |
 | Disabled Copilot baseline/task plugin | Re-enabled in `~/.copilot/settings.json`; restart required |
 
 Plugin installation uses:
@@ -52,7 +53,7 @@ The bootstrap reports but cannot safely complete:
 
 - restarting Copilot so newly installed MCP servers load;
 - `copilot auth`, Figma OAuth, AAD consent;
-- Azure authentication: explicitly tell the user to run `CODESPACES=false az login` in the current Codespace terminal, then rerun `/ow-init` or the original agentOW command;
+- Azure authentication when neither Azure CLI nor the existing Git credential can access ADO: tell the user to run `az login`, then rerun `/ow-init` or the original agentOW command;
 - FIC authentication or expired FIC credentials;
 - tenant/site/fixture eligibility and seeded test data;
 - context-repository push permission.
