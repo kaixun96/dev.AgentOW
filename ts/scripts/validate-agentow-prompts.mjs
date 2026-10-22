@@ -502,6 +502,15 @@ const sizeRegressionSnippets = [
 
 const checks = [
   {
+    file: "copilot/skills/ow-review/references/server-review-issues.md",
+    snippets: [
+      "# Server-side review issues",
+      "Use this reference for server-side changes in SPO.Core.",
+      "no additional SQL roundtrips are allowed during page viewer boot",
+      "is `Critical` and requires a new design review before merge",
+    ],
+  },
+  {
     file: "copilot/skills/ow-ref-replace-component/SKILL.md",
     snippets: [
       "Select one migration shape",
@@ -1370,6 +1379,7 @@ const mirroredChecks = [
   ["contracts/run-insights.schema.json", "copilot/contracts/run-insights.schema.json"],
   ["skills/ow-review/references/accessibility.md", "copilot/skills/ow-review/references/accessibility.md"],
   ["skills/ow-review/references/common-review-issues.md", "copilot/skills/ow-review/references/common-review-issues.md"],
+  ["skills/ow-review/references/server-review-issues.md", "copilot/skills/ow-review/references/server-review-issues.md"],
   ["skills/ow-review/references/graduation.md", "copilot/skills/ow-review/references/graduation.md"],
   ["skills/ow-review/references/localization-and-formatting.md", "copilot/skills/ow-review/references/localization-and-formatting.md"],
   ["skills/ow-review/references/shared-utility-reuse.md", "copilot/skills/ow-review/references/shared-utility-reuse.md"],
