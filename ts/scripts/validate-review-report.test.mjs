@@ -552,6 +552,65 @@ nonRuntimeSpClientChange.preReview.rolloutProtection = {
 };
 assert.equal(validate(nonRuntimeSpClientChange).status, 0, "pure documentation changes can use rollout not-applicable");
 
+for (const testPath of [
+  "sp-client/integration-tests/brand-center-playwright/src/utils/AppLandingPage.ts",
+  "sp-client/integration-tests/brand-center-playwright/src/utils/FluentFontsPage.ts",
+  "sp-client/integration-tests/brand-center-playwright/src/utils/FontsPage.ts",
+  "sp-client/integration-tests/brand-center-playwright/src/test/ValidateFluentBrandFontsList.spec.ts",
+]) {
+  const testOnlyChange = structuredClone(nonRuntimeSpClientChange);
+  testOnlyChange.riskMap[0].path = testPath;
+  testOnlyChange.coverage.changedFiles[0].path = testPath;
+  testOnlyChange.preReview.reviewability.independentBehaviorUnits[0].paths = [testPath];
+  testOnlyChange.preReview.rolloutProtection.notApplicableReason =
+    "The changed integration-test helper or spec is not shipped in the product runtime";
+  fs.writeFileSync(changedFilesPath, `${testPath}\n`);
+  fs.writeFileSync(diffNumstatPath, `10\t2\t${testPath}\n`);
+  const result = validate(testOnlyChange);
+  assert.equal(result.status, 0, `integration-test code needs no product rollout gate: ${testPath}: ${result.stdout}`);
+}
+
+for (const runtimePath of [
+  "sp-client/src/example.ts",
+  "sp-client/integration-tests-ui/src/example.ts",
+  "sp-client/src/integration-tests-helper.ts",
+]) {
+  const runtimeChange = structuredClone(nonRuntimeSpClientChange);
+  runtimeChange.riskMap[0].path = runtimePath;
+  runtimeChange.coverage.changedFiles[0].path = runtimePath;
+  runtimeChange.preReview.reviewability.independentBehaviorUnits[0].paths = [runtimePath];
+  runtimeChange.preReview.rolloutProtection.runtimePaths = [runtimePath];
+  fs.writeFileSync(changedFilesPath, `${runtimePath}\n`);
+  fs.writeFileSync(diffNumstatPath, `10\t2\t${runtimePath}\n`);
+  const result = validate(runtimeChange);
+  assert.equal(result.status, 1, `product code must still require rollout protection: ${runtimePath}`);
+  assert.ok(JSON.parse(result.stdout).errors.includes("runtime changes require a killswitch, flight, or killswitch+flight"));
+}
+
+const mixedPaths = [
+  "sp-client/integration-tests/brand-center-playwright/src/utils/FontsPage.ts",
+  "sp-client/src/example.ts",
+];
+const mixedTestAndRuntimeChange = structuredClone(nonRuntimeSpClientChange);
+mixedTestAndRuntimeChange.riskMap = mixedPaths.map((filePath) => ({
+  ...nonRuntimeSpClientChange.riskMap[0], path: filePath,
+}));
+mixedTestAndRuntimeChange.coverage.changedFiles = mixedPaths.map((filePath) => ({
+  ...nonRuntimeSpClientChange.coverage.changedFiles[0], path: filePath,
+}));
+Object.assign(mixedTestAndRuntimeChange.preReview.reviewability, {
+  changedFileCount: 2, additions: 20, deletions: 4,
+  independentBehaviorUnits: [{ name: "Product change with integration coverage", paths: mixedPaths }],
+});
+mixedTestAndRuntimeChange.preReview.rolloutProtection.runtimePaths = ["sp-client/src/example.ts"];
+fs.writeFileSync(changedFilesPath, `${mixedPaths.join("\n")}\n`);
+fs.writeFileSync(diffNumstatPath, mixedPaths.map((filePath) => `10\t2\t${filePath}\n`).join(""));
+const mixedResult = validate(mixedTestAndRuntimeChange);
+assert.equal(mixedResult.status, 1, "integration tests cannot exempt product code in a mixed change");
+const mixedErrors = JSON.parse(mixedResult.stdout).errors;
+assert.ok(mixedErrors.includes("runtime changes require a killswitch, flight, or killswitch+flight"));
+assert.ok(!mixedErrors.includes("rolloutProtection runtime paths must exactly match Git runtime changes"));
+
 fs.writeFileSync(changedFilesPath, "src/example.ts\n");
 fs.writeFileSync(diffNumstatPath, "10\t2\tsrc/example.ts\n");
 

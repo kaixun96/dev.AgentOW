@@ -334,6 +334,7 @@ function testEvidenceReference(value) {
 function isSpClientRuntimePath(filePath) {
   return (
     filePath.startsWith("sp-client/") &&
+    !filePath.startsWith("sp-client/integration-tests/") &&
     /\.(?:ts|tsx|js|jsx|css|scss|less|resx)$/i.test(filePath) &&
     !/(?:^|\/)(?:__tests__|tests?|specs?)(?:\/|$)|(?:\.test|\.spec)\.[^/]+$|\.snap$/i.test(
       filePath,
