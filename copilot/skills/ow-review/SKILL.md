@@ -114,6 +114,18 @@ substantive change retires a Flight, KS, Experiment, Feature, or Rollout gate, s
 including every mixed graduation/feature change, set `reviewPolicy=general` and read
 `${CLAUDE_PLUGIN_ROOT}/docs/review-contract.md`.
 
+Ordinary named ECS flight additions or migrations use the same call-level review as numeric
+flights: API, name provenance, call site/timing, direction, and fallback. Do not automatically
+require registration or initialization audits, or pipeline/wiki/skill lookups.
+Only investigate lifecycle infrastructure when the diff changes initialization, registration,
+manifest generation, evaluator/plumbing, or activation infrastructure, or concrete evidence shows
+a flight not taking effect or a startup failure relevant to the changed path. Then apply the
+"ECS client-flight lifecycle and generated registration" section of
+`${CLAUDE_PLUGIN_ROOT}/skills/ow-review/references/common-review-issues.md`, resolve applicable
+current guides, skills, and automation, and pass source paths/links in `contextDocuments`.
+Record unavailable or conflicting guidance rather than inventing a requirement. An absent
+generated manifest entry alone neither triggers the investigation nor establishes a merge blocker.
+
 For `graduation-only`, record every gate identifier established during this independent
 classification, one per line, in `$sessionDir/review-gates.txt` before dispatch. The reviewer must
 not create or modify this inventory. Reverse-scan merge-base and HEAD by each gate/Flight name,

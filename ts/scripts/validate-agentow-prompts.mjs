@@ -30,6 +30,22 @@ const sharedUtilityReuseSnippets = [
 ];
 
 const commonReviewIssueSnippets = [
+  "### ECS client-flight lifecycle and generated registration",
+  "<!-- review-rule: ecs.review-scope -->",
+  "the same call-level review as numeric",
+  "solely because a consumer adds or changes an ECS flight call",
+  "**Investigation trigger:** the diff changes host/SDK initialization",
+  "An absent generated",
+  "entry alone does not trigger this investigation",
+  "<!-- review-rule: ecs.current-guidance -->",
+  "<!-- review-rule: ecs.initialization-owner -->",
+  "<!-- review-rule: ecs.registration-automation -->",
+  "<!-- review-rule: ecs.merge-versus-activation -->",
+  "do not require each consumer to initialize it again",
+  "do not ask the consumer PR to hand-assign an index",
+  "is not by itself a merge blocker",
+  "safe disabled fallback",
+  "a violated merge contract, a build/runtime failure, an unsafe fallback",
   "Evaluate a Flight/KS before any new-path-only helper",
   "Trace imports and calls transitively",
   "Gate behavior, not syntax",
@@ -647,6 +663,12 @@ const checks = [
   {
     file: "copilot/skills/ow-review/SKILL.md",
     snippets: [
+      "Ordinary named ECS flight additions or migrations use the same call-level review as numeric",
+      "require registration or initialization audits, or pipeline/wiki/skill lookups",
+      "Only investigate lifecycle infrastructure when the diff changes initialization",
+      "concrete evidence shows",
+      "pass source paths/links in `contextDocuments`",
+      "generated manifest entry alone neither triggers the investigation nor establishes a merge blocker",
       "tools/ado-pr-show.mjs",
       "tools/cached-fetch.mjs",
       "verifies the exact PR head",
@@ -985,6 +1007,13 @@ const checks = [
   {
     file: "copilot/agents/reviewer.agent.md",
     snippets: [
+      "Ordinary named ECS flight additions or migrations use the same call-level review as numeric",
+      "audit registration or initialization, or require pipeline/wiki/skill lookups",
+      "Only investigate lifecycle infrastructure when the diff changes initialization",
+      "concrete evidence shows",
+      '"ECS client-flight lifecycle and generated registration" section of `common-review-issues.md`',
+      "neither triggers the investigation nor establishes a merge blocker",
+      "Missing guidance is an evidence gap, not an invented policy",
       "Pass 1: immutable scope and risk",
       "Pass 2: adversarial verification",
       "at least one falsifiable failure hypothesis",

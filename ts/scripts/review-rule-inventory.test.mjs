@@ -38,6 +38,26 @@ assert.ok(
   "the general registry must not mix in graduation-only policy",
 );
 
+const ecsLifecycleRuleIds = [
+  "ecs.review-scope",
+  "ecs.current-guidance",
+  "ecs.initialization-owner",
+  "ecs.registration-automation",
+  "ecs.merge-versus-activation",
+];
+const commonIssuesRules = extractRules(
+  fs.readFileSync(path.join(repoRoot, "skills/ow-review/references/common-review-issues.md"), "utf8"),
+  "common-review-issues",
+  "skills/ow-review/references/common-review-issues.md",
+);
+for (const id of ecsLifecycleRuleIds) {
+  assert.equal(
+    commonIssuesRules.filter((rule) => rule.id === id).length,
+    1,
+    `the canonical inventory must include the ECS lifecycle rule ${id} exactly once`,
+  );
+}
+
 const source = `
 # Accessibility
 

@@ -116,6 +116,54 @@ returns the same two cases plus `!isNewKindKSActivated() && kind === NewKind`. F
 into the helper: KS activated produces the exact old result, while KS not activated adds only
 `NewKind`. The helper executing in both states is not itself a rollout defect.
 
+### ECS client-flight lifecycle and generated registration
+
+<!-- review-rule: ecs.review-scope -->
+Ordinary named ECS flight additions or migrations use the same call-level review as numeric
+flights: verify the supported API, name provenance, call site and timing, enabled/disabled
+direction, and fallback. Do not require extra manifest scans, host initialization traces, or
+pipeline/wiki/skill lookups solely because a consumer adds or changes an ECS flight call.
+
+**Investigation trigger:** the diff changes host/SDK initialization, registration or manifest
+generation, flight evaluators/plumbing, or activation infrastructure; or concrete evidence shows
+a flight not taking effect or a startup failure relevant to the changed path. An absent generated
+entry alone does not trigger this investigation. Apply the checks below only when triggered.
+
+<!-- review-rule: ecs.current-guidance -->
+For a triggered investigation, read the applicable current creation/migration guide,
+repository-owned skill, and registration automation before recommending registration changes.
+Discover guidance through the
+advertised capabilities, supplied context, or a bounded repository search; do not invent a skill
+or assume it is available. A debug-toggle skill explains overrides, not necessarily registration.
+If a guide is unavailable or conflicts with current automation, record the gap or conflict and
+resolve the applicable workflow from authoritative evidence rather than silently treating an old
+example as policy.
+
+<!-- review-rule: ecs.initialization-owner -->
+Separate runtime initialization from flight-name registration. Trace the host/application startup,
+lazy initialization, and evaluator used by the consumer. When the host already initializes the
+shared evaluator, do not require each consumer to initialize it again. Registration supplies the
+name-to-index mapping; supplying runtime flight values does not by itself add that mapping.
+Distinguish a missing mapping from missing initialization, and inspect override and fallback
+behavior before claiming that every query returns false.
+
+<!-- review-rule: ecs.registration-automation -->
+Establish who owns the manifest and how new names reach it: manual registration or generated
+updates, the actual trigger and eligibility conditions, automatic PR integration, and deployment.
+When automation owns registration, do not ask the consumer PR to hand-assign an index or edit the
+generated manifest. Do not claim that a consumer check-in triggers registration unless the
+pipeline proves that dependency; scheduled collection from a configuration service is different.
+
+<!-- review-rule: ecs.merge-versus-activation -->
+Distinguish code-merge requirements from rollout-activation prerequisites. A name absent from the
+reviewed HEAD is not by itself a merge blocker when the supported workflow integrates generated
+registration separately and the unregistered path has a safe disabled fallback. Record the
+registration and deployment prerequisites before activation instead. Raise a blocking finding
+only with evidence of a violated merge contract, a build/runtime failure, an unsafe fallback, or
+an activation/deployment order that can expose incorrect behavior. Do not remove either live
+branch, bypass registration with a default-on value, or treat debug overrides as proof that
+production registration is ready.
+
 ## React lifecycle, state, and memoization
 
 **Trigger:** changed hooks, render-time work, transient UI editing state, context/theme
